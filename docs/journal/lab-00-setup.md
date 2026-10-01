@@ -45,7 +45,7 @@ Status: complete.
 
 ### 00C — Reference workshop
 
-Status: not started.
+Status: in progress.
 
 ## Concepts learned
 
@@ -174,3 +174,38 @@ requires it.
 
 No blocking environment issue was identified for beginning the Deep Agents
 workshop.
+
+## Results — 00C Reference workshop
+
+The official Interrupt 2026 Deep Agents workshop was cloned as an external,
+ignored reference.
+
+Reference:
+
+- repository: `langchain-samples/interrupt26-deepagents`;
+- branch: `main`;
+- commit: `3d3287cf1e51250934c11aff182d90ccfaf0e66d`;
+- short commit: `3d3287c`;
+- upstream commit date: 2026-05-14;
+- local path: `.reference/interrupt26-deepagents`.
+
+The upstream working tree was clean immediately after cloning.
+
+No workshop dependencies had been installed at this checkpoint.
+
+### Initial structural hypothesis
+
+Before reading the implementation, the repository structure suggested:
+
+- `deep_agent.ipynb`: incremental workshop material;
+- `agent/agent.py`: standalone agent implementation;
+- `langgraph.json`: LangGraph runtime configuration;
+- `pyproject.toml`: Python project and dependency definition;
+- `uv.lock`: reproducible dependency lock;
+- `.env.example`: external configuration requirements;
+- `env_utils.py`: environment helpers or validation;
+- `utils/models.py`: model-related helpers;
+- `agent/AGENTS.md`: agent instructions or persistent context;
+- `agent/skills/`: reusable agent skills.
+
+These were hypotheses to be confirmed by source inspection.
