@@ -58,3 +58,54 @@ To be completed during the laboratory.
 - What is the difference between an Agent, Thread and Run?
 - What should be standardized by Agent Protocol?
 - What should be standardized by AG-UI?
+
+## Results — 00A
+
+The initial learning repository was created successfully.
+
+Initial commit:
+
+- type: root commit;
+- message: `docs: initialize modern agentic systems learning lab`.
+
+The commit contains the initial documentation structure:
+
+- README;
+- learning roadmap;
+- technology radar;
+- architecture decision records;
+- laboratory journal;
+- external reference registry.
+
+## Concepts learned — 00A
+
+### Working tree
+
+The files currently present in the local filesystem.
+
+### Staging area / index
+
+The exact versions of files prepared for the next commit.
+
+`git add` updates the staging area. It does not create a commit.
+
+### Commit
+
+A persistent Git object representing a repository snapshot plus metadata such as:
+
+- tree;
+- parent commit, when one exists;
+- author;
+- committer;
+- commit message.
+
+The first commit has no parent and is therefore a root commit.
+
+### HEAD
+
+A reference to the currently checked-out commit through the active branch.
+
+### Working tree clean
+
+At the end of the checkpoint, the working tree matches the snapshot referenced
+by HEAD and contains no uncommitted changes.
