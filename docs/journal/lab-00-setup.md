@@ -296,3 +296,65 @@ the underlying model provider can be replaced.
 - How are Tavily tools exposed to the model?
 - What is loaded from `AGENTS.md`?
 - How are skills discovered and loaded?
+
+## Findings — 00C Standalone agent implementation
+
+Inspection of `env_utils.py`, `utils/models.py`, `agent/agent.py` and
+`AGENTS.md` clarified the framework boundaries.
+
+### LangChain
+
+Observed directly through:
+
+- `init_chat_model` for model-provider abstraction;
+- `@tool` for exposing the Tavily search function as an agent tool.
+
+### Deep Agents
+
+`create_deep_agent` is the application-level composition point.
+
+The standalone agent supplies:
+
+- a model;
+- an application tool;
+- a system prompt;
+- persistent instructions;
+- skills;
+- a backend.
+
+Deep Agents supplies the higher-level harness around these components.
+
+### LangGraph
+
+The application does not manually construct a `StateGraph`.
+
+LangGraph acts primarily as the underlying runtime and persistence layer and is
+also the runtime contract used by `langgraph.json`.
+
+### Backend routing
+
+A `CompositeBackend` maps normal filesystem paths to a `FilesystemBackend` and
+`/memories/*` to a `StoreBackend`.
+
+This provides a unified filesystem-like interface over different persistence
+mechanisms.
+
+### Context engineering
+
+The workshop demonstrates two different context-loading strategies:
+
+- `AGENTS.md`: always loaded;
+- `SKILL.md`: loaded on demand through progressive disclosure.
+
+### Security note
+
+Filesystem path virtualization is not equivalent to operating-system process
+isolation or a security sandbox.
+
+### Additional observation
+
+The standalone agent imports `MemorySaver` and `InMemoryStore`, but the inspected
+file does not use them directly.
+
+The standalone agent imports only the main `model`; the separate
+`sub_agent_model` is intended for the notebook's explicit subagent example.
