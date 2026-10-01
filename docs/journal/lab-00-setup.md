@@ -45,7 +45,7 @@ Status: complete.
 
 ### 00C — Reference workshop
 
-Status: in progress.
+Status: complete.
 
 ## Concepts learned
 
@@ -358,3 +358,91 @@ file does not use them directly.
 
 The standalone agent imports only the main `model`; the separate
 `sub_agent_model` is intended for the notebook's explicit subagent example.
+
+## Findings — 00C Lockfile, skills and notebook structure
+
+### Manifest versus lockfile
+
+`pyproject.toml` defines acceptable dependency constraints.
+
+`uv.lock` records a concrete dependency resolution.
+
+For example:
+
+~~~text
+pyproject.toml
+deepagents >= 0.5.3
+
+uv.lock
+deepagents == 0.5.3
+~~~
+
+The inspected lockfile includes:
+
+- deepagents 0.5.3;
+- langchain 1.2.15;
+- langchain-core 1.3.3;
+- langgraph 1.1.9;
+- langgraph-cli 0.4.24;
+- langgraph-sdk 0.3.13;
+- tavily 1.1.0.
+
+A package appearing in the lockfile does not necessarily mean that it will be
+installed in the default environment or used by the application at runtime.
+
+The lockfile also contains packages associated with optional extras.
+
+### LangChain Protocol observation
+
+The lockfile contains `langchain-protocol 0.0.12`.
+
+At this stage this only establishes that the package participates in the locked
+dependency resolution.
+
+We have not yet established:
+
+- whether it is installed in the default environment;
+- which dependency requires it;
+- whether the workshop application uses it directly.
+
+This will be investigated after environment synchronization.
+
+### Skills and progressive disclosure
+
+The inspected LinkedIn skill contains compact discovery metadata:
+
+- name;
+- description.
+
+The remainder of `SKILL.md` contains the detailed instructions.
+
+This structure is consistent with progressive disclosure:
+
+~~~text
+skill metadata
+      |
+      v
+capability discovery
+      |
+      | only when relevant
+      v
+full SKILL.md instructions
+~~~
+
+The exact Deep Agents implementation mechanism has not yet been inspected.
+
+### Notebook learning sequence
+
+The workshop notebook is organized as:
+
+1. Setup;
+2. First Deep Agent / harness;
+3. Custom tools;
+4. Backends;
+5. Research subagent;
+6. Human-in-the-loop;
+7. Long-term memory;
+8. AGENTS.md and Skills;
+9. Wrap-up and next steps.
+
+This sequence will be used as the basis for the Phase 0 guided laboratory.
