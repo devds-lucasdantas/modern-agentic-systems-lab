@@ -605,3 +605,68 @@ This illustrates an important principle:
 
 A diagnostic utility is evidence about the system, not an authoritative
 substitute for understanding application configuration.
+
+## Findings — 00E Environment configuration
+
+### Shell portability issue
+
+The initial secret-input command used Bash-style `read -p` semantics.
+
+The interactive shell was Zsh, where `read -p` refers to a coprocess.
+
+As a result, the input command failed and empty environment-variable values
+were written to `.env`.
+
+The configuration procedure should use a shell-independent mechanism such as
+Python `getpass` before the first live model execution.
+
+### Environment diagnostic false positive
+
+The workshop diagnostic displayed empty API key values as:
+
+~~~text
+****
+~~~
+
+This occurred because an empty string was considered an existing environment
+variable and the masking function rendered short API-key values with the
+`****` prefix.
+
+Therefore:
+
+~~~text
+variable exists
+!=
+variable contains a valid credential
+~~~
+
+Independent validation must explicitly check that secret values are non-empty.
+
+### Configuration principle
+
+Runtime configuration should be validated independently from package/runtime
+health.
+
+The environment is considered ready only when:
+
+- dependencies are valid;
+- Python runtime is valid;
+- required configuration exists;
+- required secret values are non-empty.
+
+### Current continuation point
+
+The next experiment is `0.3 Minimal Deep Agent`.
+
+Before the first model call:
+
+1. recreate `.reference/interrupt26-deepagents/.venv` with `uv sync --locked`;
+2. create `.env` using non-empty OpenAI and Tavily credentials;
+3. validate secret presence without printing the values;
+4. inspect the `create_deep_agent` signature and default backend behavior;
+5. predict the expected tool calls and state changes;
+6. execute the Part 1 minimal agent experiment.
+
+The Part 1 workshop prompt writes `notes.md` into the default virtual filesystem
+and reads it back, allowing us to observe the built-in Deep Agents harness before
+adding custom tools.
