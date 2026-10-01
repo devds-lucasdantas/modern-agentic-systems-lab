@@ -209,3 +209,90 @@ Before reading the implementation, the repository structure suggested:
 - `agent/skills/`: reusable agent skills.
 
 These were hypotheses to be confirmed by source inspection.
+
+## Findings — 00C Project contract
+
+Inspection of the workshop metadata confirmed several initial hypotheses.
+
+### Python project
+
+The workshop requires:
+
+- Python `>=3.11,<3.14`;
+- Deep Agents as a direct dependency;
+- LangChain as a direct dependency;
+- LangGraph CLI with the in-memory runtime;
+- OpenAI and Anthropic LangChain integrations;
+- Tavily for web search.
+
+The local Python 3.12 environment satisfies the workshop requirement.
+
+### LangGraph registration
+
+`langgraph.json` registers the graph:
+
+~~~text
+deep_agent
+    |
+    v
+./agent/agent.py:deep_agent
+~~~
+
+This establishes an explicit contract between the LangGraph runtime and a
+Python object exported by `agent/agent.py`.
+
+The same configuration tells the runtime to:
+
+- load the current Python project as a dependency;
+- load environment configuration from `.env`.
+
+### Notebook versus standalone agent
+
+The repository provides two distinct learning/execution paths:
+
+~~~text
+deep_agent.ipynb
+    |
+    v
+incremental learning
+
+agent/agent.py
+    |
+    v
+standalone agent
+    |
+    v
+langgraph.json
+    |
+    v
+LangGraph runtime / Studio
+~~~
+
+### External services
+
+The default workshop configuration expects:
+
+- OpenAI as the default model provider;
+- Tavily for web search;
+- LangSmith optionally for tracing and experiment tracking.
+
+Alternative model providers are prepared through optional dependencies and
+configuration.
+
+### Important distinction
+
+A Deep Agent is not itself a language model.
+
+The agent composes model capabilities, tools, state and agent behaviors while
+the underlying model provider can be replaced.
+
+## Open questions after project metadata inspection
+
+- How is `deep_agent` constructed inside `agent/agent.py`?
+- Where exactly does LangChain appear in that construction?
+- Does application code directly use LangGraph primitives, or is LangGraph
+  mostly provided underneath Deep Agents?
+- How are the main model and subagent model selected?
+- How are Tavily tools exposed to the model?
+- What is loaded from `AGENTS.md`?
+- How are skills discovered and loaded?
