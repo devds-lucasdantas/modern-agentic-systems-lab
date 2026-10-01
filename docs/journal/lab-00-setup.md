@@ -551,3 +551,57 @@ not installed in the default environment.
 
 This corrected the earlier assumption that all non-default provider packages
 would only be present when explicitly enabling workshop extras.
+
+## Findings — 00D Runtime validation
+
+The synchronized environment passed the workshop diagnostics.
+
+### Python selection
+
+No `.python-version`, `uv.toml` or relevant `UV_*` override was present.
+
+uv selected its managed CPython 3.11.14 installation, which satisfies the
+project requirement `>=3.11,<3.14`.
+
+The workshop virtual environment is active and isolated from the system Python.
+
+### Installed package metadata
+
+Installed package metadata confirms:
+
+- Deep Agents directly requires LangChain;
+- Deep Agents directly requires LangChain Core;
+- Deep Agents directly requires LangChain Anthropic;
+- Deep Agents directly requires LangChain Google GenAI;
+- LangChain requires LangGraph;
+- LangChain Core requires `langchain-protocol`.
+
+This confirms the framework dependency relationship using installed package
+metadata rather than only the lockfile.
+
+### Environment diagnostic
+
+`env_utils.py` successfully validated:
+
+- Python version;
+- virtual environment;
+- uv availability;
+- required package versions.
+
+No package or Python incompatibility was detected.
+
+The diagnostic reported missing external configuration rather than runtime
+problems.
+
+### Diagnostic limitation observed
+
+The environment helper marked `TAVILY_API_KEY` as required but did not mark
+`OPENAI_API_KEY` as required.
+
+The default workshop model nevertheless uses OpenAI, so a valid OpenAI API key
+is required for the default agent execution.
+
+This illustrates an important principle:
+
+A diagnostic utility is evidence about the system, not an authoritative
+substitute for understanding application configuration.
