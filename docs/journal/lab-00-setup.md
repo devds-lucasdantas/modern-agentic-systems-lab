@@ -446,3 +446,108 @@ The workshop notebook is organized as:
 9. Wrap-up and next steps.
 
 This sequence will be used as the basis for the Phase 0 guided laboratory.
+
+## Results — 00D Environment synchronization
+
+The workshop environment was synchronized with:
+
+`uv sync --locked`
+
+The existing lockfile was used without modification.
+
+### Virtual environment
+
+uv created:
+
+`.reference/interrupt26-deepagents/.venv`
+
+The environment uses:
+
+- CPython 3.11.14;
+- a uv-managed base Python installation;
+- an isolated project virtual environment.
+
+The system Python remains separate.
+
+~~~text
+WSL
+|
++-- system Python 3.12.3
+|
++-- uv-managed CPython 3.11.14
+      |
+      +-- workshop .venv
+~~~
+
+### Locked versus installed dependencies
+
+The lockfile resolution contained 189 packages while the default synchronized
+environment installed 175 packages.
+
+This demonstrates an important distinction:
+
+~~~text
+locked
+!=
+installed
+!=
+imported
+!=
+used at runtime
+~~~
+
+For example, `langchain-aws` exists in the locked dependency graph through the
+optional Bedrock extra but was not installed in the default environment.
+
+### Installed framework versions
+
+The synchronized environment contains:
+
+- deepagents 0.5.3;
+- langchain 1.2.15;
+- langchain-core 1.3.3;
+- langchain-protocol 0.0.12;
+- langgraph 1.1.9;
+- langgraph-cli 0.4.24;
+- langgraph-sdk 0.3.13;
+- tavily 1.1.0.
+
+### Dependency relationship
+
+The installed/locked graph confirms that Deep Agents depends on LangChain and
+that LangChain depends on LangGraph.
+
+~~~text
+Deep Agents
+    |
+    v
+LangChain
+    |
+    v
+LangGraph
+~~~
+
+This dependency relationship supports the framework layering observed earlier,
+while not implying that every runtime call follows a strictly linear path.
+
+### LangChain Protocol
+
+`langchain-protocol 0.0.12` is installed as a transitive dependency of
+`langchain-core`.
+
+The workshop application does not explicitly import it in the source inspected
+so far.
+
+Its relationship with the broader Agent Protocol concepts will be studied
+separately later in the learning path.
+
+### Provider dependencies
+
+`langchain-google-genai` is installed in the default environment and appears in
+the Deep Agents dependency tree.
+
+`langchain-aws` is present in the lockfile for the optional Bedrock extra but is
+not installed in the default environment.
+
+This corrected the earlier assumption that all non-default provider packages
+would only be present when explicitly enabling workshop extras.
