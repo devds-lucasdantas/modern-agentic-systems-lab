@@ -2,7 +2,7 @@
 
 ## Phase 0 — Deep Agents
 
-- [ ] 0.1 Repository and environment setup
+- [x] 0.1 Repository and environment setup
 - [ ] 0.2 Explore the Interrupt 2026 workshop
 - [ ] 0.3 Minimal Deep Agent
 - [ ] 0.4 Planning and filesystem

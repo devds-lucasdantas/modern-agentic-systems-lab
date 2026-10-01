@@ -41,7 +41,7 @@ Status: complete.
 
 ### 00B — Environment preflight
 
-Status: not started.
+Status: complete.
 
 ### 00C — Reference workshop
 
@@ -109,3 +109,68 @@ A reference to the currently checked-out commit through the active branch.
 
 At the end of the checkpoint, the working tree matches the snapshot referenced
 by HEAD and contains no uncommitted changes.
+
+## Results — 00B Environment preflight
+
+The execution environment was inspected before installing any agent framework.
+
+### Operating system
+
+- Ubuntu 24.04.5 LTS;
+- WSL2;
+- kernel: `6.18.33.2-microsoft-standard-WSL2`.
+
+### Compute visible inside WSL
+
+- logical CPUs: 24;
+- cores reported by Linux: 12;
+- threads per core: 2;
+- memory: 47 GiB;
+- swap: 16 GiB.
+
+### Development tools
+
+- Git: 2.43.0;
+- Python: 3.12.3;
+- uv: 0.12.19;
+- Node.js: 24.15.0;
+- pnpm: 10.6.2;
+- Docker CLI: 29.8.1.
+
+### Storage
+
+Approximately 607 GiB were available in the WSL filesystem during the preflight.
+
+### Repository state
+
+The learning repository was clean before starting the environment inspection.
+
+## Concepts learned — 00B
+
+### Runtime environment
+
+The agent frameworks execute on top of a normal Python runtime and Linux
+environment.
+
+A useful debugging model distinguishes failures between:
+
+1. operating environment;
+2. Python runtime;
+3. package/dependency resolution;
+4. agent framework;
+5. model provider;
+6. tools and external services.
+
+### Docker CLI versus Docker runtime
+
+The presence of the Docker command only confirms that the client is installed.
+It does not by itself prove that a Docker daemon is available or that containers
+can be executed successfully.
+
+Docker functionality will be validated later when sandboxing or deployment
+requires it.
+
+## Environment conclusion
+
+No blocking environment issue was identified for beginning the Deep Agents
+workshop.
