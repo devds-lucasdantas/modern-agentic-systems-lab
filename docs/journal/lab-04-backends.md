@@ -646,3 +646,110 @@ CompositeBackend behaves conceptually like a virtual mount table:
 
 Multiple physical storage implementations can therefore appear to the agent as
 one coherent filesystem namespace.
+
+## 0.6D2 — Store Provisioning in create_deep_agent
+
+### Objective
+
+Determine whether `create_deep_agent` automatically provisions a LangGraph
+Store or Checkpointer when a backend contains `StoreBackend`.
+
+### create_deep_agent contract
+
+The inspected signature exposes independent optional parameters:
+
+~~~text
+checkpointer = None
+store        = None
+~~~
+
+Its documentation explicitly states that `store` is required when the backend
+uses `StoreBackend`.
+
+The function does not implicitly create either dependency.
+
+Instead, it passes both parameters directly to LangChain's `create_agent`:
+
+~~~python
+return create_agent(
+    ...
+    checkpointer=checkpointer,
+    store=store,
+    ...
+)
+~~~
+
+### Workshop configuration
+
+The workshop creates:
+
+~~~text
+CompositeBackend
+└── /memories/ -> StoreBackend()
+~~~
+
+but calls `create_deep_agent` without either:
+
+~~~text
+store=
+checkpointer=
+~~~
+
+### Compiled graph
+
+Runtime introspection of the workshop's compiled graph showed:
+
+~~~text
+store:        None
+checkpointer: None
+~~~
+
+The compiled graph therefore has no configured BaseStore and no configured
+checkpointer.
+
+### Unused imports
+
+The workshop imports:
+
+~~~text
+InMemoryStore
+MemorySaver
+~~~
+
+but neither is connected to the compiled agent in the inspected assembly.
+
+### Architectural distinction
+
+~~~text
+Store
+    -> application/cross-thread data
+    -> consumed by StoreBackend via get_store()
+
+Checkpointer
+    -> graph execution state
+    -> thread checkpoints and recovery
+~~~
+
+They are independent mechanisms.
+
+A checkpointer does not satisfy StoreBackend's requirement for a BaseStore.
+
+### Current hypothesis
+
+The workshop's `/memories/` route is structurally configured but likely not
+operational because:
+
+~~~text
+StoreBackend()
+     |
+     v
+get_store()
+     |
+     v
+compiled graph store
+     |
+     v
+None
+~~~
+
+This will be validated by an execution experiment before modifying the sample.
