@@ -472,3 +472,177 @@ backend lifetime semantics
 StateBackend lifetime follows graph-state persistence.
 
 FilesystemBackend lifetime follows the external filesystem.
+
+## 0.6C — CompositeBackend Routing
+
+### Objective
+
+Validate whether `CompositeBackend` presents a single virtual filesystem
+namespace while routing different path prefixes to independent storage
+backends.
+
+Two physical FilesystemBackends were used to isolate routing behavior without
+introducing LangGraph Store semantics yet.
+
+### Configuration
+
+The experiment used:
+
+~~~text
+CompositeBackend
+├── default
+│   └── FilesystemBackend
+│       root: /tmp/deepagents-composite-lab/default
+│
+└── /memories/
+    └── FilesystemBackend
+        root: /tmp/deepagents-composite-lab/memories
+~~~
+
+### Default routing
+
+Writing:
+
+~~~text
+/ordinary.txt
+~~~
+
+produced the physical file:
+
+~~~text
+/tmp/deepagents-composite-lab/default/ordinary.txt
+~~~
+
+### Routed path
+
+Writing:
+
+~~~text
+/memories/profile.txt
+~~~
+
+produced:
+
+~~~text
+/tmp/deepagents-composite-lab/memories/profile.txt
+~~~
+
+It did not produce:
+
+~~~text
+/tmp/deepagents-composite-lab/default/memories/profile.txt
+~~~
+
+or:
+
+~~~text
+/tmp/deepagents-composite-lab/memories/memories/profile.txt
+~~~
+
+This demonstrates that the route prefix is removed before delegation.
+
+Conceptually:
+
+~~~text
+/memories/profile.txt
+        |
+        | route /memories/
+        v
+/profile.txt
+        |
+        v
+routed backend
+~~~
+
+### Path remapping
+
+Although the routed backend operates on the stripped path:
+
+~~~text
+/profile.txt
+~~~
+
+the CompositeBackend exposes it again as:
+
+~~~text
+/memories/profile.txt
+~~~
+
+Results are therefore remapped back into the composite virtual namespace.
+
+### Root listing
+
+Listing:
+
+~~~text
+/
+~~~
+
+returned:
+
+~~~text
+/memories/
+/ordinary.txt
+~~~
+
+The `/memories/` directory is a logical route exposed by CompositeBackend. It
+does not need to physically exist inside the default backend.
+
+### Routed listing
+
+Listing:
+
+~~~text
+/memories/
+~~~
+
+returned:
+
+~~~text
+/memories/profile.txt
+~~~
+
+even though the routed backend itself stores the file under its local root as:
+
+~~~text
+/profile.txt
+~~~
+
+### Cross-backend glob
+
+Running a glob from the composite root returned:
+
+~~~text
+/memories/profile.txt
+/ordinary.txt
+~~~
+
+The files physically lived in separate backend roots.
+
+This demonstrates that some global filesystem operations fan out across
+multiple backends and merge results into the virtual namespace.
+
+### Assertions
+
+All routing assertions passed:
+
+~~~text
+ordinary file stored in default backend          PASS
+ordinary content correct                         PASS
+routed file not stored below default root        PASS
+route prefix stripped before delegation          PASS
+route prefix not duplicated                      PASS
+routed content correct                           PASS
+~~~
+
+### Main lesson
+
+CompositeBackend behaves conceptually like a virtual mount table:
+
+~~~text
+/             -> default backend
+/memories/    -> routed backend
+~~~
+
+Multiple physical storage implementations can therefore appear to the agent as
+one coherent filesystem namespace.
