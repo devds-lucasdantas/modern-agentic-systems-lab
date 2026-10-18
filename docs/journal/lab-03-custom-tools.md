@@ -204,3 +204,117 @@ ToolMessage
      v
 final model response
 ~~~
+
+## 0.5B — Autonomous Custom Tool Selection
+
+### Objective
+
+Determine whether the model can select an application-defined tool based only
+on the user's intent and the tool contract, without the user explicitly
+requesting a tool call.
+
+### Setup
+
+The custom tool was:
+
+~~~text
+calculate_short_code_capacity
+~~~
+
+Its description stated that it calculates the exact capacity of a fixed-length
+code space where every position uses the same alphabet.
+
+The user prompt did not:
+
+- mention the tool name;
+- instruct the model to use a tool;
+- prohibit direct calculation.
+
+The task asked for the exact capacity of identifiers with:
+
+~~~text
+alphabet size: 73
+code length:   11
+~~~
+
+### Result
+
+The model autonomously emitted:
+
+~~~text
+calculate_short_code_capacity(
+    alphabet_size=73,
+    code_length=11
+)
+~~~
+
+The Python tool returned:
+
+~~~text
+313726685568359708377
+~~~
+
+The model then reported the result to the user.
+
+Observed tool sequence:
+
+~~~text
+calculate_short_code_capacity
+~~~
+
+No planning, filesystem, shell or subagent tools were called.
+
+### Finding
+
+The experiment demonstrates autonomous tool selection based on:
+
+~~~text
+user intent
+     +
+tool name
+     +
+tool description
+     +
+argument schema
+     |
+     v
+model tool selection
+~~~
+
+This is distinct from experiment 0.5A, where the user explicitly requested use
+of the custom tool.
+
+### Tool availability versus tool selection
+
+Registering a tool does not force the model to use it.
+
+In this experiment, the model decided that the custom tool matched the task and
+selected it without explicit instruction.
+
+Tool design therefore affects agent behavior. Names, descriptions and schemas
+are part of the interface presented to the model, not merely developer
+documentation.
+
+### State
+
+The final result contained only:
+
+~~~text
+messages
+~~~
+
+The custom calculation tool returned an observation through a `ToolMessage`
+without mutating graph state.
+
+### Conclusion
+
+The custom tool path is now validated in both modes:
+
+~~~text
+explicit invocation
+        +
+autonomous selection
+~~~
+
+The next experiment will investigate whether the StructuredTool argument schema
+is merely descriptive or is actually enforced by the runtime.
