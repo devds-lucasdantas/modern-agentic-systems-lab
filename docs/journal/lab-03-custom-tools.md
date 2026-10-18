@@ -455,3 +455,172 @@ The experiment invoked the `StructuredTool` directly.
 It proves schema enforcement by the tool itself, but does not yet establish how
 LangGraph's `ToolNode` represents or handles a validation failure originating
 from an LLM-generated tool call.
+
+## 0.5E — Isolated Tavily API Validation
+
+### Objective
+
+Validate the external Tavily dependency independently of OpenAI, Deep Agents
+and the LangGraph agent loop.
+
+The tested path was:
+
+~~~text
+.env
+ |
+ v
+TAVILY_API_KEY
+ |
+ v
+TavilyClient 1.1.0
+ |
+ v
+Tavily Search API
+ |
+ v
+Python response dictionary
+~~~
+
+### SDK
+
+The installed Python distribution is:
+
+~~~text
+tavily 1.1.0
+~~~
+
+The installed module is also named:
+
+~~~text
+tavily
+~~~
+
+The search method defaults to:
+
+~~~text
+search_depth = "basic"
+max_results  = 5
+~~~
+
+and accepts additional API parameters through `**kwargs`.
+
+### Request
+
+The smoke test explicitly used:
+
+~~~text
+query:        LangGraph durable execution
+search_depth: basic
+topic:        general
+max_results:  3
+~~~
+
+No OpenAI model or Deep Agent was involved.
+
+### Response
+
+The request succeeded and returned a Python dictionary with top-level keys:
+
+~~~text
+answer
+follow_up_questions
+images
+query
+request_id
+response_time
+results
+~~~
+
+Three search results were returned.
+
+Each result contained:
+
+~~~text
+content
+id
+raw_content
+score
+title
+url
+~~~
+
+The response reported approximately:
+
+~~~text
+response_time: 1.16 seconds
+~~~
+
+### Usage metadata
+
+The response did not include a `usage` field.
+
+Therefore the experiment establishes that one real Tavily API request occurred,
+but the exact API-credit accounting cannot be derived from this response alone.
+
+### Workshop context shaping
+
+The workshop wrapper does not expose the complete Tavily response to the
+language model.
+
+For each result it retains only:
+
+~~~text
+title
+url
+content
+~~~
+
+and discards fields such as:
+
+~~~text
+id
+score
+raw_content
+~~~
+
+It also discards response-level metadata such as:
+
+~~~text
+request_id
+response_time
+images
+follow_up_questions
+~~~
+
+This is an explicit context-engineering decision.
+
+### Trust boundary
+
+Unlike the previous deterministic local calculation tool, Tavily introduces
+external untrusted content.
+
+Conceptually:
+
+~~~text
+model
+ |
+ v
+custom tool
+ |
+ v
+remote search service
+ |
+ v
+third-party web content
+ |
+ v
+ToolMessage
+ |
+ v
+model
+~~~
+
+Search retrieval provides relevant information, but does not by itself
+establish source authority or factual correctness.
+
+### Conclusion
+
+The external Tavily layer is operational independently of the agent runtime.
+
+The next step is to validate the workshop's `tavily_search` wrapper itself
+before allowing a Deep Agent to choose and invoke it autonomously.
