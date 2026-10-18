@@ -938,3 +938,167 @@ StoreBackend + InMemoryStore
 the data lifetime is tied to that in-memory Store instance/process.
 
 This is not equivalent to durable persistence across process restarts.
+
+## 0.6E — CompositeBackend Across Disk and BaseStore
+
+### Objective
+
+Validate the architecture intended by the workshop:
+
+~~~text
+CompositeBackend
+├── default -> FilesystemBackend
+└── /memories/ -> StoreBackend
+~~~
+
+while providing the StoreBackend's BaseStore through the LangGraph runtime.
+
+No language model was involved.
+
+### Configuration
+
+The default backend was:
+
+~~~text
+FilesystemBackend
+    root_dir=/tmp/deepagents-real-composite-lab/disk
+    virtual_mode=True
+~~~
+
+The `/memories/` route used:
+
+~~~text
+StoreBackend()
+~~~
+
+without an explicitly injected Store.
+
+The LangGraph graph itself was compiled with:
+
+~~~text
+store=InMemoryStore()
+~~~
+
+This caused StoreBackend to obtain the BaseStore dynamically through the
+LangGraph execution context.
+
+### Ordinary filesystem path
+
+Writing:
+
+~~~text
+/ordinary.txt
+~~~
+
+created the physical file:
+
+~~~text
+/tmp/deepagents-real-composite-lab/disk/ordinary.txt
+~~~
+
+with the expected content.
+
+### Store-backed route
+
+Writing:
+
+~~~text
+/memories/profile.txt
+~~~
+
+did not create:
+
+~~~text
+/tmp/deepagents-real-composite-lab/disk/memories/profile.txt
+~~~
+
+Instead it created a BaseStore item with:
+
+~~~text
+namespace = ("backend-lab",)
+key       = /profile.txt
+~~~
+
+and the expected content.
+
+The `/memories/` route prefix was therefore stripped before delegation to
+StoreBackend.
+
+### Unified reads
+
+Through CompositeBackend, both paths were readable using the same filesystem
+interface:
+
+~~~text
+/ordinary.txt
+    -> physical disk
+
+/memories/profile.txt
+    -> LangGraph BaseStore
+~~~
+
+The caller did not need to know which storage technology held each file.
+
+### Composite root
+
+Listing the virtual root returned:
+
+~~~text
+/memories/
+/ordinary.txt
+~~~
+
+`/memories/` is a logical mount exposed by CompositeBackend rather than a
+physical directory inside the default filesystem backend.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+ordinary file exists physically                      PASS
+ordinary file content correct                        PASS
+memory was not written below disk root               PASS
+memory exists in BaseStore                           PASS
+route prefix stripped for BaseStore key              PASS
+memory content correct                               PASS
+composite can read physical file                     PASS
+composite can read Store file                        PASS
+~~~
+
+### Final backend model
+
+~~~text
+                       virtual namespace
+                              /
+                 ┌────────────┴────────────┐
+                 │                         │
+          ordinary files              /memories/
+                 │                         │
+                 v                         v
+       FilesystemBackend             StoreBackend
+                 │                         │
+                 v                         v
+          OS filesystem                BaseStore
+                                           │
+                                           v
+                                      InMemoryStore
+~~~
+
+### Backend, Store and Checkpointer
+
+These mechanisms serve different purposes:
+
+~~~text
+Backend
+    implements filesystem-like operations
+
+Store / BaseStore
+    holds cross-execution application data
+
+Checkpointer
+    persists graph execution state and thread checkpoints
+~~~
+
+StoreBackend requires a BaseStore. A checkpointer does not substitute for a
+Store.
