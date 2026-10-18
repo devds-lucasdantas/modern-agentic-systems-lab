@@ -1,0 +1,19 @@
+diff --git a/agent/agent.py b/agent/agent.py
+index 2479ca8..18fad40 100644
+--- a/agent/agent.py
++++ b/agent/agent.py
+@@ -67,6 +67,8 @@ def tavily_search(query: str) -> str:
+ # loaded straight from disk via this backend.
+ # Route: /memories/* → StoreBackend for cross-thread persistence.
+ fs_backend = FilesystemBackend(root_dir=str(AGENT_DIR), virtual_mode=True)
++store = InMemoryStore()
++
+ backend = CompositeBackend(
+     default=fs_backend,
+     routes={"/memories/": StoreBackend()},
+@@ -82,4 +84,5 @@ deep_agent = create_deep_agent(
+     memory=["./AGENTS.md"],  # always loaded into the system prompt
+     skills=["./skills/"],  # loaded on demand via progressive disclosure
+     backend=backend,
++    store=store,
+ )
