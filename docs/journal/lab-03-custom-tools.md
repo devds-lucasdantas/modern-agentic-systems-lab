@@ -624,3 +624,154 @@ The external Tavily layer is operational independently of the agent runtime.
 
 The next step is to validate the workshop's `tavily_search` wrapper itself
 before allowing a Deep Agent to choose and invoke it autonomously.
+
+## 0.5F — Deterministic Test of the Tavily Wrapper
+
+### Objective
+
+Validate the workshop's application-defined `tavily_search` wrapper separately
+from the real Tavily network service and separately from the language model.
+
+A fake Tavily client was injected into the already-defined tool.
+
+### Structured tool contract
+
+The workshop wrapper is a LangChain:
+
+~~~text
+StructuredTool
+~~~
+
+named:
+
+~~~text
+tavily_search
+~~~
+
+with the argument schema:
+
+~~~text
+query: string, required
+~~~
+
+Because the tool uses:
+
+~~~python
+@tool(parse_docstring=True)
+~~~
+
+the parameter description from the function docstring is also represented in
+the generated schema.
+
+### Captured SDK call
+
+Invoking the wrapper with:
+
+~~~text
+LangGraph durable execution
+~~~
+
+produced exactly one fake SDK call containing:
+
+~~~text
+query       = "LangGraph durable execution"
+max_results = 3
+topic       = "general"
+~~~
+
+The wrapper does not explicitly pass `search_depth`.
+
+With the inspected Tavily 1.1.0 SDK, the effective search depth therefore comes
+from the SDK default:
+
+~~~text
+search_depth = "basic"
+~~~
+
+### Output shaping
+
+The fake Tavily response included:
+
+~~~text
+id
+title
+url
+content
+raw_content
+score
+request_id
+~~~
+
+The formatted wrapper output retained:
+
+~~~text
+title
+url
+content
+~~~
+
+and discarded:
+
+~~~text
+id
+score
+raw_content
+request_id
+~~~
+
+All deterministic assertions passed.
+
+### Finding
+
+The custom wrapper is not merely an API passthrough.
+
+It implements an explicit context-shaping boundary:
+
+~~~text
+remote API response
+        |
+        v
+application wrapper
+        |
+        +--> retain title
+        +--> retain URL
+        +--> retain content
+        |
+        +--> discard metadata not needed by the model
+        |
+        v
+compact textual tool result
+~~~
+
+### Testing lesson
+
+The Tavily capability has now been validated at two independent layers:
+
+~~~text
+real SDK + real external API      PASS
+wrapper + fake external service   PASS
+~~~
+
+The remaining layer is agent integration:
+
+~~~text
+model
+ |
+ v
+tool selection
+ |
+ v
+ToolNode
+ |
+ v
+tavily_search
+ |
+ v
+real Tavily API
+ |
+ v
+ToolMessage
+ |
+ v
+model synthesis
+~~~
