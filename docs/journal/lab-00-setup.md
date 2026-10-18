@@ -737,3 +737,79 @@ response
 
 The API integration is therefore considered independently validated before
 introducing the Deep Agents harness.
+
+## Findings — Minimal Deep Agent internals
+
+Runtime introspection of `deepagents 0.5.3` confirmed the architecture behind
+`create_deep_agent`.
+
+### Return type
+
+`create_deep_agent(...)` returns a LangGraph:
+
+~~~text
+CompiledStateGraph
+~~~
+
+This establishes that a Deep Agent is ultimately represented as an executable
+LangGraph graph rather than an unrelated agent runtime abstraction.
+
+### Construction path
+
+The inspected implementation eventually delegates to:
+
+~~~text
+LangChain create_agent(...)
+~~~
+
+Therefore the observed composition is:
+
+~~~text
+Deep Agents
+    |
+    | create_deep_agent
+    v
+LangChain
+    |
+    | create_agent
+    v
+LangGraph
+    |
+    v
+CompiledStateGraph
+~~~
+
+### Default backend
+
+When no backend is supplied, Deep Agents 0.5.3 creates:
+
+~~~text
+StateBackend()
+~~~
+
+Therefore the filesystem exposed by the minimal Part 1 agent is expected to be
+stored in graph state rather than written directly to the host filesystem.
+
+### Built-in middleware
+
+The implementation confirms built-in middleware for:
+
+- TODO/planning;
+- filesystem operations;
+- subagent delegation;
+- summarization/context management;
+- tool-call patching.
+
+Additional middleware is conditionally added for:
+
+- skills;
+- memory;
+- filesystem permissions;
+- asynchronous subagents.
+
+### Sandbox distinction
+
+The Deep Agents implementation explicitly distinguishes ordinary backends from
+backends implementing `SandboxBackendProtocol`.
+
+Filesystem capabilities therefore do not imply isolated shell execution.
