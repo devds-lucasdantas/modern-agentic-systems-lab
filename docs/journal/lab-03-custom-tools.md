@@ -318,3 +318,140 @@ autonomous selection
 
 The next experiment will investigate whether the StructuredTool argument schema
 is merely descriptive or is actually enforced by the runtime.
+
+## 0.5C — Structured Tool Schema Enforcement
+
+### Objective
+
+Determine whether a custom tool's argument schema is merely descriptive
+metadata for the model or whether it is also enforced at runtime.
+
+### Schema
+
+The custom tool exposed the following logical argument contract:
+
+~~~text
+alphabet_size: integer, required
+code_length:   integer, required
+~~~
+
+The schema was automatically derived from Python type hints and the tool
+definition through Pydantic.
+
+### Valid arguments
+
+The following input succeeded:
+
+~~~text
+alphabet_size: 62
+code_length:   7
+~~~
+
+and returned:
+
+~~~text
+3521614606208
+~~~
+
+### Type coercion
+
+Numeric strings were also accepted:
+
+~~~text
+alphabet_size: "62"
+code_length:   "7"
+~~~
+
+and were coerced into integers before the Python function executed.
+
+Therefore the default behavior is validation with coercion rather than strict
+Python-type equality.
+
+Conceptually:
+
+~~~text
+"62"
+  |
+  v
+Pydantic validation/coercion
+  |
+  v
+62
+~~~
+
+### Missing required argument
+
+Calling the tool without `code_length` raised a Pydantic:
+
+~~~text
+ValidationError
+~~~
+
+with a `Field required` error.
+
+### Invalid argument type
+
+Supplying:
+
+~~~text
+alphabet_size: "not-an-integer"
+~~~
+
+also raised:
+
+~~~text
+ValidationError
+~~~
+
+because the value could not be parsed into an integer.
+
+### Finding
+
+The custom tool argument schema is not only documentation presented to the
+model.
+
+It is an enforced runtime boundary:
+
+~~~text
+tool invocation
+      |
+      v
+Pydantic args schema
+      |
+      +--> valid/coercible --> Python function
+      |
+      +--> invalid ---------> ValidationError
+~~~
+
+### Comparison with filesystem policy
+
+This contrasts with the previously inspected filesystem rule:
+
+~~~text
+"read before edit"
+~~~
+
+which exists as model-facing tool guidance but is not enforced by
+`StateBackend`.
+
+Therefore:
+
+~~~text
+natural-language tool policy
+        |
+        v
+soft constraint
+
+structured argument schema
+        |
+        v
+runtime validation
+~~~
+
+### Scope of this experiment
+
+The experiment invoked the `StructuredTool` directly.
+
+It proves schema enforcement by the tool itself, but does not yet establish how
+LangGraph's `ToolNode` represents or handles a validation failure originating
+from an LLM-generated tool call.
