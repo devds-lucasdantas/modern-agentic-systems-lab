@@ -775,3 +775,201 @@ ToolMessage
  v
 model synthesis
 ~~~
+
+## 0.5G — Autonomous External Tool Use End-to-End
+
+### Objective
+
+Validate the complete custom-tool path with both a real language model and a
+real external service.
+
+The user requested current information from the official LangGraph
+documentation but did not mention Tavily or instruct the model to call a tool.
+
+### Autonomous tool selection
+
+The model autonomously selected:
+
+~~~text
+tavily_search
+~~~
+
+and generated the search query:
+
+~~~text
+site:langchain-ai.github.io/langgraph LangGraph official documentation capabilities durable execution human-in-the-loop memory
+~~~
+
+The observed tool sequence was:
+
+~~~text
+tavily_search
+~~~
+
+Exactly one Tavily API request was made.
+
+### End-to-end execution
+
+The observed architecture was:
+
+~~~text
+HumanMessage
+     |
+     v
+GPT-6 Luna
+     |
+     | structured tool call
+     v
+LangGraph ToolNode
+     |
+     v
+LangChain StructuredTool
+     |
+     v
+tavily_search wrapper
+     |
+     v
+TavilyClient
+     |
+     v
+Tavily Search API
+     |
+     v
+external web content
+     |
+     v
+ToolMessage
+     |
+     v
+GPT-6 Luna
+     |
+     v
+final sourced response
+~~~
+
+### Query generation
+
+The user did not supply a search query.
+
+The model therefore performed both:
+
+~~~text
+tool selection
+        +
+query formulation
+~~~
+
+autonomously.
+
+This is a more complex decision than the deterministic calculation-tool
+experiment because the model had to recognize that current external
+information was required.
+
+### Search behavior
+
+Only one search was performed.
+
+The agent did not perform query refinement or repeated retrieval because the
+first result set was sufficient for the requested answer.
+
+This demonstrates:
+
+~~~text
+tool availability
+        !=
+repeated tool use
+~~~
+
+### Grounding
+
+The Tavily result contained the official LangGraph overview stating that
+LangGraph highlights capabilities including:
+
+~~~text
+durable execution
+streaming
+human-in-the-loop
+~~~
+
+The final response reported those same three capabilities and linked to the
+retrieved official documentation URL.
+
+### Observability note
+
+The experiment script locally truncated the printed ToolMessage after 5000
+characters for terminal readability.
+
+The original tool result length was approximately:
+
+~~~text
+7202 characters
+~~~
+
+The local display truncation does not demonstrate context truncation inside the
+agent.
+
+Therefore:
+
+~~~text
+observability truncation
+        !=
+agent context truncation
+~~~
+
+### Usage
+
+Observed execution:
+
+~~~text
+model calls:       2
+Tavily calls:      1
+
+input tokens:      12084
+cached input:       5327
+output tokens:       119
+raw total tokens:  12203
+reasoning tokens:      0
+~~~
+
+The second model call incorporated the retrieved external content, increasing
+the context relative to the initial tool-selection call.
+
+### Custom Tool Layering
+
+The complete custom-tool stack demonstrated by this lab is:
+
+~~~text
+application Python function
+        |
+        v
+LangChain StructuredTool
+        |
+        v
+LangGraph ToolNode
+        |
+        v
+Deep Agent autonomous selection
+        |
+        v
+external service
+~~~
+
+### Conclusion
+
+The Custom Tools lab successfully validated:
+
+~~~text
+local deterministic custom tool
+explicit invocation
+autonomous selection
+schema generation
+runtime argument validation
+type coercion
+external API credentials
+real SDK integration
+deterministic wrapper testing with a fake
+context shaping
+autonomous external tool selection
+real web retrieval
+final grounded synthesis
+~~~

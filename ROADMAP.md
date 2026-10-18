@@ -6,7 +6,7 @@
 - [x] 0.2 Explore the Interrupt 2026 workshop
 - [x] 0.3 Minimal Deep Agent
 - [x] 0.4 Planning and filesystem
-- [ ] 0.5 Custom tools
+- [x] 0.5 Custom tools
 - [ ] 0.6 Backends
 - [ ] 0.7 Subagents
 - [ ] 0.8 Human-in-the-loop
