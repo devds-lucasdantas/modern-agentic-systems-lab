@@ -312,3 +312,242 @@ were not naturally required here:
 - `glob`
 - `grep`
 - `edit_file`
+
+## 0.4B — Directed Filesystem Coverage
+
+### Objective
+
+Deliberately exercise filesystem capabilities that were available but not
+naturally required by the autonomous planning experiment.
+
+The targeted capabilities were:
+
+- `glob`
+- `grep`
+- `read_file`
+- `edit_file`
+
+The task continued to prohibit:
+
+- subagent delegation;
+- shell execution.
+
+### Execution
+
+The observed tool sequence was:
+
+~~~text
+ 1. write_todos
+ 2. ls
+ 3. write_file
+ 4. write_file
+ 5. write_file
+ 6. write_todos
+ 7. glob
+ 8. grep
+ 9. write_todos
+10. read_file
+11. edit_file
+12. read_file
+13. grep
+14. glob
+15. write_todos
+~~~
+
+Tool counts:
+
+~~~text
+edit_file     1
+glob          2
+grep          2
+ls            1
+read_file     2
+write_file    3
+write_todos   4
+~~~
+
+### Path discovery versus content search
+
+The agent used:
+
+~~~text
+glob("*.md", path="/workspace")
+~~~
+
+to discover Markdown paths and:
+
+~~~text
+grep(
+    pattern="PLACEHOLDER",
+    path="/workspace",
+    glob="*.md"
+)
+~~~
+
+to locate content inside those files.
+
+The results demonstrate distinct responsibilities:
+
+~~~text
+glob
+  -> path discovery
+
+grep
+  -> content discovery
+~~~
+
+### Read-before-edit policy
+
+After `grep` identified `/workspace/README.md`, the agent first called:
+
+~~~text
+read_file("/workspace/README.md")
+~~~
+
+and only then:
+
+~~~text
+edit_file(
+    file_path="/workspace/README.md",
+    old_string="PLACEHOLDER",
+    new_string="Mappings are stored durably by short code."
+)
+~~~
+
+The edit succeeded.
+
+This demonstrates that the model followed the filesystem tool policy requiring
+a file to be read before editing.
+
+This experiment does not yet prove whether the runtime itself enforces that
+precondition when a model attempts to violate it.
+
+### Post-mutation verification
+
+After editing the file, one model turn requested:
+
+~~~text
+read_file README.md
+grep PLACEHOLDER
+glob *.md
+~~~
+
+The resulting observations independently established that:
+
+1. the new README content was present;
+2. `PLACEHOLDER` no longer existed;
+3. all three required Markdown files still existed.
+
+This demonstrates the pattern:
+
+~~~text
+discover
+   |
+   v
+inspect
+   |
+   v
+mutate
+   |
+   v
+verify desired state
+   |
+   v
+verify absence of old state
+   |
+   v
+verify surrounding structure
+~~~
+
+### StateBackend
+
+The final graph state contained:
+
+~~~text
+/workspace/README.md
+/workspace/api.md
+/workspace/storage.md
+~~~
+
+while none of the corresponding paths existed on the host filesystem.
+
+The experiment therefore reconfirmed the virtual filesystem semantics of
+`StateBackend`.
+
+### Token usage
+
+Observed aggregate usage:
+
+~~~text
+input tokens:       82020
+cached input:       80011
+output tokens:        994
+raw total tokens:   83014
+~~~
+
+Approximately 97.55% of the reported input tokens were cache reads.
+
+The execution used:
+
+~~~text
+13 model calls
+15 tool calls
+~~~
+
+Some model turns emitted multiple tool calls, including:
+
+~~~text
+glob + grep
+~~~
+
+and:
+
+~~~text
+read_file + grep + glob
+~~~
+
+This demonstrates batched tool-call generation within one model turn. The
+experiment does not by itself establish whether the runtime executed those
+calls concurrently.
+
+### Context engineering observation
+
+Filesystem search provides a useful context-reduction strategy:
+
+~~~text
+ls
+ |
+ v
+glob / grep
+ |
+ v
+small candidate set
+ |
+ v
+read_file
+ |
+ v
+edit_file if necessary
+~~~
+
+Searching before reading can reduce irrelevant content entering the model
+context.
+
+### Conclusion
+
+Directed filesystem coverage succeeded.
+
+The experiment validated:
+
+- explicit planning;
+- directory inspection;
+- file creation;
+- path discovery;
+- content search;
+- read-before-edit behavior;
+- exact-string editing;
+- post-edit verification;
+- virtual filesystem state.
+
+The remaining filesystem question is whether the read-before-edit rule is
+merely model guidance or is also enforced at runtime.
