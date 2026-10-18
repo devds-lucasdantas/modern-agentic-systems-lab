@@ -354,3 +354,121 @@ a specific storage technology
 
 The filesystem tool defines an operation. The backend defines its persistence,
 location and isolation semantics.
+
+## 0.6B2 — Backend Lifetime Across Fresh Agents and Processes
+
+### Objective
+
+Compare the lifetime of data stored through `StateBackend` and
+`FilesystemBackend` after the original Python process and agent instance have
+already terminated.
+
+### Existing physical artifact
+
+The previous FilesystemBackend experiment created:
+
+~~~text
+/tmp/deepagents-backend-lab/backend-demo.txt
+~~~
+
+with:
+
+~~~text
+same tool, different backend
+~~~
+
+A new Python process confirmed that the host artifact still existed before
+creating either new agent.
+
+### Fresh StateBackend
+
+A completely new agent using:
+
+~~~text
+StateBackend()
+~~~
+
+called:
+
+~~~text
+read_file("/backend-demo.txt")
+~~~
+
+and received:
+
+~~~text
+Error: File '/backend-demo.txt' not found
+~~~
+
+The new StateBackend did not automatically inherit the virtual `files` state
+created by the earlier graph execution.
+
+### Fresh FilesystemBackend
+
+A completely new agent using:
+
+~~~text
+FilesystemBackend(
+    root_dir="/tmp/deepagents-backend-lab",
+    virtual_mode=True
+)
+~~~
+
+called the same:
+
+~~~text
+read_file("/backend-demo.txt")
+~~~
+
+and successfully read:
+
+~~~text
+same tool, different backend
+~~~
+
+The storage survived both:
+
+~~~text
+a new backend object
+a new agent instance
+a new Python process
+~~~
+
+because the source of truth was the external operating-system filesystem.
+
+### Comparison
+
+All assertions passed:
+
+~~~text
+Host artifact survived previous Python process             PASS
+Fresh StateBackend used read_file                          PASS
+Fresh StateBackend could not see prior virtual state       PASS
+Fresh FilesystemBackend used read_file                     PASS
+Fresh FilesystemBackend saw prior physical file            PASS
+~~~
+
+### Scope
+
+This experiment does not imply that StateBackend state can never persist
+between invocations.
+
+StateBackend participates in LangGraph state semantics, and persisted graph
+state may be resumed when an appropriate checkpoint/thread mechanism is used.
+
+The result established only that a fresh StateBackend does not independently
+discover state from an unrelated previous graph execution.
+
+### Main lesson
+
+~~~text
+storage location
+        +
+persistence mechanism
+        =
+backend lifetime semantics
+~~~
+
+StateBackend lifetime follows graph-state persistence.
+
+FilesystemBackend lifetime follows the external filesystem.
