@@ -5,7 +5,7 @@
 - [x] 0.1 Repository and environment setup
 - [x] 0.2 Explore the Interrupt 2026 workshop
 - [x] 0.3 Minimal Deep Agent
-- [ ] 0.4 Planning and filesystem
+- [x] 0.4 Planning and filesystem
 - [ ] 0.5 Custom tools
 - [ ] 0.6 Backends
 - [ ] 0.7 Subagents

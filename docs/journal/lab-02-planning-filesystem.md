@@ -551,3 +551,106 @@ The experiment validated:
 
 The remaining filesystem question is whether the read-before-edit rule is
 merely model guidance or is also enforced at runtime.
+
+## 0.4C — Soft Tool Policy versus Runtime Enforcement
+
+### Question
+
+The `edit_file` tool description states that a file must be read before it is
+edited and claims that an edit without a prior read will fail.
+
+The experiment investigated whether this rule is:
+
+1. guidance communicated to the model;
+2. a runtime-enforced precondition;
+3. both.
+
+### FilesystemMiddleware inspection
+
+The synchronous `edit_file` wrapper:
+
+1. resolves the configured backend;
+2. validates the path;
+3. directly calls `backend.edit(...)`;
+4. returns the backend result.
+
+It does not track whether `read_file` was previously called.
+
+The asynchronous implementation follows the same pattern.
+
+`FilesystemMiddleware.wrap_tool_call` also does not enforce a prior-read rule.
+Its responsibility here is interception of large tool results for filesystem
+offloading.
+
+### StateBackend inspection
+
+`StateBackend.edit(...)`:
+
+1. reads the current `files` state channel;
+2. finds the requested file;
+3. fails if the file does not exist;
+4. performs the requested exact-string replacement;
+5. queues the updated file into LangGraph state.
+
+It does not inspect or maintain any history of user-visible `read_file` tool
+calls.
+
+`StateBackend.__init__` also contains no state such as:
+
+~~~text
+files_already_read
+read_history
+files_seen
+~~~
+
+### Important distinction
+
+`StateBackend._read_files()` is an internal operation that retrieves the
+LangGraph `files` state channel.
+
+It is not equivalent to the agent calling the public `read_file` tool.
+
+Therefore:
+
+~~~text
+backend._read_files()
+        !=
+agent tool call read_file()
+~~~
+
+### Finding
+
+For the inspected `deepagents 0.5.3` + `StateBackend` implementation:
+
+~~~text
+"read before edit"
+
+tool/model guidance:       YES
+runtime enforcement:       NO
+~~~
+
+The model followed the guidance naturally in experiment 0.4B, but the
+filesystem backend itself does not require evidence of a previous `read_file`
+call.
+
+### Security lesson
+
+A behavioral instruction is not equivalent to an enforced policy.
+
+~~~text
+tool description / prompt
+        |
+        v
+soft policy
+
+middleware / authorization / runtime gate
+        |
+        v
+hard policy
+~~~
+
+Security-sensitive invariants should therefore not rely solely on model
+instructions.
+
+This distinction will be revisited when studying permissions, human-in-the-loop
+approval, sandboxing and tool authorization.
