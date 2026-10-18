@@ -753,3 +753,188 @@ None
 ~~~
 
 This will be validated by an execution experiment before modifying the sample.
+
+## 0.6D3 — StoreBackend Runtime Provisioning
+
+### Objective
+
+Validate how `StoreBackend()` obtains its BaseStore from a LangGraph execution
+context and determine the actual lifetime semantics of `InMemoryStore`.
+
+### Graph without a Store
+
+A minimal LangGraph graph was compiled without:
+
+~~~text
+store=
+~~~
+
+A node called:
+
+~~~python
+StoreBackend().write(...)
+~~~
+
+The operation failed with:
+
+~~~text
+AttributeError:
+'NoneType' object has no attribute 'get'
+~~~
+
+The expected defensive RuntimeError did not occur.
+
+### Why the error occurred
+
+`StoreBackend._get_store()` attempts to obtain the runtime store using:
+
+~~~text
+get_store()
+~~~
+
+and handles RuntimeError or KeyError.
+
+In this graph execution, however, `get_store()` returned:
+
+~~~text
+None
+~~~
+
+rather than raising one of those exceptions.
+
+The returned `None` was then used by `StoreBackend.write()` as if it were a
+BaseStore:
+
+~~~text
+None.get(...)
+~~~
+
+which produced the AttributeError.
+
+For the pinned dependency combination, this demonstrates a defensive edge case:
+
+~~~text
+missing runtime store
+        |
+        v
+get_store() -> None
+        |
+        v
+StoreBackend receives None
+        |
+        v
+later AttributeError
+~~~
+
+The architectural conclusion is unchanged: StoreBackend requires an actual
+BaseStore.
+
+### Graph with InMemoryStore
+
+The same graph was then compiled with:
+
+~~~python
+store = InMemoryStore()
+
+graph = builder.compile(store=store)
+~~~
+
+The exact same `StoreBackend()` successfully wrote:
+
+~~~text
+/profile.txt
+~~~
+
+under namespace:
+
+~~~text
+("backend-lab",)
+~~~
+
+### Stored representation
+
+The resulting BaseStore item contained:
+
+~~~text
+namespace: ("backend-lab",)
+key:       /profile.txt
+~~~
+
+and a value containing:
+
+~~~text
+content
+encoding
+created_at
+modified_at
+~~~
+
+This confirms that StoreBackend represents filesystem files as BaseStore
+namespace/key/value entries.
+
+### Backend lifetime versus Store lifetime
+
+A completely new `StoreBackend` instance given the same InMemoryStore could
+read the previously written file.
+
+Therefore:
+
+~~~text
+StoreBackend object lifetime
+        !=
+stored-data lifetime
+~~~
+
+The BaseStore instance is the source of truth.
+
+### Fresh InMemoryStore
+
+A new InMemoryStore instance with the same:
+
+~~~text
+namespace
+key
+process
+~~~
+
+could not see the previous item.
+
+Therefore:
+
+~~~text
+same namespace
++
+same key
++
+different InMemoryStore
+=
+different storage
+~~~
+
+### Assertions
+
+All storage assertions passed:
+
+~~~text
+configured graph has InMemoryStore               PASS
+graph wrote expected item                        PASS
+stored key correct                               PASS
+stored content correct                           PASS
+fresh backend with same store can read           PASS
+fresh InMemoryStore cannot see old data          PASS
+~~~
+
+### Persistence semantics
+
+`StoreBackend` provides BaseStore-backed cross-execution storage semantics, but
+the actual durability depends on the concrete BaseStore implementation.
+
+For:
+
+~~~text
+StoreBackend + InMemoryStore
+~~~
+
+the data lifetime is tied to that in-memory Store instance/process.
+
+This is not equivalent to durable persistence across process restarts.
