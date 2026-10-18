@@ -670,3 +670,70 @@ Before the first model call:
 The Part 1 workshop prompt writes `notes.md` into the default virtual filesystem
 and reads it back, allowing us to observe the built-in Deep Agents harness before
 adding custom tools.
+
+## Results — OpenAI API smoke test
+
+The OpenAI API integration was validated independently before running a Deep
+Agent.
+
+Configuration:
+
+~~~text
+provider: OpenAI
+model: gpt-6-luna
+reasoning effort: none
+LangSmith tracing: disabled
+~~~
+
+The model was invoked through LangChain and returned the expected response.
+
+Observed response metadata:
+
+~~~text
+input tokens:      14
+output tokens:      4
+total tokens:      18
+reasoning tokens:   0
+cached tokens:      0
+service tier:       default
+finish reason:      stop
+~~~
+
+The response identifier used the `chatcmpl-` prefix, confirming that the
+LangChain integration used the Chat Completions endpoint for this invocation.
+
+### Cost
+
+Using the Standard/default GPT-6 Luna rates at the time of the experiment:
+
+~~~text
+input:
+14 / 1,000,000 * $0.10 = $0.0000014
+
+output:
+4 / 1,000,000 * $0.50 = $0.0000020
+
+total:
+$0.0000034
+~~~
+
+This validates the complete path:
+
+~~~text
+.env
+ |
+ v
+LangChain model abstraction
+ |
+ v
+OpenAI API
+ |
+ v
+GPT-6 Luna
+ |
+ v
+response
+~~~
+
+The API integration is therefore considered independently validated before
+introducing the Deep Agents harness.
