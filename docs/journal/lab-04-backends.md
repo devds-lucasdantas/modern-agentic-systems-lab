@@ -1102,3 +1102,228 @@ Checkpointer
 
 StoreBackend requires a BaseStore. A checkpointer does not substitute for a
 Store.
+
+## 0.6F — Workshop Store Wiring Fix
+
+### Problem
+
+The workshop configured:
+
+~~~text
+/memories/ -> StoreBackend()
+~~~
+
+but the compiled agent had:
+
+~~~text
+store        = None
+checkpointer = None
+~~~
+
+Because StoreBackend obtains an implicit store from the LangGraph runtime,
+the `/memories/` route was not operational.
+
+### Minimal fix
+
+The workshop was patched to create:
+
+~~~python
+store = InMemoryStore()
+~~~
+
+and pass it explicitly to:
+
+~~~python
+create_deep_agent(
+    ...
+    store=store,
+)
+~~~
+
+No checkpointer was added.
+
+This deliberately keeps Store persistence separate from graph checkpointing.
+
+### Compiled graph validation
+
+Runtime introspection confirmed:
+
+~~~text
+declared store: InMemoryStore
+compiled store: InMemoryStore
+same object:    True
+checkpointer:   None
+~~~
+
+The exact store created by the application is therefore propagated through
+`create_deep_agent` and `create_agent` into the compiled LangGraph graph.
+
+### Workshop route validation
+
+The real workshop CompositeBackend was executed inside a LangGraph graph using
+the workshop's configured Store.
+
+Writing and reading:
+
+~~~text
+/memories/backend-lab-validation.txt
+~~~
+
+succeeded.
+
+The corresponding BaseStore item used:
+
+~~~text
+namespace = ("filesystem",)
+key       = /backend-lab-validation.txt
+~~~
+
+demonstrating that CompositeBackend stripped the `/memories/` prefix before
+delegating to StoreBackend.
+
+### Reproducibility
+
+The workshop source modification is preserved as:
+
+~~~text
+patches/interrupt26-store-wiring.patch
+~~~
+
+while the external workshop remains pinned to its upstream commit.
+
+### Why no checkpointer was added
+
+~~~text
+Store
+    -> cross-execution application data
+
+Checkpointer
+    -> graph/thread execution state
+~~~
+
+Only Store was required to repair the `/memories/` route.
+
+Checkpointing is intentionally deferred to the LangGraph Runtime and Studio
+lab.
+
+## 0.6 — Backends Review
+
+The backend experiments established:
+
+~~~text
+filesystem tool
+        !=
+backend
+        !=
+storage mechanism
+~~~
+
+### StateBackend
+
+~~~text
+files
+  -> LangGraph graph state
+~~~
+
+A fresh unrelated StateBackend does not independently recover files from a
+previous execution.
+
+### FilesystemBackend
+
+~~~text
+files
+  -> operating-system filesystem
+~~~
+
+Data survives new agent instances and Python processes according to filesystem
+lifetime.
+
+`virtual_mode=True` provides virtual path semantics and path guardrails, not
+process isolation or a security sandbox.
+
+### StoreBackend
+
+~~~text
+files
+  -> BaseStore namespace/key/value entries
+~~~
+
+StoreBackend is an adapter over BaseStore, not a storage engine itself.
+
+Actual durability depends on the concrete BaseStore implementation.
+
+### InMemoryStore
+
+~~~text
+StoreBackend
+    +
+InMemoryStore
+~~~
+
+supports sharing data through the same Store instance but does not imply
+durability across process restarts.
+
+### CompositeBackend
+
+CompositeBackend exposes multiple storage backends as one virtual namespace:
+
+~~~text
+/
+├── ordinary files -> default backend
+└── /memories/     -> routed StoreBackend
+~~~
+
+Route prefixes are stripped before backend delegation and restored when results
+are returned.
+
+Global operations such as root listings and globs can aggregate multiple
+backends.
+
+### Store versus Checkpointer
+
+~~~text
+Backend
+    implements filesystem-style operations
+
+BaseStore
+    stores application/cross-execution data
+
+Checkpointer
+    persists graph execution state and thread history
+~~~
+
+These are distinct abstractions and must not be treated interchangeably.
+
+### Final architecture
+
+~~~text
+Agent
+ |
+ v
+filesystem tools
+ |
+ v
+FilesystemMiddleware
+ |
+ v
+CompositeBackend
+ |
+ +-- ordinary paths
+ |      |
+ |      v
+ |  FilesystemBackend
+ |      |
+ |      v
+ |  OS filesystem
+ |
+ +-- /memories/*
+        |
+        v
+    StoreBackend
+        |
+        v
+    BaseStore
+        |
+        v
+    InMemoryStore
+~~~

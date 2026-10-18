@@ -7,7 +7,7 @@
 - [x] 0.3 Minimal Deep Agent
 - [x] 0.4 Planning and filesystem
 - [x] 0.5 Custom tools
-- [ ] 0.6 Backends
+- [x] 0.6 Backends
 - [ ] 0.7 Subagents
 - [ ] 0.8 Human-in-the-loop
 - [ ] 0.9 Long-term memory
