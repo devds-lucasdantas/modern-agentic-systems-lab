@@ -173,3 +173,184 @@ storage implementation
 
 The same model-visible operation can have different persistence, isolation and
 security semantics depending on the configured backend.
+
+## 0.6B — Same Tool, Different Backend
+
+### Objective
+
+Isolate the effect of backend selection while keeping all other relevant
+variables constant.
+
+Both experiments used the same:
+
+~~~text
+model
+prompt
+filesystem tool
+virtual path
+content
+~~~
+
+The only changed variable was the backend implementation.
+
+### Common operation
+
+Both agents emitted:
+
+~~~text
+write_file(
+    file_path="/backend-demo.txt",
+    content="same tool, different backend"
+)
+~~~
+
+and both received:
+
+~~~text
+Updated file /backend-demo.txt
+~~~
+
+### StateBackend result
+
+With:
+
+~~~text
+StateBackend
+~~~
+
+the final agent result contained:
+
+~~~text
+files
+messages
+~~~
+
+The virtual file existed at:
+
+~~~text
+/backend-demo.txt
+~~~
+
+inside graph state.
+
+The corresponding host path:
+
+~~~text
+/tmp/deepagents-backend-lab/backend-demo.txt
+~~~
+
+did not exist.
+
+Therefore:
+
+~~~text
+write_file
+   |
+   v
+StateBackend
+   |
+   v
+LangGraph files state
+~~~
+
+### FilesystemBackend result
+
+With:
+
+~~~text
+FilesystemBackend(
+    root_dir="/tmp/deepagents-backend-lab",
+    virtual_mode=True
+)
+~~~
+
+the final result contained only:
+
+~~~text
+messages
+~~~
+
+The virtual path:
+
+~~~text
+/backend-demo.txt
+~~~
+
+resolved to the physical path:
+
+~~~text
+/tmp/deepagents-backend-lab/backend-demo.txt
+~~~
+
+and the file existed on the host with the expected content.
+
+Therefore:
+
+~~~text
+write_file
+   |
+   v
+FilesystemBackend
+   |
+   v
+operating-system filesystem
+~~~
+
+### Comparison
+
+All experiment assertions passed:
+
+~~~text
+StateBackend stored virtual file in state            PASS
+StateBackend content correct                         PASS
+FilesystemBackend did not add files state            PASS
+FilesystemBackend created physical file              PASS
+FilesystemBackend physical content correct           PASS
+~~~
+
+This demonstrates:
+
+~~~text
+same tool call
++
+different backend
+=
+different storage semantics
+~~~
+
+### Graph state versus external side effect
+
+The experiment also reinforces:
+
+~~~text
+StateBackend
+    -> graph-state mutation
+
+FilesystemBackend
+    -> external side effect
+~~~
+
+An external filesystem mutation does not require a corresponding `files` field
+in the agent graph state.
+
+### Tool abstraction
+
+The model-visible result was effectively identical in both cases:
+
+~~~text
+Updated file /backend-demo.txt
+~~~
+
+The backend therefore hides the concrete storage implementation behind a stable
+filesystem-tool interface.
+
+### Main lesson
+
+~~~text
+write_file(path, content)
+        !=
+a specific storage technology
+~~~
+
+The filesystem tool defines an operation. The backend defines its persistence,
+location and isolation semantics.
