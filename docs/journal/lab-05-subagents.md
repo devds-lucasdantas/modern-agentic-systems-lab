@@ -347,3 +347,149 @@ Compiled subagents provide the runnable directly.
 
 After normalization, the task tool invokes both through the same routing and
 return mechanism.
+
+## 0.7A3 — Parent/Child State Boundary
+
+### Excluded state keys
+
+The pinned implementation defines:
+
+~~~text
+messages
+todos
+structured_response
+skills_metadata
+memory_contents
+~~~
+
+as `_EXCLUDED_STATE_KEYS`.
+
+The same exclusion set participates in both directions of synchronous task
+delegation.
+
+### Parent to child
+
+The child state is initially built by copying parent runtime state except for
+the excluded keys.
+
+The child `messages` field is then explicitly replaced with:
+
+~~~text
+[HumanMessage(task_description)]
+~~~
+
+Therefore parent conversation history does not enter the child conversation.
+
+### Child to parent
+
+When the subagent finishes, its result is filtered using the same exclusion
+set before producing the parent state update.
+
+The final child message is separately converted into a ToolMessage.
+
+### Message isolation versus state isolation
+
+The resulting boundary is:
+
+~~~text
+messages             isolated
+todos                isolated
+skills_metadata      isolated
+memory_contents      isolated
+structured_response  not merged as state
+
+other state keys     potentially propagated
+~~~
+
+Therefore synchronous Deep Agent subagents provide conversation isolation, not
+necessarily complete graph-state isolation.
+
+### Files are not excluded
+
+The `files` state key is not part of `_EXCLUDED_STATE_KEYS`.
+
+This is particularly important when using StateBackend, where virtual files are
+stored inside graph state.
+
+Conceptually:
+
+~~~text
+parent files state
+      |
+      v
+child files state
+      |
+      v
+child modifications
+      |
+      v
+Command state update
+      |
+      v
+parent files state
+~~~
+
+This behavior will be validated separately rather than inferred solely from the
+source.
+
+### Todos are intentionally local
+
+The implementation comments explain that child `todos` are excluded from state
+merging.
+
+This allows:
+
+~~~text
+parent planning
+    !=
+child planning
+~~~
+
+so a delegated task can maintain its own local plan without overwriting the
+orchestrator's todo state.
+
+### Skills and memory context
+
+`skills_metadata` and `memory_contents` are explicitly filtered to prevent
+parent-loaded skill and memory context from leaking into child agents.
+
+Subagents can therefore load their own SkillsMiddleware and MemoryMiddleware
+context.
+
+### Structured responses
+
+`structured_response` is excluded from the returned graph-state update.
+
+However, when present, `_return_command_with_state_update` serializes the
+structured response and uses it as the content of the task ToolMessage.
+
+Therefore:
+
+~~~text
+child structured_response
+        |
+        +--X--> parent structured_response state
+        |
+        +-----> parent ToolMessage content
+~~~
+
+### Final boundary model
+
+~~~text
+parent state
+    |
+    | filter private/local keys
+    v
+child state
+    |
+    | isolated messages + local agent loop
+    v
+child result
+    |
+    | filter private/local keys
+    +------> allowed state updates
+    |
+    +------> final result as ToolMessage
+    v
+parent state
+~~~
