@@ -1095,3 +1095,163 @@ routing policy
 
 A useful orchestrator should account for capability ownership as well as task
 complexity when deciding whether and where to delegate.
+
+## 0.7F1 — StateBackend Files Across the Subagent Boundary
+
+### Objective
+
+Validate experimentally that the `files` graph-state field can cross the
+parent/subagent boundary when using StateBackend.
+
+Static inspection previously established that:
+
+~~~text
+files
+~~~
+
+is not included in `_EXCLUDED_STATE_KEYS`.
+
+This experiment tested the resulting runtime behavior.
+
+### Initial parent state
+
+The parent invocation began with:
+
+~~~text
+/shared.txt
+
+owner=PARENT
+status=before
+~~~
+
+stored in the StateBackend `files` state.
+
+### Delegation
+
+The parent delegated exactly once to:
+
+~~~text
+file-worker
+~~~
+
+The child was instructed to:
+
+~~~text
+read_file("/shared.txt")
+edit_file(...)
+read_file("/shared.txt")
+~~~
+
+and return:
+
+~~~text
+FILE_CHILD_DONE
+~~~
+
+after verifying the change.
+
+### Parent-visible message history
+
+The parent observed only:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- task(file-worker)
+    |
+    v
+ToolMessage
+    |
+    +-- FILE_CHILD_DONE
+    |
+    v
+AIMessage
+    |
+    +-- FILE_CHILD_DONE
+~~~
+
+The child-internal filesystem calls were not visible in the parent message
+history.
+
+In particular:
+
+~~~text
+read_file    hidden
+edit_file    hidden
+~~~
+
+### Returned graph state
+
+The final parent result contained:
+
+~~~text
+files
+messages
+~~~
+
+The returned `/shared.txt` state was:
+
+~~~text
+owner=PARENT
+status=after-child
+~~~
+
+The original parent content was therefore visible to the child, modified by the
+child, and propagated back to the parent graph state.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+parent delegated exactly once                          PASS
+file-worker selected                                   PASS
+parent received one task result                        PASS
+child reported successful completion                   PASS
+files state returned to parent                         PASS
+shared file still exists                               PASS
+child edit propagated to parent files                  PASS
+original owner line preserved                          PASS
+parent-visible history hides read_file                 PASS
+parent-visible history hides edit_file                 PASS
+final parent response contains child result            PASS
+~~~
+
+### State-flow model
+
+The behavior is best modeled as:
+
+~~~text
+parent graph state
+        |
+        | copy/filter into child invocation
+        v
+child graph state
+        |
+        | filesystem operations mutate child files state
+        v
+child result
+        |
+        | task returns Command state update
+        v
+parent graph state
+~~~
+
+This should not be described merely as a shared mutable state object.
+
+The important property is that non-excluded graph-state updates can propagate
+across the task boundary.
+
+### Main lesson
+
+~~~text
+message-history isolation
+        !=
+graph-state isolation
+~~~
+
+With StateBackend, virtual filesystem contents can cross the subagent boundary
+while the child's internal message/tool history remains isolated.
