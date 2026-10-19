@@ -195,3 +195,155 @@ or
 
 Does any parent conversation state enter the child invocation?
 ~~~
+
+## 0.7A2 — Exact task() Invocation Semantics
+
+### Task implementation
+
+The built-in `task` capability is implemented as a module-level StructuredTool
+created by `_build_task_tool`.
+
+The model-visible schema contains only:
+
+~~~text
+description: string
+subagent_type: string
+~~~
+
+The underlying Python function additionally receives a `ToolRuntime`, which is
+injected by the agent runtime rather than supplied by the language model.
+
+### Subagent routing
+
+The middleware normalizes subagents into a mapping conceptually equivalent to:
+
+~~~text
+subagent name -> runnable
+~~~
+
+`subagent_type` selects the runnable by name.
+
+Unknown subagent types are rejected with an error describing the allowed
+agent types.
+
+### Child state preparation
+
+Before invoking the selected subagent, the implementation copies parent runtime
+state fields except those listed in `_EXCLUDED_STATE_KEYS`.
+
+It then explicitly replaces the `messages` field with:
+
+~~~text
+[HumanMessage(task_description)]
+~~~
+
+Therefore the parent's conversation history is not copied into the child
+conversation.
+
+This establishes strong message-context isolation:
+
+~~~text
+parent message history
+        X
+        |
+task description
+        |
+        v
+child HumanMessage
+~~~
+
+### Important state nuance
+
+Message isolation does not necessarily imply complete graph-state isolation.
+
+The implementation first copies non-excluded keys from:
+
+~~~text
+runtime.state
+~~~
+
+before replacing `messages`.
+
+The exact list of `_EXCLUDED_STATE_KEYS` still needs to be inspected to
+determine which state fields can cross the parent/subagent boundary.
+
+### Execution
+
+The synchronous task path invokes:
+
+~~~text
+subagent.invoke(subagent_state)
+~~~
+
+The async path equivalently uses:
+
+~~~text
+await subagent.ainvoke(subagent_state)
+~~~
+
+### Return path
+
+The task tool does not merely return a string.
+
+The child result is converted into a LangGraph `Command`.
+
+The implementation:
+
+1. requires a `messages` key in the child result;
+2. extracts non-excluded child state fields;
+3. uses `structured_response` when present, otherwise the final child message;
+4. converts that output into a `ToolMessage`;
+5. returns a `Command` updating the parent graph state.
+
+Conceptually:
+
+~~~text
+child result
+        |
+        +--> final child message -> ToolMessage
+        |
+        +--> allowed child state -> state update
+        |
+        v
+Command
+        |
+        v
+parent graph
+~~~
+
+### Context-compression precision
+
+The workshop statement that "only the final summary returns" is accurate for
+the child message history.
+
+Intermediate child model messages and tool calls do not enter the parent's
+message history.
+
+However, non-excluded graph-state fields may also be propagated through the
+returned Command.
+
+Therefore:
+
+~~~text
+message-history isolation
+        !=
+necessarily complete graph-state isolation
+~~~
+
+### Declarative and compiled subagents
+
+Both declarative `SubAgent` and `CompiledSubAgent` definitions are normalized to
+a common internal structure:
+
+~~~text
+name
+description
+runnable
+~~~
+
+Declarative subagents are compiled internally with `create_agent`.
+
+Compiled subagents provide the runnable directly.
+
+After normalization, the task tool invokes both through the same routing and
+return mechanism.
