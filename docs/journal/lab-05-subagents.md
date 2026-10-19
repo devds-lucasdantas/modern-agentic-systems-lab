@@ -493,3 +493,150 @@ child result
     v
 parent state
 ~~~
+
+## 0.7B — First Real Synchronous Delegation
+
+### Objective
+
+Execute the smallest possible real subagent delegation and observe the message
+boundary visible to the parent agent.
+
+The experiment deliberately avoided:
+
+~~~text
+Tavily
+filesystem operations
+Store
+checkpointer
+custom tools
+~~~
+
+to isolate only the synchronous `task()` mechanism.
+
+### Request
+
+The parent was explicitly instructed to delegate exactly once to:
+
+~~~text
+general-purpose
+~~~
+
+The delegated task was a deterministic arithmetic operation:
+
+~~~text
+37 * 41
+~~~
+
+with the child required to return:
+
+~~~text
+CHILD_RESULT=<number>
+~~~
+
+### Parent-visible trace
+
+The resulting parent message history was:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- task(
+          subagent_type="general-purpose",
+          description="Calculate 37 * 41 ..."
+        )
+    |
+    v
+ToolMessage
+    |
+    +-- CHILD_RESULT=1517
+    |
+    v
+AIMessage
+    |
+    +-- CHILD_RESULT=1517
+~~~
+
+### Delegation
+
+The parent invoked `task` exactly once and selected:
+
+~~~text
+general-purpose
+~~~
+
+The task description created by the parent was:
+
+~~~text
+Calculate 37 * 41 and return exactly CHILD_RESULT=<number>.
+No other text.
+~~~
+
+This demonstrates that the parent acts as a context-engineering boundary.
+
+The child does not receive the original user message history. It receives the
+self-contained task description constructed by the parent.
+
+### Return boundary
+
+The child result visible to the parent was a single:
+
+~~~text
+ToolMessage
+~~~
+
+containing:
+
+~~~text
+CHILD_RESULT=1517
+~~~
+
+No child-internal AI messages or tool calls appeared in the parent's
+`result["messages"]`.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+parent called task exactly once                  PASS
+parent selected general-purpose                  PASS
+task description asked for sentinel              PASS
+parent received one task ToolMessage             PASS
+subagent returned expected arithmetic            PASS
+final parent response used expected result       PASS
+~~~
+
+### What this experiment does not prove
+
+The absence of child messages from the parent trace does not imply that the
+child executed only one model call.
+
+The child may run its own internal agent loop.
+
+The experiment proves only that those intermediate child messages are not
+propagated into the parent's message history.
+
+### Main lesson
+
+Synchronous subagents create a real context boundary:
+
+~~~text
+user context
+     |
+     v
+parent orchestrator
+     |
+     | creates self-contained task description
+     v
+isolated child agent execution
+     |
+     | returns final result only
+     v
+parent ToolMessage
+     |
+     v
+parent synthesis
+~~~
