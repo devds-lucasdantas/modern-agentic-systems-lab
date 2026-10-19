@@ -818,3 +818,120 @@ message-history isolation
 +
 result compression
 ~~~
+
+## 0.7D — Autonomous Delegation Policy
+
+### Objective
+
+Observe whether the parent model chooses synchronous subagent delegation
+without being explicitly instructed to use `task`.
+
+The agent retained the default general-purpose subagent and received only a
+neutral instruction to use available capabilities when they materially improve
+the answer.
+
+### Task
+
+The user requested independent evaluation of three rollout strategies:
+
+~~~text
+A. big-bang migration
+B. phased migration
+C. voluntary adoption through champions
+~~~
+
+Each strategy had to be evaluated across four dimensions and then compared.
+
+The prompt did not mention:
+
+~~~text
+task
+subagent
+delegation
+~~~
+
+### Result
+
+The parent produced the complete answer directly.
+
+Observed delegation metrics:
+
+~~~text
+task calls:        0
+task ToolMessages: 0
+~~~
+
+The parent-visible trace was simply:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    v
+final analysis
+~~~
+
+### Interpretation
+
+The availability of `task()` does not force delegation.
+
+The task tool description and system-prompt guidance influence model policy,
+but they are not runtime enforcement.
+
+For this particular prompt, model, and configuration, the parent considered
+direct execution preferable to introducing a subagent.
+
+### Important scope
+
+This result does not establish that the model generally avoids autonomous
+delegation.
+
+It establishes only:
+
+~~~text
+GPT-6 Luna
++
+this task
++
+this system prompt
++
+default general-purpose subagent
+=
+direct execution selected
+~~~
+
+A different task, specialist description, capability requirement, or context
+size may produce different routing behavior.
+
+### Orchestration layers
+
+This experiment separates three concerns:
+
+~~~text
+Capability
+    task() exists
+
+Routing policy
+    should the model use task()?
+
+Execution
+    what happens after task() is selected?
+~~~
+
+Previous experiments validated capability and execution.
+
+This experiment observed the routing policy selecting direct execution.
+
+### Main lesson
+
+~~~text
+available capability
+        !=
+selected capability
+~~~
+
+A production orchestrator must reason not only about whether a task can be
+delegated, but whether delegation is worth its latency, token, coordination,
+and context overhead.
