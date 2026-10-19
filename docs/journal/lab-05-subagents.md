@@ -640,3 +640,181 @@ parent ToolMessage
      v
 parent synthesis
 ~~~
+
+## 0.7C — Child-Only Tool and Context Compression
+
+### Objective
+
+Demonstrate empirically that a subagent can execute internal tool calls that are
+not exposed to the parent agent and that those internal messages do not enter
+the parent's message history.
+
+### Child-only tool
+
+A deterministic custom tool was created:
+
+~~~text
+child_probe(value)
+~~~
+
+It multiplied the supplied value by seven and also appended an event to an
+external Python list for instrumentation.
+
+The tool was provided only to a specialized:
+
+~~~text
+calculator
+~~~
+
+subagent.
+
+### Parent capability surface
+
+Before invocation, the parent ToolNode contained:
+
+~~~text
+edit_file
+execute
+glob
+grep
+ls
+read_file
+task
+write_file
+write_todos
+~~~
+
+It did not contain:
+
+~~~text
+child_probe
+~~~
+
+Therefore the parent could not invoke the experimental tool directly.
+
+### Delegation
+
+The parent delegated the request through:
+
+~~~text
+task(
+    subagent_type="calculator",
+    description=...
+)
+~~~
+
+The calculator subagent was instructed to use its child-only tool.
+
+### External instrumentation
+
+During execution, the Python-side probe recorded:
+
+~~~text
+child_probe(value=23)
+-> 161
+~~~
+
+exactly once.
+
+This independently proves that the child tool executed.
+
+### Parent-visible history
+
+The parent observed only:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- task(...)
+    |
+    v
+ToolMessage
+    |
+    +-- CHILD_TOOL_RESULT=161
+    |
+    v
+AIMessage
+    |
+    +-- CHILD_TOOL_RESULT=161
+~~~
+
+No parent-visible AIMessage called `child_probe`, and no ToolMessage named
+`child_probe` appeared in the parent message history.
+
+### Tool-call counting nuance
+
+The instrumentation list of parent-visible tool names contained:
+
+~~~text
+["task", "task"]
+~~~
+
+This represents:
+
+~~~text
+one AIMessage task tool call
++
+one ToolMessage containing the task result
+~~~
+
+and does not represent two task invocations.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+parent does not directly expose child_probe          PASS
+child_probe executed exactly once                    PASS
+child_probe received expected value                  PASS
+child_probe produced expected result                 PASS
+parent-visible history contains task                 PASS
+parent-visible history hides child_probe             PASS
+parent received exactly one task result              PASS
+task result contains child output                    PASS
+final response contains expected result              PASS
+~~~
+
+### Main lesson
+
+Subagents can provide capability isolation in addition to message-context
+isolation.
+
+Conceptually:
+
+~~~text
+Parent
+    |
+    | task(...)
+    v
+Child
+    |
+    +-- child-only model/tool loop
+    |
+    +-- internal AIMessage
+    +-- internal tool call
+    +-- internal ToolMessage
+    +-- internal AIMessage
+    |
+    v
+single final result
+    |
+    v
+Parent ToolMessage
+~~~
+
+The parent benefits from the child's specialized capability without exposing
+the child's tool or intermediate execution trace in the parent context.
+
+This experimentally demonstrates:
+
+~~~text
+tool capability isolation
++
+message-history isolation
++
+result compression
+~~~
