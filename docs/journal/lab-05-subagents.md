@@ -935,3 +935,163 @@ selected capability
 A production orchestrator must reason not only about whether a task can be
 delegated, but whether delegation is worth its latency, token, coordination,
 and context overhead.
+
+## 0.7E — Autonomous Specialist Routing
+
+### Objective
+
+Test whether the parent can autonomously discover and route a request to a
+specialized subagent when the required capability is unavailable directly to
+the parent.
+
+Unlike previous experiments, the parent was not instructed to:
+
+~~~text
+use task
+delegate
+use a subagent
+select lab-decoder
+~~~
+
+### Specialized capability
+
+A private deterministic tool was created:
+
+~~~text
+decode_probe(code)
+~~~
+
+The tool existed only inside the:
+
+~~~text
+lab-decoder
+~~~
+
+subagent.
+
+The parent ToolNode did not expose `decode_probe`.
+
+### User request
+
+The user requested:
+
+~~~text
+Decode experimental lab code 29 and give me only the authoritative decoded
+value.
+~~~
+
+The private decoding transformation was not present in the user prompt or in
+the parent's direct tools.
+
+### Autonomous routing
+
+The parent independently generated:
+
+~~~text
+task(
+    subagent_type="lab-decoder",
+    description=(
+        "Decode experimental lab code 29 using authoritative decoding "
+        "capability. Return only the decoded value, with no explanation."
+    )
+)
+~~~
+
+Therefore the model autonomously performed:
+
+~~~text
+capability discovery
+        |
+        v
+specialist selection
+        |
+        v
+task construction
+        |
+        v
+delegation
+~~~
+
+### Child capability execution
+
+External instrumentation confirmed exactly one execution:
+
+~~~text
+decode_probe(code=29)
+-> DECODED-384
+~~~
+
+The parent could not invoke this tool directly.
+
+### Parent-visible trace
+
+The visible parent history was:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- task(subagent_type="lab-decoder", ...)
+    |
+    v
+ToolMessage
+    |
+    +-- DECODED-384
+    |
+    v
+AIMessage
+    |
+    +-- DECODED-384
+~~~
+
+The child-only `decode_probe` invocation remained hidden from the parent
+message history.
+
+### Assertions
+
+All checks passed:
+
+~~~text
+parent lacks decode_probe                               PASS
+parent autonomously used task                           PASS
+lab-decoder was selected                                PASS
+decode_probe actually executed                          PASS
+decode_probe received 29                                PASS
+probe generated authoritative value                     PASS
+parent final answer contains authoritative value        PASS
+~~~
+
+### Comparison with 0.7D
+
+The two autonomous-routing experiments produced different choices:
+
+~~~text
+0.7D
+parent could perform the analysis directly
+-> no delegation
+
+0.7E
+required capability existed only in a specialist
+-> autonomous delegation
+~~~
+
+This does not establish a universal routing policy, but it demonstrates that
+tool/subagent metadata can influence capability-aware orchestration rather than
+merely triggering delegation whenever work is decomposable.
+
+### Main lesson
+
+~~~text
+can delegate
+    !=
+should delegate
+
+specialized capability boundary
+    can influence
+routing policy
+~~~
+
+A useful orchestrator should account for capability ownership as well as task
+complexity when deciding whether and where to delegate.
