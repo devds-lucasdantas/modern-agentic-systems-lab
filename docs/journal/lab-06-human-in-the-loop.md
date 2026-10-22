@@ -411,3 +411,159 @@ but one final assertion reused the post-resume event list and therefore had an
 imprecise label.
 
 Future experiments snapshot event counts before and after resume explicitly.
+
+## 0.8B2 — Edit
+
+### Objective
+
+Validate that a human reviewer can modify a pending tool call before execution
+and that only the edited action is executed.
+
+### Initial model proposal
+
+The model proposed:
+
+~~~text
+gated_probe(value=17)
+~~~
+
+The graph paused before tool execution.
+
+At that point:
+
+~~~text
+tool events: 0
+~~~
+
+### Human edit
+
+The graph was resumed with an edit decision replacing:
+
+~~~text
+value=17
+~~~
+
+with:
+
+~~~text
+value=23
+~~~
+
+Conceptually:
+
+~~~text
+model proposal
+    |
+    +-- gated_probe(17)
+    |
+    v
+HITL
+    |
+    +-- edit
+    |
+    v
+gated_probe(23)
+~~~
+
+### Executed action
+
+External instrumentation recorded exactly one real execution:
+
+~~~text
+gated_probe(value=23)
+-> GATED_RESULT=69
+~~~
+
+The original value `17` was never executed.
+
+### Tool-call identity
+
+The original tool call had an ID similar to:
+
+~~~text
+call_vlqfVhlSQ6hLQ2wPgHwcNDwI
+~~~
+
+After editing, the tool call still used the same ID.
+
+The ToolMessage produced by the tool also referenced the same ID.
+
+Therefore the edit changes the action payload while preserving tool-call
+identity.
+
+### Final message trace
+
+The final graph message history contained:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- gated_probe(value=23)
+    |
+    v
+ToolMessage
+    |
+    +-- GATED_RESULT=69
+    |
+    v
+AIMessage
+    |
+    +-- GATED_RESULT=69
+~~~
+
+The final AIMessage stored in state therefore reflects the edited action rather
+than the model's original arguments.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+initial invocation interrupted                             PASS
+original requested value was 17                            PASS
+tool did not execute before edit decision                  PASS
+tool executed exactly once after resume                    PASS
+original value 17 never executed                           PASS
+edited value 23 executed                                   PASS
+edited execution returned expected result                  PASS
+final AI tool call now contains edited args                PASS
+tool call id preserved across edit                         PASS
+ToolMessage references same tool call id                   PASS
+final answer contains edited result                        PASS
+~~~
+
+### Auditability implication
+
+Because the final graph message state reflects the edited tool call, an
+application that must preserve both:
+
+~~~text
+original model proposal
+human modification
+~~~
+
+should record the review event separately in an audit or observability system.
+
+The final message history alone represents the authorized/executed action.
+
+### Main lesson
+
+Human-in-the-loop editing is not merely approval with commentary.
+
+It can transform the executable action before any side effect occurs:
+
+~~~text
+model intent
+    |
+    v
+human edit
+    |
+    v
+authorized action
+    |
+    v
+tool execution
+~~~
