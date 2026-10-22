@@ -698,3 +698,159 @@ proposal
   -> no execution
   -> synthetic error ToolMessage
 ~~~
+
+## 0.8C — Batched Human Review
+
+### Objective
+
+Validate how HumanInTheLoopMiddleware handles multiple gated tool calls emitted
+in the same AIMessage.
+
+The experiment also tested mixed human decisions within one review batch.
+
+### Model proposal
+
+The model emitted exactly two tool calls in the same AIMessage:
+
+~~~text
+gated_probe_a(value=10)
+gated_probe_b(value=20)
+~~~
+
+Neither tool executed immediately.
+
+### One interrupt, multiple actions
+
+The graph surfaced one interrupt containing:
+
+~~~text
+action_requests[0] -> gated_probe_a(value=10)
+action_requests[1] -> gated_probe_b(value=20)
+
+review_configs[0] -> policy for A
+review_configs[1] -> policy for B
+~~~
+
+This confirms that multiple gated calls from one model step can be grouped into
+one HITL request.
+
+### Positional decisions
+
+The graph was resumed with:
+
+~~~text
+decisions[0] = approve
+decisions[1] = reject
+~~~
+
+The decisions corresponded positionally to the interrupted actions.
+
+### Mixed outcome
+
+External instrumentation recorded exactly one real execution:
+
+~~~text
+gated_probe_a(value=10)
+-> A_RESULT=110
+~~~
+
+`gated_probe_b` never executed.
+
+Instead, B produced:
+
+~~~text
+ToolMessage
+status=error
+content=Reviewer rejected operation B.
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+one graph interrupt surfaced                               PASS
+model emitted exactly two tool calls                       PASS
+both calls were in the same AIMessage                      PASS
+HITL request contains two actions                          PASS
+HITL request contains two review configs                   PASS
+first action is probe A                                    PASS
+second action is probe B                                   PASS
+nothing executed before review                             PASS
+exactly one real tool executed                             PASS
+probe A executed                                           PASS
+probe B did not execute                                    PASS
+probe A produced real ToolMessage                          PASS
+probe B produced rejection ToolMessage                     PASS
+probe B rejection text propagated                          PASS
+~~~
+
+### ToolMessage ordering nuance
+
+The original model call order was:
+
+~~~text
+A
+B
+~~~
+
+but the resulting ToolMessages appeared as:
+
+~~~text
+B rejection
+A success
+~~~
+
+This is consistent with the HITL execution flow.
+
+A rejected call can be converted immediately into a synthetic error ToolMessage
+during middleware processing, while an approved call must continue to the
+actual tool-execution node before its ToolMessage exists.
+
+Therefore:
+
+~~~text
+action request order
+    !=
+necessarily final ToolMessage order
+~~~
+
+Systems should correlate actions and results using stable identifiers such as:
+
+~~~text
+tool_call_id
+~~~
+
+rather than relying on message-array position.
+
+### Batch model
+
+~~~text
+AIMessage
+  |
+  +-- gated action A
+  |
+  +-- gated action B
+          |
+          v
+     one HITLRequest
+          |
+     human decisions
+       /        \
+ approve A    reject B
+    |             |
+execute A     synthetic error
+    |             |
+real result      /
+       \         /
+        v       v
+       model continuation
+~~~
+
+### Main lesson
+
+Human review operates on a batch of gated actions while preserving an
+individual decision for each action.
+
+Mixed approval outcomes can therefore be processed in a single pause/resume
+cycle.
