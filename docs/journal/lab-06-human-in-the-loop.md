@@ -854,3 +854,331 @@ individual decision for each action.
 
 Mixed approval outcomes can therefore be processed in a single pause/resume
 cycle.
+
+## 0.8D — Inherited HITL Inside a Subagent
+
+### Objective
+
+Validate that a declarative synchronous subagent inherits the top-level
+`interrupt_on` policy and that an interrupt originating inside the child can
+pause the outer Deep Agent execution.
+
+The experiment also verifies that normal subagent message isolation remains
+intact.
+
+### Capability boundary
+
+A child-only tool was created:
+
+~~~text
+child_gated_probe(value)
+~~~
+
+The parent ToolNode did not expose this tool directly.
+
+The only parent-visible delegation capability was:
+
+~~~text
+task
+~~~
+
+### HITL configuration
+
+The top-level Deep Agent was configured with:
+
+~~~text
+interrupt_on:
+  child_gated_probe:
+    allowed_decisions:
+      - approve
+      - reject
+~~~
+
+The declarative `approval-worker` subagent did not define its own
+`interrupt_on`.
+
+Therefore any HITL behavior inside the child had to come from inherited
+top-level configuration.
+
+### Nested execution
+
+The parent delegated through:
+
+~~~text
+task(
+    subagent_type="approval-worker",
+    ...
+)
+~~~
+
+Inside the child, the model proposed:
+
+~~~text
+child_gated_probe(value=7)
+~~~
+
+### Interrupt propagation
+
+The outer invocation returned one interrupt even though the risky action
+originated inside the subagent.
+
+The surfaced HITL action was:
+
+~~~text
+name: child_gated_probe
+args:
+  value: 7
+~~~
+
+with:
+
+~~~text
+approve
+reject
+~~~
+
+as allowed decisions.
+
+This proves that the top-level HITL policy was inherited by the declarative
+subagent.
+
+### Parent state at pause
+
+At the pause boundary, the parent message history contained only:
+
+~~~text
+HumanMessage
+AIMessage
+  -> task(approval-worker)
+~~~
+
+The child-internal tool call did not leak into the parent message history.
+
+However, the HITL interrupt exposed the concrete risky child action to the
+reviewer.
+
+Therefore:
+
+~~~text
+parent conversational abstraction
+        =
+task(...)
+
+review surface
+        =
+actual gated child action
+~~~
+
+### Approval
+
+Before approval:
+
+~~~text
+child tool events: 0
+~~~
+
+After resuming the same thread with `approve`:
+
+~~~text
+child_gated_probe(value=7)
+-> CHILD_GATED_RESULT=35
+~~~
+
+executed exactly once.
+
+### Final parent trace
+
+The final parent-visible history remained:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- task(approval-worker)
+    |
+    v
+ToolMessage
+    |
+    +-- CHILD_GATED_RESULT=35
+    |
+    v
+AIMessage
+    |
+    +-- CHILD_GATED_RESULT=35
+~~~
+
+`child_gated_probe` remained hidden from the parent message history.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+parent does not directly expose child tool                     PASS
+nested execution surfaced one interrupt                        PASS
+interrupt contains one action                                  PASS
+interrupt action is child_gated_probe                          PASS
+inherited policy allows approve and reject                     PASS
+child tool did not execute before approval                     PASS
+child tool executed exactly once after approval                PASS
+child tool received value 7                                    PASS
+child tool produced expected result                            PASS
+child tool remains hidden from parent messages                 PASS
+parent-visible trace contains task                             PASS
+final response contains child result                           PASS
+~~~
+
+### Main lesson
+
+Human-in-the-loop review composes across synchronous subagent boundaries.
+
+A child can retain conversational isolation while still surfacing its concrete
+risky actions to the outer reviewer.
+
+~~~text
+subagent context isolation
+        +
+nested HITL visibility
+        +
+top-level policy inheritance
+~~~
+
+can coexist.
+
+## 0.8 — Human-in-the-Loop Review
+
+The HITL experiments validated the complete synchronous approval lifecycle.
+
+### Architecture
+
+~~~text
+model proposes tool call
+        |
+        v
+HumanInTheLoopMiddleware
+        |
+        v
+HITLRequest
+        |
+        v
+interrupt()
+        |
+        v
+checkpoint + pause
+        |
+        v
+human decision
+        |
+        v
+Command(resume=...)
+        |
+        v
+same thread resumes
+~~~
+
+### Approve
+
+~~~text
+proposal
+  -> pause
+  -> approve
+  -> execute original action
+  -> real ToolMessage
+~~~
+
+The tool does not execute before approval.
+
+### Edit
+
+~~~text
+proposal
+  -> pause
+  -> human modifies name/args
+  -> execute edited action
+  -> real ToolMessage
+~~~
+
+The tool-call identity is preserved while the executable arguments change.
+
+### Reject
+
+~~~text
+proposal
+  -> pause
+  -> reject
+  -> no real tool execution
+  -> synthetic ToolMessage(status="error")
+~~~
+
+The human rejection message becomes model-visible tool-result context.
+
+### Batched review
+
+Multiple gated tool calls emitted by one AIMessage can produce one HITLRequest.
+
+Human decisions correspond positionally to the interrupted action requests.
+
+Mixed outcomes are supported in the same review cycle.
+
+### Result ordering
+
+Final ToolMessage order must not be assumed to match original action order.
+
+Rejected actions may produce synthetic ToolMessages before approved actions
+finish real tool execution.
+
+Stable identifiers such as:
+
+~~~text
+tool_call_id
+~~~
+
+should be used for correlation.
+
+### Checkpointer semantics
+
+Interrupts require a checkpointer because execution genuinely pauses and is
+later resumed.
+
+This reinforces the distinction:
+
+~~~text
+Store
+    -> application / long-lived data
+
+Checkpointer
+    -> execution / thread state
+    -> pause and resume
+~~~
+
+### Node re-execution
+
+LangGraph resumes an interrupted node by restarting that node.
+
+Therefore custom node code before an `interrupt()` should avoid unsafe
+non-idempotent side effects.
+
+### Subagents
+
+Declarative synchronous SubAgents inherit the top-level `interrupt_on` policy by
+default unless they override it.
+
+A nested child action can interrupt the outer execution while remaining absent
+from the parent conversation history.
+
+### Final validated properties
+
+~~~text
+approve                         PASS
+edit                            PASS
+reject                          PASS
+batched review                  PASS
+mixed decisions                 PASS
+tool execution gated pre-effect PASS
+checkpointer pause/resume       PASS
+nested subagent HITL            PASS
+policy inheritance              PASS
+context isolation preserved     PASS
+~~~

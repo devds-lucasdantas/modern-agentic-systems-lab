@@ -9,7 +9,7 @@
 - [x] 0.5 Custom tools
 - [x] 0.6 Backends
 - [x] 0.7 Subagents
-- [ ] 0.8 Human-in-the-loop
+- [x] 0.8 Human-in-the-loop
 - [ ] 0.9 Long-term memory
 - [ ] 0.10 AGENTS.md
 - [ ] 0.11 Skills
