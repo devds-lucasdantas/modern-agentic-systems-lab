@@ -407,3 +407,145 @@ survive Python process restart  no
 
 The term "long-term" here therefore refers to lifetime beyond a conversation
 thread, not durable production storage.
+
+## 0.9C — Memory Isolation by Namespace
+
+### Objective
+
+Validate BaseStore namespace isolation using one shared Store and identical
+logical memory paths.
+
+The experiment deliberately held constant:
+
+~~~text
+BaseStore instance
+memory filename
+memory backend behavior
+~~~
+
+while varying only the namespace.
+
+### Setup
+
+Two memory agents shared one InMemoryStore.
+
+User A used:
+
+~~~text
+("user-a", "memories")
+~~~
+
+User B used:
+
+~~~text
+("user-b", "memories")
+~~~
+
+Both wrote to the same logical path:
+
+~~~text
+/memories/preferences.md
+~~~
+
+### Stored values
+
+The resulting BaseStore contained:
+
+~~~text
+namespace=("user-a", "memories")
+key=/preferences.md
+value=Preferred deployment target: staging.
+~~~
+
+and independently:
+
+~~~text
+namespace=("user-b", "memories")
+key=/preferences.md
+value=Preferred deployment target: production.
+~~~
+
+The identical key therefore refers to different items when used under different
+namespaces.
+
+### Retrieval
+
+User A retrieved:
+
+~~~text
+staging
+~~~
+
+while User B retrieved:
+
+~~~text
+production
+~~~
+
+Neither agent observed the other namespace's preference.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+User A has one memory item                                 PASS
+User B has one memory item                                 PASS
+both namespaces may use same file key                      PASS
+User A store contains staging                              PASS
+User A store does not contain production                   PASS
+User B store contains production                           PASS
+User B store does not contain staging                      PASS
+User A agent answers staging                               PASS
+User A agent does not answer production                    PASS
+User B agent answers production                            PASS
+User B agent does not answer staging                       PASS
+~~~
+
+### Identity model
+
+A Store item is effectively identified by:
+
+~~~text
+namespace + key
+~~~
+
+not by key alone.
+
+Conceptually:
+
+~~~text
+BaseStore
+|
++-- ("user-a", "memories")
+|     |
+|     +-- /preferences.md -> staging
+|
++-- ("user-b", "memories")
+      |
+      +-- /preferences.md -> production
+~~~
+
+### Security boundary precision
+
+Namespaces provide logical data separation inside the Store API.
+
+They are not, by themselves, an authentication mechanism.
+
+A production namespace should be derived from trusted authenticated runtime
+identity rather than arbitrary user-controlled prompt content.
+
+Conceptually:
+
+~~~text
+authenticated request
+        |
+        v
+trusted user identity
+        |
+        v
+memory namespace
+        |
+        v
+StoreBackend
+~~~
