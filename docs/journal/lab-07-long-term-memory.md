@@ -648,3 +648,209 @@ store
 
 This distinction becomes important when authentication, multi-tenancy, and
 memory are combined.
+
+## 0.9D2 — Dynamic Per-User Memory Namespace
+
+### Objective
+
+Validate a production-shaped memory architecture in which one compiled agent
+and one shared BaseStore serve multiple users while deriving memory isolation
+from trusted run-scoped context.
+
+### Setup
+
+The experiment used:
+
+~~~text
+one compiled Deep Agent
+one InMemoryStore
+one CompositeBackend
+one StoreBackend
+one logical memory path
+~~~
+
+The only variable between requests was:
+
+~~~text
+Runtime.context.user_id
+~~~
+
+### Namespace factory
+
+The StoreBackend namespace was derived dynamically:
+
+~~~python
+def memory_namespace(runtime):
+    user_id = runtime.context["user_id"]
+
+    return (
+        user_id,
+        "memories",
+    )
+~~~
+
+Therefore the same StoreBackend instance resolved different namespaces for
+different invocations.
+
+### User A
+
+A request with:
+
+~~~text
+context.user_id = user-a
+~~~
+
+stored:
+
+~~~text
+/memories/preferences.md
+~~~
+
+under:
+
+~~~text
+("user-a", "memories")
+~~~
+
+with the preference:
+
+~~~text
+staging
+~~~
+
+### User B
+
+A request through the same compiled agent with:
+
+~~~text
+context.user_id = user-b
+~~~
+
+stored the same logical file:
+
+~~~text
+/memories/preferences.md
+~~~
+
+under:
+
+~~~text
+("user-b", "memories")
+~~~
+
+with:
+
+~~~text
+production
+~~~
+
+### Shared infrastructure
+
+The final Store contained:
+
+~~~text
+BaseStore
+|
++-- ("user-a", "memories")
+|     |
+|     +-- /preferences.md -> staging
+|
++-- ("user-b", "memories")
+      |
+      +-- /preferences.md -> production
+~~~
+
+Both namespaces were created through the same:
+
+~~~text
+agent
+store
+backend
+logical filename
+~~~
+
+### Retrieval
+
+Using the same compiled agent:
+
+~~~text
+context=user-a -> staging
+context=user-b -> production
+~~~
+
+Neither retrieval exposed the other user's value.
+
+### Namespace factory invocation behavior
+
+Instrumentation showed that the namespace factory can be evaluated multiple
+times during one agent invocation.
+
+This is expected because filesystem operations independently resolve their
+Store namespace.
+
+Therefore a namespace factory should normally be:
+
+~~~text
+pure
+cheap
+deterministic
+side-effect free
+~~~
+
+It should not generate random namespace components or perform unnecessary
+external work.
+
+### Architecture
+
+~~~text
+authenticated request
+        |
+        v
+Runtime.context.user_id
+        |
+        v
+namespace factory
+        |
+        +---------------------------+
+        |                           |
+        v                           v
+("user-a", "memories")   ("user-b", "memories")
+        |                           |
+        +-------------+-------------+
+                      |
+                      v
+                shared BaseStore
+~~~
+
+### Assertions
+
+All functional isolation assertions passed.
+
+The experimental check:
+
+~~~python
+id(agent) == id(agent)
+~~~
+
+is tautological and should not itself be treated as evidence.
+
+The actual evidence that one compiled agent served both users is the experiment
+structure: `create_deep_agent()` was called once and that same `agent` object was
+used for all requests.
+
+### Main lesson
+
+Per-user long-term memory does not require a separate agent instance per user.
+
+A shared agent can safely select a logical memory partition from trusted
+run-scoped identity:
+
+~~~text
+one agent
++
+one store
++
+runtime identity
++
+namespace isolation
+~~~
