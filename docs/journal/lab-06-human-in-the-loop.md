@@ -567,3 +567,134 @@ authorized action
     v
 tool execution
 ~~~
+
+## 0.8B3 — Reject
+
+### Objective
+
+Validate that rejecting a pending tool call prevents real tool execution while
+still providing a protocol-compatible result to the agent loop.
+
+### Initial proposal
+
+The model proposed:
+
+~~~text
+gated_probe(value=17)
+~~~
+
+The graph paused before execution.
+
+At the pause boundary:
+
+~~~text
+tool events: 0
+~~~
+
+### Human rejection
+
+The thread was resumed with:
+
+~~~text
+type: reject
+message: Rejected by reviewer: operation not authorized.
+~~~
+
+### No real execution
+
+External instrumentation remained:
+
+~~~text
+before resume: 0
+after resume:  0
+~~~
+
+Therefore the gated tool never executed.
+
+### Synthetic ToolMessage
+
+Instead of executing the tool, HumanInTheLoopMiddleware inserted an error
+ToolMessage:
+
+~~~text
+name: gated_probe
+status: error
+tool_call_id: <original tool-call id>
+content: Rejected by reviewer: operation not authorized.
+~~~
+
+The ToolMessage preserved the original tool-call identity.
+
+### Model continuation
+
+The model then received the rejection through the normal tool-result channel
+and responded:
+
+~~~text
+The gated operation was rejected because it was not authorized.
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+initial invocation interrupted                             PASS
+original tool call requested value 17                      PASS
+tool had not executed before rejection                     PASS
+tool still did not execute after rejection                 PASS
+no real tool executions occurred                           PASS
+rejection produced error ToolMessage                       PASS
+rejection ToolMessage contains reviewer message            PASS
+rejection ToolMessage preserves call id                    PASS
+final answer acknowledges rejection                        PASS
+~~~
+
+### Protocol model
+
+Reject does not simply remove a pending tool call.
+
+Instead:
+
+~~~text
+AIMessage(tool_call)
+        |
+        v
+human rejection
+        |
+        v
+synthetic ToolMessage(status="error")
+        |
+        v
+model continuation
+~~~
+
+This preserves the normal tool-call / tool-result protocol without performing
+the real side effect.
+
+### Human feedback as model context
+
+The optional rejection message becomes ToolMessage content.
+
+Therefore human feedback can influence the next model step rather than serving
+only as external approval metadata.
+
+### Three decision semantics
+
+~~~text
+APPROVE
+proposal
+  -> execute original action
+  -> real ToolMessage
+
+EDIT
+proposal
+  -> human modifies action
+  -> execute modified action
+  -> real ToolMessage
+
+REJECT
+proposal
+  -> no execution
+  -> synthetic error ToolMessage
+~~~
