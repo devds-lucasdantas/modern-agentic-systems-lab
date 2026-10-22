@@ -245,3 +245,169 @@ custom tool:
 
 The first experiment must prove that a gated tool has not executed when the
 interrupt is surfaced, executes only after approval, and executes exactly once.
+
+## 0.8B1 — Approve
+
+### Objective
+
+Validate a real Human-in-the-Loop pause/resume cycle and prove that a gated
+tool does not execute before human approval.
+
+### Setup
+
+A deterministic custom tool was created:
+
+~~~text
+gated_probe(value)
+~~~
+
+The tool records every real execution in an external Python list and returns:
+
+~~~text
+GATED_RESULT=<value * 3>
+~~~
+
+The agent was configured with:
+
+~~~text
+interrupt_on = {
+    "gated_probe": {
+        "allowed_decisions": [
+            "approve",
+            "edit",
+            "reject",
+        ]
+    }
+}
+~~~
+
+and an InMemorySaver checkpointer.
+
+### Initial invocation
+
+The model proposed:
+
+~~~text
+gated_probe(value=17)
+~~~
+
+The graph returned:
+
+~~~text
+__interrupt__
+messages
+~~~
+
+rather than executing the tool.
+
+The surfaced HITL request contained one action request:
+
+~~~text
+name: gated_probe
+args:
+  value: 17
+~~~
+
+with:
+
+~~~text
+approve
+edit
+reject
+~~~
+
+as allowed decisions.
+
+### Tool execution boundary
+
+Immediately after the interrupt:
+
+~~~text
+tool events: 0
+~~~
+
+Therefore the gated operation had not executed.
+
+The parent message state at the pause contained only:
+
+~~~text
+HumanMessage
+AIMessage(tool_call=gated_probe)
+~~~
+
+There was no ToolMessage yet.
+
+### Resume
+
+The same thread was resumed with:
+
+~~~python
+Command(
+    resume={
+        "decisions": [
+            {"type": "approve"}
+        ]
+    }
+)
+~~~
+
+Only after the resume did the external instrumentation record:
+
+~~~text
+gated_probe(value=17)
+-> GATED_RESULT=51
+~~~
+
+exactly once.
+
+### Final message trace
+
+After approval:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- gated_probe(value=17)
+    |
+    v
+ToolMessage
+    |
+    +-- GATED_RESULT=51
+    |
+    v
+AIMessage
+    |
+    +-- GATED_RESULT=51
+~~~
+
+### Main lesson
+
+Human-in-the-loop approval gates tool execution before the tool side effect
+occurs.
+
+~~~text
+tool proposal
+    |
+    v
+interrupt
+    |
+    v
+human approval
+    |
+    v
+actual tool execution
+~~~
+
+The checkpointer and thread identity make it possible to pause and later resume
+the same graph execution.
+
+### Instrumentation note
+
+The original experiment printed the pre-approval event count correctly as zero,
+but one final assertion reused the post-resume event list and therefore had an
+imprecise label.
+
+Future experiments snapshot event counts before and after resume explicitly.
