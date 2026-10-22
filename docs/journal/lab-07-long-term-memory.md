@@ -549,3 +549,102 @@ memory namespace
         v
 StoreBackend
 ~~~
+
+## 0.9D1 — Run-Scoped Identity Context
+
+### Objective
+
+Determine the supported mechanism for deriving a memory namespace dynamically
+from request-scoped identity.
+
+### Runtime context
+
+LangGraph Runtime exposes:
+
+~~~text
+context
+store
+stream_writer
+previous
+execution_info
+server_info
+~~~
+
+`context` is run-scoped information defined by the graph's `context_schema`.
+
+It is distinct from:
+
+~~~text
+RunnableConfig
+graph state
+messages
+BaseStore
+~~~
+
+### Deep Agents integration
+
+`create_deep_agent()` accepts:
+
+~~~python
+context_schema=...
+~~~
+
+and forwards it to the underlying LangChain agent graph.
+
+The compiled graph invocation API accepts:
+
+~~~python
+agent.invoke(
+    input,
+    context=...
+)
+~~~
+
+as a dedicated keyword argument.
+
+The same context mechanism is available through synchronous, asynchronous, and
+streaming graph APIs.
+
+### Identity boundary
+
+User identity should not be inferred from prompt text.
+
+A production-shaped flow is:
+
+~~~text
+authenticated request
+        |
+        v
+trusted identity
+        |
+        v
+invoke(..., context={user_id: ...})
+        |
+        v
+Runtime.context
+        |
+        v
+StoreBackend namespace
+~~~
+
+The context therefore represents a suitable boundary for deriving per-user
+memory namespaces.
+
+### Context versus config
+
+~~~text
+context
+    -> run-scoped application identity/data
+
+config
+    -> execution configuration such as thread metadata
+
+state
+    -> mutable graph state
+
+store
+    -> cross-run application data
+~~~
+
+This distinction becomes important when authentication, multi-tenancy, and
+memory are combined.
