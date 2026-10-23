@@ -1838,3 +1838,108 @@ When it contains pending `next` nodes, it is an executable continuation point.
 `update_state` plus `as_node` can therefore be used to perform graph-aware
 state surgery and subsequently resume normal agent execution from the repaired
 state.
+
+## 0.12B12 — Runtime Store API Contract
+
+### Objective
+
+Inspect the Store API exposed by the pinned LangGraph Runtime before testing
+Deep Agents `StoreBackend` integration.
+
+### Store item model
+
+The Runtime Store represents an item as:
+
+~~~text
+namespace: string[]
+key: string
+value: object
+created_at: datetime
+updated_at: datetime
+~~~
+
+The OpenAPI description explicitly identifies Store items as documents or data
+entries used for cross-thread memories.
+
+### Store operations
+
+The Runtime exposes:
+
+~~~text
+GET    /store/items
+PUT    /store/items
+DELETE /store/items
+
+POST   /store/items/search
+POST   /store/namespaces
+~~~
+
+A PUT requires:
+
+~~~text
+namespace
+key
+value
+~~~
+
+and optionally supports:
+
+~~~text
+index
+ttl
+~~~
+
+### Search
+
+`POST /store/items/search` supports two modes.
+
+Without `query`:
+
+~~~text
+list items ordered by updated time
+~~~
+
+With `query`:
+
+~~~text
+natural-language search over Store contents
+~~~
+
+It also supports:
+
+~~~text
+namespace_prefix
+filter
+limit
+offset
+refresh_ttl
+~~~
+
+### Namespaces
+
+Namespaces are hierarchical arrays of strings.
+
+They can be listed using:
+
+~~~text
+prefix
+suffix
+max_depth
+limit
+offset
+~~~
+
+### Runtime persistence model
+
+The API now exposes two distinct persistence domains:
+
+~~~text
+Thread / Checkpoint persistence
+    -> per-thread execution state and history
+
+Store persistence
+    -> namespace/key/value data intended for cross-thread memory
+~~~
+
+The next experiment validates Store behavior directly before connecting it to
+Deep Agents `StoreBackend`.
