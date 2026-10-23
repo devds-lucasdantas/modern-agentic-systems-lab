@@ -218,3 +218,97 @@ The next experiments need to determine:
 4. which state channels are exposed through runtime APIs;
 5. how streaming events map to graph execution;
 6. what survives a local runtime process restart.
+
+## 0.12B1 — Runtime-Owned Persistence Boundary
+
+### First server startup
+
+The local development server successfully initialized:
+
+~~~text
+langgraph-api
+    -> local_dev
+
+langgraph-runtime-inmem
+    -> active
+
+development persistence flush loop
+    -> active
+~~~
+
+However, graph registration failed.
+
+### Failure
+
+The exported `deep_agent` contained:
+
+~~~text
+store = InMemoryStore()
+~~~
+
+inside its compiled graph.
+
+LangGraph API rejected the graph and reported that persistence for registered
+graphs is managed by the platform/runtime.
+
+The graph therefore failed during registration rather than during model
+execution.
+
+### Consequence
+
+A graph definition suitable for direct Python execution is not necessarily a
+valid LangGraph API deployment definition.
+
+The original standalone arrangement was:
+
+~~~text
+CompiledStateGraph
+    |
+    +-- custom InMemoryStore
+~~~
+
+The Runtime contract requires:
+
+~~~text
+CompiledStateGraph
+    |
+    +-- store = None
+    |
+    v
+LangGraph API Runtime
+    |
+    +-- runtime-managed persistence/store
+~~~
+
+### Split execution modes
+
+The workshop agent was therefore separated into two modes.
+
+Runtime/deployment:
+
+~~~text
+deep_agent
+    -> no custom Store
+    -> no custom Checkpointer
+    -> persistence supplied by LangGraph API
+~~~
+
+Standalone Python:
+
+~~~text
+create_standalone_agent()
+    |
+    v
+InMemoryStore
+    -> process-local long-term memory
+~~~
+
+Both modes share the same tools, filesystem backend, memory route, AGENTS.md,
+skills, and model configuration.
+
+### Main lesson
+
+Persistence ownership is part of the deployment contract.
+
+Application code should not embed development-only persistence implementations
+into a graph intended to be managed by LangGraph API.
