@@ -577,3 +577,153 @@ Skills implement real progressive disclosure at the LLM-context layer.
 
 The framework exposes a lightweight capability index, and the model loads the
 full instructions only for skills it determines are relevant.
+
+## 0.11C — Duplicate Skill Names and Source Precedence
+
+### Objective
+
+Validate the framework-level precedence rule for skills with the same metadata
+name across multiple configured skill sources.
+
+### Setup
+
+Two sources contained a skill named:
+
+~~~text
+deployment-advisor
+~~~
+
+The configured order was:
+
+~~~python
+skills=[
+    "/skills/base/",
+    "/skills/project/",
+]
+~~~
+
+The files were:
+
+~~~text
+/skills/base/deployment-advisor/SKILL.md
+    -> BASE_SKILL_SENTINEL_1111
+
+/skills/project/deployment-advisor/SKILL.md
+    -> PROJECT_SKILL_SENTINEL_2222
+~~~
+
+Both SKILL.md files declared the same metadata name:
+
+~~~text
+deployment-advisor
+~~~
+
+### Framework merge
+
+Static source inspection had established that SkillsMiddleware processes sources
+in order and stores discovered skills using:
+
+~~~text
+all_skills[skill["name"]] = skill
+~~~
+
+Therefore a later skill with the same name replaces the earlier metadata entry.
+
+Conceptually:
+
+~~~text
+base/deployment-advisor
+        |
+        v
+all_skills["deployment-advisor"] = BASE
+        |
+        v
+project/deployment-advisor
+        |
+        v
+all_skills["deployment-advisor"] = PROJECT
+~~~
+
+### Runtime result
+
+The model was instructed to use the installed `deployment-advisor` skill.
+
+It called:
+
+~~~text
+read_file(
+    "/skills/project/deployment-advisor/SKILL.md",
+    limit=1000
+)
+~~~
+
+It did not read:
+
+~~~text
+/skills/base/deployment-advisor/SKILL.md
+~~~
+
+The selected project skill returned:
+
+~~~text
+PROJECT_SKILL_SENTINEL_2222
+~~~
+
+and the model returned that value exactly.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+project override skill was read                              PASS
+base shadowed skill was not read                             PASS
+answer is project sentinel                                   PASS
+base sentinel absent from final answer                       PASS
+~~~
+
+### Skills versus AGENTS.md layering
+
+The experiments now demonstrate two different layering models.
+
+AGENTS.md:
+
+~~~text
+source A
+source B
+    |
+    v
+ordered textual composition
+    |
+    v
+both instructions reach the model
+~~~
+
+Skills:
+
+~~~text
+source A / skill-x
+source B / skill-x
+    |
+    v
+merge by skill name
+    |
+    v
+later source replaces earlier source
+    |
+    v
+only winning skill metadata/path is advertised
+~~~
+
+### Main lesson
+
+For duplicate skill names, source precedence is a deterministic framework
+behavior:
+
+~~~text
+later source wins
+~~~
+
+This is different from instruction-memory source ordering, where conflicting
+AGENTS.md contents are merely concatenated and conflict resolution is left to
+the model.
