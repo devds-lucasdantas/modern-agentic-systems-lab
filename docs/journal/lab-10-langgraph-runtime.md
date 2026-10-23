@@ -977,3 +977,80 @@ Later runs extend the thread without destroying earlier snapshots.
 
 Runtime checkpoint history is therefore versioned execution state, not merely
 an audit list of identifiers.
+
+## 0.12B7 — Historical Run Contract
+
+### OpenAPI inspection
+
+The pinned Runtime exposes historical checkpoint selection directly in the
+stateful run creation schema.
+
+`RunCreateStateful` contains:
+
+~~~text
+checkpoint: CheckpointConfig
+~~~
+
+described by the API as:
+
+~~~text
+The checkpoint to resume from.
+~~~
+
+`CheckpointConfig` exposes:
+
+~~~text
+thread_id
+checkpoint_ns
+checkpoint_id
+checkpoint_map
+~~~
+
+Therefore historical execution is part of the normal stateful run contract.
+
+### Distinct checkpoint operations
+
+The API exposes three separate checkpoint-oriented operations.
+
+Run creation:
+
+~~~text
+RunCreateStateful.checkpoint
+    -> checkpoint to resume execution from
+~~~
+
+State mutation:
+
+~~~text
+ThreadStateUpdate.checkpoint
+    -> checkpoint whose state should be updated
+~~~
+
+Historical state retrieval:
+
+~~~text
+ThreadStateCheckpointRequest.checkpoint
+    -> checkpoint whose state should be returned
+~~~
+
+Therefore checkpoint selection, state mutation, and historical state retrieval
+are distinct Runtime operations.
+
+### Time-travel execution model
+
+The expected execution model is:
+
+~~~text
+historical checkpoint
+        |
+        v
+RunCreateStateful.checkpoint
+        |
+        + new input
+        |
+        v
+new execution lineage
+~~~
+
+The next experiment will resume the existing thread from the final checkpoint
+of Run 1, while the original Run 2 lineage already exists.
