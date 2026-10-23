@@ -76,14 +76,39 @@ learning path remains reproducible without mixing upstream history with our own.
 The repository should grow incrementally. Directories and abstractions are added
 when the laboratory introduces them, rather than being scaffolded prematurely.
 
-## Current starting point
+## Current status
 
-The initial repository intentionally contains documentation only. No agent
-framework has been installed or implemented yet.
+Phase 0 — Deep Agents is functionally complete.
+
+The laboratory has incrementally validated:
+
+- Deep Agents construction and framework boundaries;
+- planning and filesystem behavior;
+- custom tools;
+- backend and persistence abstractions;
+- subagents;
+- human-in-the-loop;
+- long-term memory;
+- AGENTS.md instruction memory;
+- Skills and progressive disclosure;
+- LangGraph Runtime resources, checkpoints, branching and Store integration.
+
+The detailed Phase 0 synthesis is available at:
+
+- `docs/journal/lab-11-phase-0-review.md`.
+
+The current architectural model is maintained at:
+
+- `docs/architecture.md`.
+
+Phase 1 will move from agent internals toward runtime contracts, streaming and
+interoperability.
 
 See:
 
 - `ROADMAP.md` for the learning sequence;
+- `CURRENT.md` for the exact continuation point;
+- `docs/architecture.md` for the current system model;
 - `docs/radar.md` for the technology and architecture radar;
 - `docs/adr/` for architecture decisions;
 - `docs/journal/` for experiment records;
