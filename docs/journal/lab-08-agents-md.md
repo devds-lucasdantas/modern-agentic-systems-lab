@@ -544,3 +544,197 @@ rewrite the MemoryMiddleware snapshot already active in the current execution.
 
 The edit therefore reliably affects a later fresh load, not necessarily the
 current run.
+
+## 0.10D — Checkpointed Instruction-Memory Snapshot
+
+### Objective
+
+Determine whether the cached `memory_contents` snapshot survives across
+multiple `invoke()` calls when the same LangGraph thread is persisted through a
+checkpointer.
+
+### Setup
+
+The agent used:
+
+~~~text
+StateBackend
+MemoryMiddleware
+InMemorySaver checkpointer
+same thread_id
+~~~
+
+The initial AGENTS.md contained:
+
+~~~text
+CURRENT_SENTINEL=CHECKPOINT_OLD_3141
+~~~
+
+### First invocation
+
+The first invocation loaded the instruction file and returned:
+
+~~~text
+CHECKPOINT_OLD_3141
+~~~
+
+Inspection of the checkpoint showed:
+
+~~~text
+memory_contents
+    -> present
+    -> contains CHECKPOINT_OLD_3141
+~~~
+
+Therefore the private MemoryMiddleware state was persisted in checkpoint state.
+
+### Private does not mean ephemeral
+
+`memory_contents` is declared using `PrivateStateAttr`.
+
+The experiment demonstrates that, in this version, private state can still be
+present in checkpoint channel values.
+
+Therefore:
+
+~~~text
+PrivateStateAttr
+    !=
+ephemeral / non-checkpointed state
+~~~
+
+Here, "private" primarily concerns the agent state interface rather than
+checkpoint lifetime.
+
+### Editing AGENTS.md
+
+A second invocation in the same thread edited the backend file:
+
+~~~text
+CHECKPOINT_OLD_3141
+        ->
+CHECKPOINT_NEW_9265
+~~~
+
+The backend file successfully changed to the NEW value.
+
+However:
+
+~~~text
+model response
+    -> CHECKPOINT_OLD_3141
+
+checkpoint memory_contents
+    -> CHECKPOINT_OLD_3141
+~~~
+
+The file edit did not invalidate the cached instruction-memory snapshot.
+
+### Third invocation in the same thread
+
+A later `invoke()` using the same thread_id still returned:
+
+~~~text
+CHECKPOINT_OLD_3141
+~~~
+
+and checkpoint inspection still showed the OLD snapshot.
+
+The lifecycle was therefore:
+
+~~~text
+checkpoint restores memory_contents
+        |
+        v
+MemoryMiddleware.before_agent()
+        |
+        +-- memory_contents already exists
+        |
+        v
+skip backend reload
+~~~
+
+### New thread
+
+A different thread_id started without checkpointed `memory_contents`.
+
+MemoryMiddleware therefore loaded the already-updated backend file.
+
+The model returned:
+
+~~~text
+CHECKPOINT_NEW_9265
+~~~
+
+and the new thread's checkpoint contained the NEW version.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+initial model sees OLD                                             PASS
+memory_contents persisted in checkpoint                            PASS
+checkpoint initially contains OLD                                  PASS
+backend file changed to NEW                                        PASS
+edit invocation still reports OLD                                  PASS
+checkpoint remains OLD after file edit                             PASS
+same-thread later invocation reports OLD                           PASS
+same-thread checkpoint still contains OLD                          PASS
+new thread reports NEW                                             PASS
+new-thread checkpoint contains NEW                                 PASS
+~~~
+
+### Correct cache model
+
+Without checkpoint continuity, a fresh invocation can load the current backend
+file.
+
+With checkpoint continuity, the more accurate rule is:
+
+~~~text
+new invoke
+    !=
+fresh instruction-memory load
+~~~
+
+A reload occurs when execution state does not already contain
+`memory_contents`.
+
+Therefore instruction-memory snapshot lifetime is closer to:
+
+~~~text
+graph/thread state lifetime
+~~~
+
+than to:
+
+~~~text
+single invoke lifetime
+~~~
+
+### Operational implication
+
+An agent can edit its AGENTS.md and successfully persist a new instruction
+without that instruction becoming active in its current checkpointed thread.
+
+Applications that require immediate adoption of new instruction memory need an
+explicit cache invalidation or reload strategy.
+
+### Main lesson
+
+Three different truths can coexist:
+
+~~~text
+backend AGENTS.md
+    -> NEW
+
+checkpointed memory_contents
+    -> OLD
+
+effective model system context
+    -> OLD
+~~~
+
+File persistence and active instruction context therefore have independent
+lifecycles.
