@@ -857,3 +857,123 @@ Run 1 final checkpoint
         v
 Run 2 input checkpoint
 ~~~
+
+## 0.12B6 — Historical State by Checkpoint ID
+
+### Objective
+
+Verify that an earlier Runtime checkpoint remains directly addressable after
+later runs have extended the same thread.
+
+This is the read-only half of checkpoint time travel.
+
+### Historical checkpoint
+
+The final checkpoint from Run 1 was:
+
+~~~text
+1f1ce7cc-c568-61ea-8005-0abc595ebd5b
+~~~
+
+The Runtime endpoint:
+
+~~~text
+GET /threads/{thread_id}/state/{checkpoint_id}
+~~~
+
+returned the state associated with that exact checkpoint.
+
+### Historical state
+
+The Run 1 checkpoint contained two messages:
+
+~~~text
+Human:
+Return exactly RUNTIME_CHECKPOINT_7319 and nothing else.
+
+AI:
+RUNTIME_CHECKPOINT_7319
+~~~
+
+It did not contain the later Run 2 request.
+
+### Current state
+
+The current thread state, after Run 2, contained four messages:
+
+~~~text
+Human  Run 1 request
+AI     Run 1 response
+Human  Run 2 request
+AI     Run 2 response
+~~~
+
+Therefore retrieving an old checkpoint does not simply return the current
+thread state.
+
+It reconstructs the earlier persisted graph snapshot.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+historical state has two messages                              PASS
+current state has four messages                                PASS
+historical state contains original token                       PASS
+historical state excludes run-2 request                        PASS
+current state contains run-2 request                           PASS
+historical checkpoint differs from current                     PASS
+historical metadata retains middleware state                   PASS
+~~~
+
+### Historical middleware state
+
+The historical checkpoint also retained:
+
+~~~text
+skills_metadata
+memory_contents
+~~~
+
+Therefore historical state is not limited to conversation messages.
+
+It contains the graph channels that were persisted at that execution point.
+
+### Read-only time travel
+
+The Runtime now demonstrates:
+
+~~~text
+Thread
+ |
+ +-- current state
+ |
+ +-- historical checkpoint C1
+ |
+ +-- historical checkpoint C2
+ |
+ +-- ...
+ |
+ +-- historical checkpoint CN
+~~~
+
+Each persisted checkpoint can be addressed directly by checkpoint ID.
+
+This establishes read-only time travel:
+
+~~~text
+checkpoint ID
+    |
+    v
+historical graph snapshot
+~~~
+
+No branching or execution from a historical checkpoint has yet been performed.
+
+### Main lesson
+
+Later runs extend the thread without destroying earlier snapshots.
+
+Runtime checkpoint history is therefore versioned execution state, not merely
+an audit list of identifiers.
