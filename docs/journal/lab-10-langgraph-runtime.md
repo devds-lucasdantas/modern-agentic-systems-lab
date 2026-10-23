@@ -1943,3 +1943,229 @@ Store persistence
 
 The next experiment validates Store behavior directly before connecting it to
 Deep Agents `StoreBackend`.
+
+## 0.12B13 — Runtime Store Persistence and StoreBackend Mapping
+
+### Runtime Store operations
+
+A Store item was written to:
+
+~~~text
+namespace:
+    runtime-lab
+    b13
+
+key:
+    cross-thread-proof
+~~~
+
+with the marker:
+
+~~~text
+STORE_RUNTIME_6241
+~~~
+
+Runtime Store search successfully returned the item.
+
+A second PUT to the same namespace/key made the address resolve to:
+
+~~~text
+version: 2
+updated: true
+~~~
+
+All corrected assertions passed:
+
+~~~text
+v1 item exists                                       PASS
+v1 namespace is correct                              PASS
+v1 key is correct                                    PASS
+v1 marker is correct                                 PASS
+v2 item exists                                       PASS
+same namespace/key was updated                       PASS
+v2 updated flag is true                              PASS
+v2 preserves marker                                  PASS
+namespace listing contains b13                       PASS
+timestamps are present                               PASS
+~~~
+
+### Timestamp behavior
+
+The second PUT produced new `created_at` and `updated_at` values.
+
+Therefore the observed in-memory Runtime Store behavior should not be described
+as preserving the original item's creation timestamp.
+
+The demonstrated property is instead:
+
+~~~text
+same namespace/key
+    ->
+new value becomes addressable at the same logical Store address
+~~~
+
+### Point GET compatibility issue
+
+The OpenAPI-described point lookup:
+
+~~~text
+GET /store/items
+~~~
+
+returned `null` when the namespace query parameter was sent as repeated values:
+
+~~~text
+namespace=runtime-lab
+namespace=b13
+~~~
+
+This does not indicate a failed write because Store search returned the item
+immediately.
+
+The exact query serialization accepted by this pinned API remains a
+compatibility investigation.
+
+### Namespace endpoint schema drift
+
+The OpenAPI schema represented the namespace-list response as:
+
+~~~text
+array[array[string]]
+~~~
+
+while the observed server response was:
+
+~~~json
+{
+  "namespaces": [
+    ["runtime-lab", "b13"]
+  ]
+}
+~~~
+
+This is another compatibility/documentation discrepancy in the pinned Runtime.
+
+### Correct workshop Python environment
+
+The system Python is:
+
+~~~text
+/usr/bin/python
+Python 3.12.3
+~~~
+
+while the locked workshop environment uses:
+
+~~~text
+.venv/bin/python
+Python 3.11.14
+~~~
+
+Dependency source inspection must therefore use:
+
+~~~text
+uv run --locked python
+~~~
+
+### StoreBackend runtime ownership
+
+The pinned `StoreBackend` accepts an optional explicit Store.
+
+When no Store is supplied, `_get_store()` calls LangGraph `get_store()` at
+execution time.
+
+Conceptually:
+
+~~~text
+StoreBackend(store=None)
+        |
+        v
+get_store()
+        |
+        v
+LangGraph execution context
+        |
+        v
+Runtime-managed Store
+~~~
+
+This directly supports the Runtime export used by the workshop:
+
+~~~text
+registered Deep Agent
+    custom Store = None
+~~~
+
+### Legacy namespace behavior
+
+The workshop constructs `StoreBackend()` without an explicit namespace.
+
+The pinned implementation therefore uses its legacy namespace resolution.
+
+When an assistant ID is present in execution metadata:
+
+~~~text
+namespace =
+    (
+        assistant_id,
+        "filesystem"
+    )
+~~~
+
+Otherwise:
+
+~~~text
+namespace =
+    (
+        "filesystem",
+    )
+~~~
+
+Thread ID is not part of this default namespace.
+
+Therefore different threads running the same assistant are expected to resolve
+to the same Store namespace.
+
+### File representation
+
+The effective constructor default is:
+
+~~~text
+file_format = "v2"
+~~~
+
+V2 Store values contain:
+
+~~~json
+{
+  "content": "...",
+  "encoding": "utf-8"
+}
+~~~
+
+The pinned source docstring still labels V1 as the default, which is
+inconsistent with the executable constructor signature.
+
+### Store address
+
+`StoreBackend.read()` resolves a file using:
+
+~~~text
+store.get(namespace, file_path)
+~~~
+
+and `StoreBackend.write()` persists using:
+
+~~~text
+store.put(namespace, file_path, value)
+~~~
+
+Therefore Store files are addressed by:
+
+~~~text
+(namespace, file_path)
+~~~
+
+The remaining question before the end-to-end agent experiment is how
+`CompositeBackend` transforms the `/memories/` route before delegating the path
+to `StoreBackend`.
