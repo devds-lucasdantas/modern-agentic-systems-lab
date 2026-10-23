@@ -953,3 +953,24 @@ backend SKILL.md
 explicit read_file result
     -> NEW
 ~~~
+
+### Fixture pitfall — YAML plain scalars
+
+An earlier version of this experiment used:
+
+~~~yaml
+description: Deployment architecture skill. Catalog marker: OLD_CATALOG_3141.
+~~~
+
+The embedded `: ` sequence made the unquoted YAML scalar invalid.
+
+The parser correctly skipped the skill and produced an empty metadata catalog.
+
+The fixture was corrected to:
+
+~~~yaml
+description: "Deployment architecture skill. Catalog marker: OLD_CATALOG_3141."
+~~~
+
+This also provided an incidental confirmation that invalid YAML causes an
+individual skill to be skipped rather than crashing the entire agent.
