@@ -180,3 +180,122 @@ Static inspection leaves several runtime questions:
 5. How do multiple instruction files compose when they conflict?
 
 These are validated incrementally in the following experiments.
+
+## 0.10A2 — Memory State and Prompt Injection
+
+### Private state
+
+MemoryMiddleware extends agent state with:
+
+~~~text
+memory_contents: dict[str, str]
+~~~
+
+This field is marked as private state and is therefore intended for internal
+middleware use rather than final agent output.
+
+Conceptually:
+
+~~~text
+configured memory files
+        |
+        v
+backend.download_files(...)
+        |
+        v
+memory_contents
+        |
+        v
+private graph state
+~~~
+
+### Exact system wrapper
+
+Loaded instruction memory is injected using:
+
+~~~text
+<agent_memory>
+...
+</agent_memory>
+
+<memory_guidelines>
+...
+</memory_guidelines>
+~~~
+
+The agent-memory section includes both source paths and file contents.
+
+Therefore the model can distinguish which configured file a section came from.
+
+### Built-in memory policy
+
+MemoryMiddleware injects more than the configured AGENTS.md content.
+
+It also adds built-in memory guidelines that instruct the model to:
+
+- learn from user feedback;
+- save durable preferences and reusable information;
+- update memory immediately when appropriate;
+- avoid storing transient facts;
+- avoid storing credentials and secrets;
+- use filesystem editing tools to maintain instruction memory.
+
+Therefore `memory=` is not merely a file-include mechanism.
+
+It also activates a self-learning behavioral policy.
+
+### System-message composition
+
+Memory content is appended as an additional text content block to the existing
+SystemMessage.
+
+Existing system-message content blocks are preserved.
+
+Conceptually:
+
+~~~text
+existing system message
+        |
+        +
+instruction-memory block
+        |
+        v
+effective model request
+~~~
+
+### Cached snapshot
+
+MemoryMiddleware stores loaded files in:
+
+~~~text
+state["memory_contents"]
+~~~
+
+and skips loading when that field already exists.
+
+FilesystemMiddleware contains no logic that updates `memory_contents` when a
+memory source file is written or edited.
+
+This strongly suggests:
+
+~~~text
+AGENTS.md loaded
+      |
+      v
+memory_contents snapshot
+      |
+      +---- filesystem edit changes backend file
+      |
+      +---- cached snapshot may remain unchanged
+~~~
+
+The runtime consequences are not assumed yet and will be tested experimentally.
+
+### Open runtime questions
+
+The remaining important questions are:
+
+1. Can AGENTS.md influence a model response without explicit file reads?
+2. Does an edit affect a later model call in the same invocation?
+3. Does a fresh invocation reload the modified file?
+4. How does checkpointed state affect reload behavior?
