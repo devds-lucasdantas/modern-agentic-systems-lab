@@ -2246,3 +2246,56 @@ runtime-proof.txt
 ~~~
 
 This will be verified directly against `_route_for_path`.
+
+### Exact route normalization
+
+Direct inspection of `_route_for_path()` resolved the remaining path question.
+
+For the `/memories/` route:
+
+~~~text
+/memories/runtime-proof.txt
+    -> StoreBackend
+    -> /runtime-proof.txt
+
+/memories/subdir/note.md
+    -> StoreBackend
+    -> /subdir/note.md
+
+/memories/
+    -> StoreBackend
+    -> /
+
+/other.txt
+    -> default FilesystemBackend
+    -> /other.txt
+~~~
+
+The virtual route prefix is therefore removed while the delegated backend path
+retains a leading slash.
+
+The complete Store address expected for a routed memory file is:
+
+~~~text
+namespace:
+    (assistant_id, "filesystem")
+
+key:
+    stripped virtual path
+~~~
+
+For example:
+
+~~~text
+virtual path:
+    /memories/runtime-proof.txt
+
+Store namespace:
+    (<assistant-id>, "filesystem")
+
+Store key:
+    /runtime-proof.txt
+~~~
+
+This completes the source-level mapping required for the end-to-end Runtime
+Store experiment.
