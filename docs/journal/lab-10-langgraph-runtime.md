@@ -711,3 +711,149 @@ Run 2 initial checkpoint
 ~~~
 
 That boundary will be inspected directly from checkpoint history next.
+
+## 0.12B5 — Checkpoint Lineage Across Run Boundaries
+
+### Objective
+
+Verify whether checkpoint lineage itself crosses the boundary between separate
+runs on the same thread.
+
+The previous experiment had already demonstrated behavioral and state
+continuity. This experiment reconstructs the checkpoint parent relationships
+directly.
+
+### Run 1
+
+The first run produced checkpoints from:
+
+~~~text
+step -1
+~~~
+
+through:
+
+~~~text
+step 5
+~~~
+
+Its final checkpoint was:
+
+~~~text
+1f1ce7cc-c568-61ea-8005-0abc595ebd5b
+~~~
+
+### Run 2
+
+The second run began with:
+
+~~~text
+step: 6
+source: input
+next: [__start__]
+~~~
+
+Its first checkpoint was:
+
+~~~text
+1f1ce7dc-56b0-6aea-8006-df45400bbc36
+~~~
+
+and its parent was:
+
+~~~text
+1f1ce7cc-c568-61ea-8005-0abc595ebd5b
+~~~
+
+which is exactly the final checkpoint from Run 1.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+different run ids                                PASS
+run1 final checkpoint exists                     PASS
+run2 first checkpoint exists                     PASS
+run2 first parent is run1 final                  PASS
+~~~
+
+### Cross-run lineage
+
+The resulting lineage is therefore:
+
+~~~text
+Run 1
+
+C0 -> C1 -> C2 -> C3 -> C4 -> C5 -> C6
+                                    |
+                                    v
+Run 2
+
+                                    C7 -> C8 -> ... -> C13
+~~~
+
+The Runtime does not create an independent checkpoint chain for each run.
+
+Instead, a new run on an existing thread extends the previous persisted
+checkpoint lineage.
+
+### Input checkpoint
+
+The first checkpoint of Run 2 has:
+
+~~~text
+source = input
+next = [__start__]
+~~~
+
+This shows that the new run input is applied to the previously persisted thread
+state and itself becomes a new checkpoint before normal graph execution
+continues.
+
+Conceptually:
+
+~~~text
+previous thread state
+        |
+        v
+new run input
+        |
+        v
+checkpoint(source=input)
+        |
+        v
+__start__
+        |
+        v
+graph execution
+~~~
+
+### Step continuity
+
+The observed step sequence did not restart between runs:
+
+~~~text
+Run 1: -1, 0, 1, 2, 3, 4, 5
+Run 2:  6, 7, 8, 9, 10, 11, 12
+~~~
+
+For this linear thread execution, `metadata.step` therefore behaves as a
+continuous state-transition sequence rather than a run-local counter.
+
+This observation should not yet be generalized to branched/time-travel
+execution, which will be tested separately.
+
+### Main lesson
+
+Thread continuity exists at the checkpoint-lineage level, not merely at the
+conversation-message level.
+
+A new run extends the existing persisted execution history:
+
+~~~text
+Run 1 final checkpoint
+        |
+        v
+Run 2 input checkpoint
+~~~
