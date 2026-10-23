@@ -2169,3 +2169,80 @@ Therefore Store files are addressed by:
 The remaining question before the end-to-end agent experiment is how
 `CompositeBackend` transforms the `/memories/` route before delegating the path
 to `StoreBackend`.
+
+## 0.12B14A — CompositeBackend Route Delegation
+
+### Objective
+
+Determine how the virtual `/memories/` route delegates filesystem operations
+to `StoreBackend`.
+
+### Composite routing
+
+`CompositeBackend` routes paths by prefix and sorts configured routes by
+descending prefix length.
+
+Conceptually:
+
+~~~text
+virtual path
+    |
+    v
+longest matching route
+    |
+    +-- selected backend
+    |
+    +-- stripped backend key
+~~~
+
+The workshop route is:
+
+~~~text
+/memories/
+    -> StoreBackend
+~~~
+
+### Delegated paths
+
+For routed file operations, `CompositeBackend` calls `_route_for_path()` and
+passes the returned stripped key to the selected backend.
+
+For reads:
+
+~~~text
+backend, stripped_key = route(file_path)
+backend.read(stripped_key)
+~~~
+
+For writes:
+
+~~~text
+backend, stripped_key = route(file_path)
+backend.write(stripped_key, content)
+~~~
+
+The same stripping behavior is also used for edits, uploads, and downloads.
+
+Therefore `StoreBackend` does not receive the original virtual
+`/memories/...` path directly.
+
+The remaining source-level question is the exact shape of the stripped path,
+specifically whether:
+
+~~~text
+/memories/runtime-proof.txt
+~~~
+
+becomes:
+
+~~~text
+/runtime-proof.txt
+~~~
+
+or:
+
+~~~text
+runtime-proof.txt
+~~~
+
+This will be verified directly against `_route_for_path`.
