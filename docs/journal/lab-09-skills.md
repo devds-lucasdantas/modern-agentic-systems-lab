@@ -436,3 +436,144 @@ rather than:
 ~~~text
 backend file I/O
 ~~~
+
+## 0.11B — Runtime Progressive Disclosure
+
+### Objective
+
+Validate that skill metadata is sufficient for the model to select a relevant
+skill, while the full SKILL.md body is loaded only after explicit runtime
+selection.
+
+### Setup
+
+Two skills were installed:
+
+~~~text
+/skills/
+|
++-- deployment-advisor/
+|     +-- SKILL.md
+|
++-- poetry-writer/
+      +-- SKILL.md
+~~~
+
+Their metadata descriptions targeted unrelated domains.
+
+The deployment skill described deployment architecture, staging, production,
+and release targets.
+
+The poetry skill described poems, verses, rhyme, and related creative writing.
+
+### Body-only sentinels
+
+Each full skill body contained a value that was deliberately absent from the
+frontmatter description.
+
+~~~text
+deployment-advisor
+    -> DEPLOY_SKILL_SENTINEL_7319
+
+poetry-writer
+    -> POETRY_SKILL_SENTINEL_8426
+~~~
+
+Therefore the deployment sentinel could not be recovered from the initial
+metadata catalog alone.
+
+### Runtime routing
+
+The request was explicitly a deployment architecture task.
+
+The model selected the relevant skill and invoked:
+
+~~~text
+read_file(
+    "/skills/deployment-advisor/SKILL.md",
+    limit=1000
+)
+~~~
+
+The ToolMessage returned the complete deployment skill instructions, including:
+
+~~~text
+DEPLOY_SKILL_SENTINEL_7319
+~~~
+
+The model then returned exactly that value.
+
+### Irrelevant skill
+
+The model never called:
+
+~~~text
+read_file(
+    "/skills/poetry-writer/SKILL.md"
+)
+~~~
+
+and the poetry sentinel never appeared in the model-visible conversation or
+final response.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+at least one skill read occurred                               PASS
+deployment skill was read                                      PASS
+poetry skill was not read                                      PASS
+final answer is deployment body sentinel                       PASS
+poetry body sentinel never reached final answer                PASS
+~~~
+
+### Precise progressive-disclosure boundary
+
+Static inspection previously established that SkillsMiddleware internally
+downloads candidate SKILL.md files while discovering metadata.
+
+Therefore this experiment does not prove that the irrelevant skill file was
+never read by the runtime.
+
+It proves the more important model-context property:
+
+~~~text
+irrelevant full skill body
+    -> not disclosed to the model conversation
+~~~
+
+while:
+
+~~~text
+relevant full skill body
+    -> explicitly loaded through read_file
+~~~
+
+### Runtime architecture
+
+~~~text
+all skill metadata
+        |
+        v
+model-visible capability catalog
+        |
+        v
+semantic skill selection by model
+        |
+        v
+read_file(relevant SKILL.md)
+        |
+        v
+full selected instructions
+        |
+        v
+task execution
+~~~
+
+### Main lesson
+
+Skills implement real progressive disclosure at the LLM-context layer.
+
+The framework exposes a lightweight capability index, and the model loads the
+full instructions only for skills it determines are relevant.
