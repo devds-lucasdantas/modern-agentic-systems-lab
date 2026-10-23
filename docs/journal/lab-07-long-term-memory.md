@@ -1018,3 +1018,190 @@ Runtime.context
     -> namespace
     -> accessible memory
 ~~~
+
+## 0.9F — Memory Update and Staleness
+
+### Objective
+
+Validate how an agent maintains a canonical long-term memory when a previously
+valid fact changes.
+
+The experiment begins with:
+
+~~~text
+preferred deployment target = staging
+~~~
+
+and later receives:
+
+~~~text
+preferred deployment target = production
+~~~
+
+The desired behavior is to update the canonical fact rather than create
+conflicting duplicate memories.
+
+### Initial memory creation
+
+The agent first inspected the memory directory and attempted to read the
+canonical preference file.
+
+Because the file did not yet exist, it created:
+
+~~~text
+/memories/preferences.md
+~~~
+
+containing:
+
+~~~text
+Preferred deployment target: staging.
+~~~
+
+### Preference change
+
+A fresh invocation then stated that the preference had changed to:
+
+~~~text
+production
+~~~
+
+The agent performed:
+
+~~~text
+ls("/memories")
+        |
+        v
+read_file("/memories/preferences.md")
+        |
+        v
+edit_file(
+    old="Preferred deployment target: staging.",
+    new="Preferred deployment target: production."
+)
+~~~
+
+The existing canonical file was edited rather than replaced by a new memory
+file.
+
+### Store state after update
+
+The BaseStore still contained exactly one item:
+
+~~~text
+/preferences.md
+~~~
+
+with:
+
+~~~text
+Preferred deployment target: production.
+~~~
+
+The obsolete `staging` value no longer appeared in the canonical memory.
+
+### Metadata
+
+The Store item retained its original creation timestamp while receiving a later
+modification timestamp.
+
+Conceptually:
+
+~~~text
+created_at
+    -> memory object creation
+
+modified_at
+    -> latest canonical update
+~~~
+
+This is additional evidence that the same memory item was updated.
+
+### Fresh retrieval
+
+A third independent invocation asked for the current deployment preference.
+
+The agent again inspected long-term memory and read:
+
+~~~text
+production
+~~~
+
+It did not report `staging`.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+initial canonical memory existed                               PASS
+initial memory contained staging                               PASS
+updated canonical memory still exists                          PASS
+only one memory item remains                                   PASS
+canonical key remains preferences.md                           PASS
+updated memory contains production                             PASS
+updated memory no longer contains staging                      PASS
+update step inspected or edited memory                         PASS
+fresh retrieval consulted memory                               PASS
+fresh answer contains production                               PASS
+fresh answer does not claim staging                            PASS
+~~~
+
+### Current semantic memory versus event history
+
+The canonical memory represents the current semantic truth:
+
+~~~text
+current preference -> production
+~~~
+
+This is different from an append-only historical record such as:
+
+~~~text
+time 1 -> staging
+time 2 -> production
+~~~
+
+A production system may need both:
+
+~~~text
+event/audit history
+    -> append-only historical facts
+
+current agent memory
+    -> consolidated current facts
+~~~
+
+### Concurrency limitation
+
+This experiment validates sequential memory updates.
+
+It does not yet validate concurrent update behavior such as:
+
+~~~text
+reader A sees staging
+reader B sees staging
+
+A updates -> production
+B updates -> development
+~~~
+
+Conflict detection, optimistic concurrency, and lost-update prevention belong
+to later persistence and production-readiness work.
+
+### Main lesson
+
+Long-term memory requires lifecycle management, not just persistence.
+
+A useful memory system must support:
+
+~~~text
+create
+discover
+read
+update
+invalidate obsolete facts
+retrieve current truth
+~~~
+
+rather than accumulating every statement indefinitely.
