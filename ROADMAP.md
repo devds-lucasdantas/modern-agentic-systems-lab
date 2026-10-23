@@ -12,7 +12,7 @@
 - [x] 0.8 Human-in-the-loop
 - [x] 0.9 Long-term memory
 - [x] 0.10 AGENTS.md
-- [ ] 0.11 Skills
+- [x] 0.11 Skills
 - [ ] 0.12 LangGraph Runtime and Studio
 - [ ] 0.13 Phase review
 
