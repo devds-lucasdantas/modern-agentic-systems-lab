@@ -390,3 +390,157 @@ model
 ~~~
 
 Explicit filesystem access to the same file remains a separate capability.
+
+## 0.10C — Editing AGENTS.md During an Invocation
+
+### Objective
+
+Determine whether editing a configured AGENTS.md source immediately updates the
+instruction-memory content used by later model calls in the same invocation.
+
+### Initial instruction memory
+
+The agent started with:
+
+~~~text
+CURRENT_SENTINEL=OLD_SENTINEL_4182
+~~~
+
+configured through:
+
+~~~python
+memory=["/AGENTS.md"]
+~~~
+
+MemoryMiddleware loaded this content before execution.
+
+### Runtime edit
+
+During the invocation, the model called:
+
+~~~text
+edit_file(
+    /AGENTS.md,
+    OLD_SENTINEL_4182
+        ->
+    NEW_SENTINEL_9057
+)
+~~~
+
+The tool succeeded.
+
+The backend file then contained:
+
+~~~text
+CURRENT_SENTINEL=NEW_SENTINEL_9057
+~~~
+
+and no longer contained the old value.
+
+### Same-invocation model context
+
+After the successful edit, the next model call was instructed to report the
+sentinel present in its preloaded instruction-memory context rather than infer
+the value from tool-call history.
+
+It returned:
+
+~~~text
+OLD_SENTINEL_4182
+~~~
+
+Therefore the backend file and active instruction-memory snapshot had diverged:
+
+~~~text
+backend file
+    -> NEW_SENTINEL_9057
+
+memory_contents snapshot
+    -> OLD_SENTINEL_4182
+~~~
+
+### No automatic invalidation
+
+The agent did not perform any filesystem reread after editing the file.
+
+Static inspection had already shown that FilesystemMiddleware does not update
+`memory_contents`.
+
+The runtime result confirms the consequence:
+
+~~~text
+edit AGENTS.md
+    !=
+invalidate/reload MemoryMiddleware snapshot
+~~~
+
+during the same execution.
+
+### Fresh invocation
+
+A second independent invocation was started with the updated backend file.
+
+No filesystem discovery or explicit read tool was called.
+
+MemoryMiddleware loaded the file again and the model returned:
+
+~~~text
+NEW_SENTINEL_9057
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+first invocation edited AGENTS.md                                PASS
+first invocation did not reread after edit                       PASS
+backend file now contains NEW sentinel                           PASS
+backend file no longer contains OLD sentinel                     PASS
+same invocation reported OLD cached sentinel                     PASS
+fresh invocation used no filesystem read tools                   PASS
+fresh invocation reported NEW sentinel                           PASS
+~~~
+
+### Runtime model
+
+~~~text
+Invocation 1
+────────────
+AGENTS.md v1
+    |
+    v
+memory_contents v1
+    |
+    v
+model call
+    |
+    +-- edit AGENTS.md -> v2
+    |
+    v
+later model call
+    |
+    +-- memory_contents still v1
+
+
+Independent Invocation 2
+────────────────────────
+AGENTS.md v2
+    |
+    v
+new memory_contents v2
+    |
+    v
+model call
+~~~
+
+### Main lesson
+
+File-backed instruction memory and the active model instruction snapshot have
+different lifecycles.
+
+Editing AGENTS.md updates the backend immediately but does not automatically
+rewrite the MemoryMiddleware snapshot already active in the current execution.
+
+The edit therefore reliably affects a later fresh load, not necessarily the
+current run.
