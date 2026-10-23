@@ -1,0 +1,93 @@
+--- a/agent/agent.py
++++ b/agent/agent.py
+@@ -7,15 +7,18 @@
+ - /memories/* persists across threads via StoreBackend
+ - All other files live on disk in this project (sandboxed via virtual_mode=True)
+ 
+-Run directly (from the repo root):
+-    python agent/agent.py
++Runtime usage:
++    `deep_agent` is the LangGraph API / deployment export. It does not embed a
++    custom Store because persistence is supplied by the LangGraph Runtime.
+ 
+-Or import the compiled agent:
+-    from agent.agent import deep_agent
+-    result = deep_agent.invoke({"messages": [...]}, config={...})
++Standalone usage:
++    from agent.agent import create_standalone_agent
+ 
+-This module exports `deep_agent` so it can be wired into `langgraph.json`
+-for `langgraph dev` and LangSmith Deployments.
++    agent = create_standalone_agent()
++    result = agent.invoke({"messages": [...]}, config={...})
++
++The standalone variant uses a process-local InMemoryStore so `/memories/*`
++works without the LangGraph API runtime.
+ """
+ 
+ import sys
+@@ -65,24 +68,51 @@
+ # ---- Backend --------------------------------------------------------------
+ # Default: real disk in this project (sandboxed). AGENTS.md and skills/* are
+ # loaded straight from disk via this backend.
+-# Route: /memories/* → StoreBackend for cross-thread persistence.
+-fs_backend = FilesystemBackend(root_dir=str(AGENT_DIR), virtual_mode=True)
+-store = InMemoryStore()
++#
++# Route: /memories/* -> StoreBackend.
++#
++# StoreBackend intentionally has no explicit BaseStore here. It resolves the
++# active store from the graph/runtime execution context:
++#
++# - LangGraph API supplies the runtime-managed Store.
++# - create_standalone_agent() supplies a process-local InMemoryStore.
++fs_backend = FilesystemBackend(
++    root_dir=str(AGENT_DIR),
++    virtual_mode=True,
++)
+ 
+ backend = CompositeBackend(
+     default=fs_backend,
+-    routes={"/memories/": StoreBackend()},
++    routes={
++        "/memories/": StoreBackend(),
++    },
+ )
+ 
+ 
+ # ---- Agent ----------------------------------------------------------------
+ 
+-deep_agent = create_deep_agent(
+-    model=model,
+-    tools=[tavily_search],
+-    system_prompt="You are an expert research assistant.",
+-    memory=["./AGENTS.md"],  # always loaded into the system prompt
+-    skills=["./skills/"],  # loaded on demand via progressive disclosure
+-    backend=backend,
+-    store=store,
+-)
++def _build_agent(*, store=None):
++    """Build the workshop Deep Agent with the supplied runtime Store."""
++    return create_deep_agent(
++        model=model,
++        tools=[tavily_search],
++        system_prompt="You are an expert research assistant.",
++        memory=["./AGENTS.md"],
++        skills=["./skills/"],
++        backend=backend,
++        store=store,
++    )
++
++
++# Runtime/deployment export.
++#
++# Do NOT embed a custom Store or Checkpointer here. LangGraph API owns
++# persistence for registered graphs.
++deep_agent = _build_agent()
++
++
++def create_standalone_agent():
++    """Build a direct-Python agent with process-local long-term memory."""
++    return _build_agent(
++        store=InMemoryStore(),
++    )
