@@ -1200,3 +1200,59 @@ LangGraph Runtime checkpoint history is a branching execution DAG.
 
 A stateful run can resume from an earlier checkpoint and create a new
 descendant lineage without destroying already-existing descendants.
+
+## 0.12B9 — Thread State Update Contract
+
+### OpenAPI contract
+
+The pinned Runtime exposes:
+
+~~~text
+POST /threads/{thread_id}/state
+~~~
+
+with a `ThreadStateUpdate` payload containing:
+
+~~~text
+values
+checkpoint
+as_node
+~~~
+
+The API describes these fields as:
+
+~~~text
+values
+    -> The values to update the state with.
+
+checkpoint
+    -> The checkpoint to update the state of.
+
+as_node
+    -> Update the state as if this node had just executed.
+~~~
+
+The response contains a checkpoint object.
+
+### Conceptual distinction
+
+Historical run execution:
+
+~~~text
+checkpoint + Run
+    -> resume graph execution
+    -> execute nodes/model
+    -> create natural descendant lineage
+~~~
+
+Manual state update:
+
+~~~text
+checkpoint + values + as_node
+    -> directly modify graph state
+    -> create a derived checkpoint
+    -> no model execution required
+~~~
+
+The next experiment will update the historical final checkpoint of Run 1 and
+compare the resulting lineage with the two already-existing descendants.
