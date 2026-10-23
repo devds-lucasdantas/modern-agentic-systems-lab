@@ -10,7 +10,7 @@
 - [x] 0.6 Backends
 - [x] 0.7 Subagents
 - [x] 0.8 Human-in-the-loop
-- [ ] 0.9 Long-term memory
+- [x] 0.9 Long-term memory
 - [ ] 0.10 AGENTS.md
 - [ ] 0.11 Skills
 - [ ] 0.12 LangGraph Runtime and Studio
