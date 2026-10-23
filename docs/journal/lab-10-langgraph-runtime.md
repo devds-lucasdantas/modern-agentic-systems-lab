@@ -1481,3 +1481,138 @@ move the thread HEAD
 ~~~
 
 without executing the model.
+
+## 0.12B10 — Three Direct Descendants of One Checkpoint
+
+### Objective
+
+Inspect the checkpoint DAG after creating three different descendants of the
+same historical checkpoint through two mechanisms:
+
+1. normal stateful runs;
+2. explicit `update_state`.
+
+### Direct children
+
+The final Run 1 checkpoint has exactly three direct children:
+
+~~~text
+C6 step=5
+|
++-- C7
+|   source=input
+|   step=6
+|   run_id=<original Run 2>
+|
++-- B7
+|   source=input
+|   step=6
+|   run_id=<historical branch run>
+|
++-- U7
+    source=update
+    step=6
+    run_id=None
+~~~
+
+All assertions passed:
+
+~~~text
+C6 has exactly three direct children                 PASS
+all three children are logical step 6                PASS
+two children came from run input                     PASS
+one child came from update_state                     PASS
+manual update is one direct child                    PASS
+~~~
+
+### Run checkpoints versus update checkpoints
+
+The two run-created children have:
+
+~~~text
+source = input
+run_id = <run identifier>
+next = [__start__]
+~~~
+
+The state-surgery child has:
+
+~~~text
+source = update
+run_id = None
+next = [SkillsMiddleware.before_agent]
+~~~
+
+This confirms that `update_state` creates persisted graph state without
+creating a Run.
+
+### `as_node` and control-flow position
+
+The manual update used:
+
+~~~text
+as_node = "__start__"
+~~~
+
+Its resulting checkpoint therefore starts after `__start__`:
+
+~~~text
+next = [SkillsMiddleware.before_agent]
+~~~
+
+By comparison, a normal new Run first creates an input checkpoint whose next
+node is still:
+
+~~~text
+__start__
+~~~
+
+The difference can be represented as:
+
+~~~text
+Run input:
+
+new input
+   |
+   v
+checkpoint(source=input)
+   |
+   v
+__start__
+   |
+   v
+SkillsMiddleware
+
+
+update_state(as_node="__start__"):
+
+manual values
+   |
+   v
+checkpoint(source=update)
+   |
+   v
+SkillsMiddleware
+~~~
+
+### Step semantics
+
+All three children have:
+
+~~~text
+step = 6
+~~~
+
+despite being created at different wall-clock times and through different
+mechanisms.
+
+Therefore `metadata.step` is best interpreted, for the behavior observed in
+this pinned Runtime, as logical lineage position rather than a globally unique
+thread sequence.
+
+### Main lesson
+
+A Runtime thread checkpoint history is a true execution DAG.
+
+The same parent state can have multiple independently created descendants,
+including descendants created without a Run.
