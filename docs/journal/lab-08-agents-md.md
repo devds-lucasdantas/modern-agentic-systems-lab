@@ -738,3 +738,139 @@ effective model system context
 
 File persistence and active instruction context therefore have independent
 lifecycles.
+
+## 0.10E — Multiple AGENTS.md Sources
+
+### Objective
+
+Determine how MemoryMiddleware composes multiple instruction-memory sources.
+
+The experiment deliberately separates two questions:
+
+1. how the framework combines the sources;
+2. how the model behaves after receiving the combined instructions.
+
+### Configured sources
+
+The agent used:
+
+~~~python
+memory=[
+    "/global/AGENTS.md",
+    "/project/AGENTS.md",
+]
+~~~
+
+The global file contained:
+
+~~~text
+GLOBAL_SENTINEL_1111
+~~~
+
+and the project file contained:
+
+~~~text
+PROJECT_SENTINEL_2222
+~~~
+
+### Static composition
+
+Direct formatting through MemoryMiddleware produced:
+
+~~~text
+<agent_memory>
+
+/global/AGENTS.md
+...
+GLOBAL_SENTINEL_1111
+
+/project/AGENTS.md
+...
+PROJECT_SENTINEL_2222
+
+</agent_memory>
+~~~
+
+The configured source order was preserved.
+
+All static assertions passed:
+
+~~~text
+global source present                                  PASS
+project source present                                 PASS
+global content present                                 PASS
+project content present                                PASS
+configured source order preserved                      PASS
+~~~
+
+### Runtime behavior
+
+A model request asked for both sentinels.
+
+The visible trace contained only:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+~~~
+
+The model returned:
+
+~~~text
+GLOBAL=GLOBAL_SENTINEL_1111
+PROJECT=PROJECT_SENTINEL_2222
+~~~
+
+No filesystem discovery or read tools were used.
+
+### Composition semantics
+
+The demonstrated framework behavior is:
+
+~~~text
+configured sources
+        |
+        v
+ordered concatenation
+        |
+        v
+single instruction-memory block
+        |
+        v
+model system context
+~~~
+
+No semantic merge or conflict-resolution algorithm was observed.
+
+### No framework-level precedence rule
+
+Source ordering should not be confused with an authorization or instruction
+precedence system.
+
+The experiment does not establish a rule such as:
+
+~~~text
+project instructions override global instructions
+~~~
+
+If two files contain contradictory instructions, the model receives both.
+
+Any preference for one instruction over another would therefore be model
+behavior unless an explicit application-level precedence mechanism is added.
+
+### Main lesson
+
+Multiple AGENTS.md sources provide ordered composition, not semantic override.
+
+~~~text
+ordered composition
+    -> demonstrated
+
+semantic precedence
+    -> not demonstrated
+~~~
+
+Critical policies should not depend on the model informally resolving
+conflicting instruction files.
