@@ -974,3 +974,148 @@ description: "Deployment architecture skill. Catalog marker: OLD_CATALOG_3141."
 
 This also provided an incidental confirmation that invalid YAML causes an
 individual skill to be skipped rather than crashing the entire agent.
+
+## 0.11E — Skill Scope Across Subagents
+
+### Objective
+
+Determine how top-level skill sources interact with:
+
+- custom declarative subagents without `skills`;
+- custom declarative subagents with explicit `skills`;
+- the automatically-created general-purpose subagent.
+
+The experiment also prevents the parent from leaking the test marker through
+the `task` description.
+
+### Test skill
+
+The parent was configured with:
+
+~~~python
+skills=["/skills/"]
+~~~
+
+The advertised deployment skill description contained:
+
+~~~text
+CHILD_CATALOG_5731
+~~~
+
+The marker existed only in the Skills System catalog generated from the skill
+metadata.
+
+### Custom child without skills
+
+The first custom declarative subagent did not declare a `skills` field.
+
+The parent delegated using:
+
+~~~text
+subagent_type = custom-no-skills
+~~~
+
+The task description did not contain the marker.
+
+The child returned:
+
+~~~text
+NO_SKILLS_ADVERTISED
+~~~
+
+Therefore the child did not receive the parent's skill catalog through either
+the task arguments or its own automatic SkillsMiddleware.
+
+### Custom child with explicit skills
+
+The second custom declarative subagent declared:
+
+~~~python
+skills=["/skills/"]
+~~~
+
+Again, the task description did not contain the marker.
+
+The child returned:
+
+~~~text
+CHILD_CATALOG_5731
+~~~
+
+Therefore its explicitly configured SkillsMiddleware loaded and advertised the
+skill metadata in the child's own model context.
+
+### Default general-purpose subagent
+
+The automatically-created `general-purpose` subagent also returned:
+
+~~~text
+CHILD_CATALOG_5731
+~~~
+
+without receiving the marker through the task arguments.
+
+This confirms the static wiring previously observed: the automatically-created
+general-purpose subagent is explicitly constructed using the top-level skill
+sources.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+no-skills case delegated correctly                                     PASS
+explicit-skills case delegated correctly                               PASS
+general-purpose case delegated correctly                               PASS
+parent did not leak marker into no-skills task args                    PASS
+parent did not leak marker into explicit task args                    PASS
+parent did not leak marker into general-purpose task args              PASS
+custom child without skills sees no advertised skill                   PASS
+custom child without skills does not know marker                       PASS
+custom child with explicit skills sees marker                          PASS
+general-purpose child sees inherited marker                            PASS
+~~~
+
+### Skill scope model
+
+~~~text
+top-level skills=
+        |
+        +--------------------> main agent SkillsMiddleware
+        |
+        +--------------------> automatic general-purpose
+        |
+        X
+        |
+        +----> arbitrary custom declarative subagent
+
+
+custom declarative subagent
+        |
+        +-- no skills=
+        |      -> no skill catalog
+        |
+        +-- explicit skills=
+               -> own SkillsMiddleware
+~~~
+
+### State isolation
+
+The subagent experiments previously established that `skills_metadata` is not
+propagated from parent graph state into child state.
+
+Therefore a custom declarative child cannot obtain the parent's skill catalog
+merely through state inheritance.
+
+Its skills must be wired into the child's middleware configuration.
+
+### Main lesson
+
+Top-level skills are not a universal inheritance mechanism for every
+declarative subagent.
+
+The automatic general-purpose subagent is a special case constructed with the
+top-level skill configuration.
+
+Custom declarative subagents require explicit skill configuration when those
+capabilities should be available in their own context.
