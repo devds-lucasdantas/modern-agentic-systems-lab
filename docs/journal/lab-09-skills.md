@@ -727,3 +727,229 @@ later source wins
 This is different from instruction-memory source ordering, where conflicting
 AGENTS.md contents are merely concatenated and conflict resolution is left to
 the model.
+
+## 0.11D — Checkpointed Skill Catalog Staleness
+
+### Objective
+
+Determine whether skill discovery metadata is refreshed after the underlying
+SKILL.md changes inside a checkpointed thread.
+
+The experiment also separates:
+
+~~~text
+capability discovery metadata
+~~~
+
+from:
+
+~~~text
+current capability instructions
+~~~
+
+### Initial discovery
+
+The initial SKILL.md contained metadata with:
+
+~~~text
+OLD_CATALOG_3141
+~~~
+
+SkillsMiddleware discovered exactly one skill:
+
+~~~text
+deployment-advisor
+~~~
+
+and checkpoint state contained:
+
+~~~text
+skills_metadata = [
+    {
+        name: deployment-advisor,
+        description: ... OLD_CATALOG_3141 ...,
+        path: /skills/deployment-advisor/SKILL.md,
+        ...
+    }
+]
+~~~
+
+The model, using only its advertised Skills System catalog, returned:
+
+~~~text
+OLD_CATALOG_3141
+~~~
+
+### Updating the skill file
+
+The same checkpointed thread edited the SKILL.md frontmatter description:
+
+~~~text
+OLD_CATALOG_3141
+    ->
+NEW_CATALOG_9265
+~~~
+
+The backend file successfully changed.
+
+However, checkpointed `skills_metadata` remained:
+
+~~~text
+OLD_CATALOG_3141
+~~~
+
+### Same-thread catalog
+
+A later invocation in the same thread was instructed to use only the
+advertised Skills System catalog.
+
+It returned:
+
+~~~text
+OLD_CATALOG_3141
+~~~
+
+The checkpoint also still contained OLD metadata.
+
+Therefore the skill catalog was not automatically rediscovered after the file
+edit.
+
+### Same-thread explicit file read
+
+The agent then explicitly called:
+
+~~~text
+read_file(
+    "/skills/deployment-advisor/SKILL.md"
+)
+~~~
+
+The tool returned the current file contents containing:
+
+~~~text
+NEW_CATALOG_9265
+~~~
+
+The model therefore returned NEW.
+
+However, checkpointed `skills_metadata` remained OLD.
+
+Thus:
+
+~~~text
+read_file(SKILL.md)
+    !=
+refresh skills_metadata
+~~~
+
+### New thread
+
+A new thread started without cached `skills_metadata`.
+
+SkillsMiddleware performed discovery again and loaded:
+
+~~~text
+NEW_CATALOG_9265
+~~~
+
+The new thread's catalog-only response also returned NEW.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+initial catalog has exactly one skill                                PASS
+initial catalog contains OLD                                         PASS
+initial catalog does not contain NEW                                 PASS
+initial model catalog answer is OLD                                  PASS
+edit_file was used                                                   PASS
+backend file contains NEW                                            PASS
+backend file no longer contains OLD                                  PASS
+same-thread catalog remains OLD after edit                           PASS
+same-thread catalog-only model answer is OLD                         PASS
+same-thread metadata remains OLD                                     PASS
+current SKILL.md was explicitly read                                 PASS
+current file tool output contains NEW                                PASS
+current-file model answer is NEW                                     PASS
+catalog still OLD after reading current file                         PASS
+new-thread catalog contains NEW                                      PASS
+new-thread catalog-only answer is NEW                                PASS
+~~~
+
+### Two independent lifecycles
+
+The experiment establishes two different capability lifecycles:
+
+~~~text
+DISCOVERY
+
+SKILL.md
+    |
+    v
+SkillsMiddleware discovery
+    |
+    v
+skills_metadata
+    |
+    v
+checkpointed catalog
+
+
+EXECUTION
+
+current SKILL.md
+    |
+    v
+read_file
+    |
+    v
+current full instructions
+~~~
+
+The discovery catalog can therefore become stale while the current skill
+artifact is already updated.
+
+### Operational consequence
+
+Updating the body of an already-known skill can affect an explicit future
+`read_file` immediately.
+
+Updating metadata used for skill routing, especially `description`, may not
+affect an existing checkpointed thread until the metadata cache is invalidated
+or discovery occurs in fresh state.
+
+This matters because semantic skill selection is based on the advertised
+catalog.
+
+### Private state persistence
+
+`skills_metadata` is declared using `PrivateStateAttr`, yet the experiment
+shows that it survives checkpoint persistence.
+
+Combined with the AGENTS.md experiments:
+
+~~~text
+PrivateStateAttr
+    !=
+ephemeral state
+~~~
+
+for the pinned framework version.
+
+### Main lesson
+
+Capability discovery and capability execution have independent lifecycles.
+
+At the same moment a thread can legitimately contain:
+
+~~~text
+skills_metadata catalog
+    -> OLD
+
+backend SKILL.md
+    -> NEW
+
+explicit read_file result
+    -> NEW
+~~~
