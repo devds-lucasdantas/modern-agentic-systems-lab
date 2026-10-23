@@ -78,7 +78,7 @@ when the laboratory introduces them, rather than being scaffolded prematurely.
 
 ## Current status
 
-Phase 0 — Deep Agents is functionally complete.
+Phase 0 — Deep Agents is complete.
 
 The laboratory has incrementally validated:
 

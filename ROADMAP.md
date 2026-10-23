@@ -14,7 +14,7 @@
 - [x] 0.10 AGENTS.md
 - [x] 0.11 Skills
 - [x] 0.12 LangGraph Runtime and Studio
-- [ ] 0.13 Phase review
+- [x] 0.13 Phase review
 
 ## Phase 1 — Agent Runtime & Protocols
 

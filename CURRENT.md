@@ -28,7 +28,7 @@ and remains outside the learning repository history.
 
 ## Current phase
 
-Phase 0 — Deep Agents is functionally complete.
+Phase 0 — Deep Agents is complete.
 
 Completed roadmap items:
 
@@ -45,18 +45,16 @@ Completed roadmap items:
 0.10 AGENTS.md
 0.11 Skills
 0.12 LangGraph Runtime and Studio
-~~~
-
-Current item:
-
-~~~text
 0.13 Phase review
 ~~~
 
-The Phase 0 synthesis has already been written.
+All Phase 0 roadmap items are complete.
 
-Remaining work is the final repository consistency review and formal closure of
-0.13.
+The Phase 0 synthesis is preserved in:
+
+~~~text
+docs/journal/lab-11-phase-0-review.md
+~~~
 
 ## Current architecture
 
@@ -283,23 +281,30 @@ excluded from repository history.
 
 ## Next
 
-Complete **0.13 Phase review** by performing a final consistency audit across:
-
-- `README.md`;
-- `CURRENT.md`;
-- `ROADMAP.md`;
-- `docs/architecture.md`;
-- `docs/journal/lab-11-phase-0-review.md`;
-- preserved patches and references.
-
-Then:
-
-1. mark `0.13 Phase review` as complete in `ROADMAP.md`;
-2. commit the Phase 0 completion checkpoint;
-3. begin Phase 1 — Agent Runtime & Protocols.
+Begin **Phase 1 — Agent Runtime & Protocols**.
 
 Phase 1 should reuse rather than repeat the Runtime knowledge already validated
 during Phase 0.
+
+The first Phase 1 objective is to formalize the runtime resource model and API
+contracts around:
+
+- Agent / Assistant;
+- Thread;
+- Run;
+- State;
+- checkpoints;
+- Store;
+- persistence.
+
+After that, the phase expands into:
+
+- streaming;
+- background runs;
+- Agent Protocol;
+- Agent Streaming Protocol;
+- MCP;
+- A2A.
 
 Its goal is to move from:
 
