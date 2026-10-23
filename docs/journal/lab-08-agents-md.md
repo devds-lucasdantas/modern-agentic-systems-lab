@@ -299,3 +299,94 @@ The remaining important questions are:
 2. Does an edit affect a later model call in the same invocation?
 3. Does a fresh invocation reload the modified file?
 4. How does checkpointed state affect reload behavior?
+
+## 0.10B — Implicit AGENTS.md Loading
+
+### Objective
+
+Prove that an AGENTS.md source configured through `memory=` influences the
+model without requiring the model to discover or explicitly read the file.
+
+### Setup
+
+The virtual filesystem contained:
+
+~~~text
+/AGENTS.md
+~~~
+
+with a deterministic instruction requiring:
+
+~~~text
+SENTINEL_AGENT_7319
+~~~
+
+The Deep Agent was configured with:
+
+~~~python
+memory=["/AGENTS.md"]
+~~~
+
+using StateBackend.
+
+### Execution
+
+The user asked which sentinel the agent was required to use.
+
+The complete visible trace was:
+
+~~~text
+HumanMessage
+    |
+    v
+AIMessage
+    |
+    +-- SENTINEL_AGENT_7319
+~~~
+
+No filesystem discovery or read operation occurred.
+
+Specifically, the agent did not call:
+
+~~~text
+ls
+read_file
+grep
+glob
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+final answer is exact sentinel                                 PASS
+no filesystem discovery/read tool was used                     PASS
+AGENTS.md remained available in StateBackend                   PASS
+~~~
+
+### Main lesson
+
+AGENTS.md configured through `memory=` is not a file that the model must decide
+to discover and read.
+
+MemoryMiddleware loads it before model execution and injects its content into
+the model's system context.
+
+~~~text
+AGENTS.md
+    |
+    v
+MemoryMiddleware
+    |
+    v
+private memory_contents state
+    |
+    v
+system context
+    |
+    v
+model
+~~~
+
+Explicit filesystem access to the same file remains a separate capability.
