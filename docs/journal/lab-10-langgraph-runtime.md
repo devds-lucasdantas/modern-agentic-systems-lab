@@ -1616,3 +1616,225 @@ A Runtime thread checkpoint history is a true execution DAG.
 
 The same parent state can have multiple independently created descendants,
 including descendants created without a Run.
+
+## 0.12B11 — Resume After Historical State Surgery
+
+### Objective
+
+Resume the checkpoint created by `update_state` without supplying any new
+input.
+
+The update checkpoint had:
+
+~~~text
+source: update
+step: 6
+run_id: None
+next:
+    SkillsMiddleware.before_agent
+~~~
+
+and contained the manually inserted HumanMessage:
+
+~~~text
+MANUAL_STATE_UPDATE_9134
+~~~
+
+### Resume request
+
+The new stateful run selected the update checkpoint but supplied no `input`.
+
+Conceptually:
+
+~~~text
+RunCreateStateful
+    assistant_id
+    checkpoint = U7
+    no input
+~~~
+
+### Execution continuation
+
+The Runtime did not create a new `source=input` checkpoint.
+
+Instead, execution continued directly from the pending node stored in U7.
+
+The observed sequence was:
+
+~~~text
+U7
+step=6
+next=SkillsMiddleware.before_agent
+    |
+    v
+step=7
+source=loop
+next=PatchToolCallsMiddleware.before_agent
+    |
+    v
+step=8
+next=MemoryMiddleware.before_agent
+    |
+    v
+step=9
+next=model
+    |
+    v
+step=10
+next=TodoListMiddleware.after_model
+    |
+    v
+step=11
+next=[]
+~~~
+
+The first descendant of U7 was therefore a normal loop checkpoint rather than
+a new input checkpoint.
+
+### Resume versus new input
+
+The experiments now distinguish two stateful-run behaviors.
+
+New input:
+
+~~~text
+previous checkpoint
+    |
+    v
+checkpoint(source=input)
+    |
+    v
+__start__
+    |
+    v
+graph execution
+~~~
+
+Resume with no input:
+
+~~~text
+pending checkpoint
+    |
+    v
+execute checkpoint.next
+    |
+    v
+checkpoint(source=loop)
+    |
+    v
+graph execution continues
+~~~
+
+### `as_node` end-to-end behavior
+
+The previous `update_state` used:
+
+~~~text
+as_node="__start__"
+~~~
+
+and produced:
+
+~~~text
+next=SkillsMiddleware.before_agent
+~~~
+
+The resume experiment confirmed that this stored control-flow position is
+executable.
+
+The Runtime resumed by executing `SkillsMiddleware.before_agent`, then advanced
+through the subsequent graph nodes.
+
+Therefore `as_node` affects actual continuation semantics, not merely
+checkpoint metadata.
+
+### State surgery and Runs
+
+The update checkpoint itself had:
+
+~~~text
+run_id=None
+~~~
+
+Resuming that checkpoint created a new Runtime Run.
+
+Therefore:
+
+~~~text
+update_state
+    -> create graph state
+    -> no Run required
+
+resume
+    -> execute graph from that state
+    -> create Run
+~~~
+
+### Model consumption of manually mutated state
+
+Before resume, the messages channel contained:
+
+~~~text
+Human  original request
+AI     original response
+Human  MANUAL_STATE_UPDATE_9134
+~~~
+
+No new HumanMessage was supplied during resume.
+
+After execution, the state contained:
+
+~~~text
+Human  original request
+AI     original response
+Human  MANUAL_STATE_UPDATE_9134
+AI     MANUAL_STATE_UPDATE_9134
+~~~
+
+Therefore the model consumed the HumanMessage introduced through
+`update_state`.
+
+This demonstrates an end-to-end state-surgery flow:
+
+~~~text
+manual state mutation
+        |
+        v
+persisted graph checkpoint
+        |
+        v
+resume
+        |
+        v
+model consumes repaired state
+        |
+        v
+normal graph completion
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+resume request contains no input                           PASS
+resume request targets U7                                  PASS
+U7 was pending before resume                               PASS
+manual marker existed before resume                        PASS
+manual marker survives resume                              PASS
+resume did not add another human message                   PASS
+resume produced a new checkpoint                           PASS
+resume created a Run                                       PASS
+resume Run exists in history                               PASS
+U7 has a descendant after resume                           PASS
+~~~
+
+### Main lesson
+
+A Runtime checkpoint is not only a historical snapshot.
+
+When it contains pending `next` nodes, it is an executable continuation point.
+
+`update_state` plus `as_node` can therefore be used to perform graph-aware
+state surgery and subsequently resume normal agent execution from the repaired
+state.
