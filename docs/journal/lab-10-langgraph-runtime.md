@@ -312,3 +312,253 @@ Persistence ownership is part of the deployment contract.
 
 Application code should not embed development-only persistence implementations
 into a graph intended to be managed by LangGraph API.
+
+## 0.12B2 — Assistant and Thread Resources
+
+### Default assistant
+
+After successful graph registration, the Runtime automatically created a
+system-owned assistant for the configured graph:
+
+~~~text
+graph_id: deep_agent
+name: deep_agent
+version: 1
+~~~
+
+The assistant therefore represents a registered graph/application
+configuration that can be selected when creating runs.
+
+### Empty thread
+
+Creating a thread before any run produced:
+
+~~~text
+status: idle
+values: null
+~~~
+
+The thread state endpoint returned:
+
+~~~text
+values: {}
+next: []
+tasks: []
+checkpoint: null
+parent_checkpoint: null
+checkpoint_id: null
+parent_checkpoint_id: null
+~~~
+
+This establishes a clean baseline before execution.
+
+### Runtime resource model
+
+At this point the API exposes distinct concepts:
+
+~~~text
+Assistant
+    -> registered graph/configuration
+
+Thread
+    -> persistent execution-state identity
+~~~
+
+A thread exists independently of a run and initially has no graph checkpoint.
+
+## 0.12B3 — Runtime-Managed Checkpoints
+
+### Objective
+
+Determine whether LangGraph API provides thread/checkpoint persistence even
+when the exported CompiledStateGraph has:
+
+~~~text
+checkpointer = None
+store = None
+~~~
+
+### First run
+
+The first thread run received only:
+
+~~~text
+Return exactly RUNTIME_CHECKPOINT_7319 and nothing else.
+~~~
+
+The model returned:
+
+~~~text
+RUNTIME_CHECKPOINT_7319
+~~~
+
+### State after the run
+
+The Runtime thread state contained:
+
+~~~text
+messages
+skills_metadata
+memory_contents
+~~~
+
+The messages channel contained both the HumanMessage and AIMessage.
+
+SkillsMiddleware metadata was persisted in:
+
+~~~text
+skills_metadata
+~~~
+
+and the AGENTS.md snapshot was persisted in:
+
+~~~text
+memory_contents
+~~~
+
+### Runtime-owned checkpoint
+
+The state returned a concrete checkpoint identifier and parent checkpoint:
+
+~~~text
+checkpoint_id
+parent_checkpoint_id
+~~~
+
+This occurred even though:
+
+~~~text
+deep_agent.checkpointer is None
+~~~
+
+Therefore the pinned LangGraph API Runtime manages checkpoint persistence
+outside the exported graph object.
+
+The effective architecture is:
+
+~~~text
+CompiledStateGraph
+    checkpointer=None
+    store=None
+        |
+        v
+LangGraph API Runtime
+        |
+        +-- threads
+        +-- checkpoints
+        +-- checkpoint history
+        +-- runtime Store
+        +-- run lifecycle
+~~~
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+runtime state contains run-1 token                         PASS
+runtime state contains messages channel                    PASS
+runtime state contains memory_contents channel             PASS
+runtime state contains skills_metadata channel             PASS
+~~~
+
+### Private middleware state
+
+The Runtime state API exposed both:
+
+~~~text
+memory_contents
+skills_metadata
+~~~
+
+Although these graph fields use `PrivateStateAttr`, they are persisted as
+checkpoint channels and visible through the Runtime thread-state API in the
+pinned stack.
+
+Therefore:
+
+~~~text
+PrivateStateAttr
+    != ephemeral
+    != non-checkpointed
+    != necessarily hidden from Runtime state inspection
+~~~
+
+### Multiple checkpoints per run
+
+Thread history revealed multiple checkpoints during one run.
+
+The execution progressed through states associated with:
+
+~~~text
+__start__
+SkillsMiddleware.before_agent
+PatchToolCallsMiddleware.before_agent
+MemoryMiddleware.before_agent
+model
+...
+~~~
+
+Each stage generated state that could be inspected through checkpoint history.
+
+Therefore:
+
+~~~text
+run
+    != checkpoint
+~~~
+
+One run can generate a chain of multiple checkpoints.
+
+### Checkpoint lineage
+
+Checkpoint entries contain:
+
+~~~text
+checkpoint_id
+parent_checkpoint_id
+~~~
+
+forming a parent-linked execution history.
+
+Conceptually:
+
+~~~text
+C0
+ |
+ v
+C1
+ |
+ v
+C2
+ |
+ v
+...
+ |
+ v
+CN
+~~~
+
+This lineage is the foundation for later experiments involving replay,
+time-travel, state updates, branching, and interruption/resume.
+
+### Runtime concepts
+
+The experiments now support the following model:
+
+~~~text
+Assistant
+    -> graph/configuration to execute
+
+Thread
+    -> persistent execution identity
+
+Run
+    -> one execution request against a thread
+
+Checkpoint
+    -> persisted state snapshot during graph execution
+~~~
+
+A single thread can contain multiple runs and each run can generate multiple
+checkpoints.
