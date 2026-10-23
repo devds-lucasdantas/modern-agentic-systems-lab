@@ -2299,3 +2299,264 @@ Store key:
 
 This completes the source-level mapping required for the end-to-end Runtime
 Store experiment.
+
+## 0.12B14 — End-to-End Runtime Store and Cross-Thread Memory
+
+### Objective
+
+Validate the complete Runtime Store integration used by the workshop Deep
+Agent:
+
+~~~text
+Deep Agent filesystem tools
+    ->
+CompositeBackend
+    ->
+StoreBackend
+    ->
+LangGraph execution-context Store
+    ->
+Runtime-managed Store
+~~~
+
+The experiment also verifies that Store-backed memory is shared across
+different threads executing the same assistant.
+
+### Writer and reader threads
+
+Two different Runtime threads were used:
+
+~~~text
+writer:
+01a166a4-55bd-7ed1-89d0-3a69ca6f5be4
+
+reader:
+01a16697-2ff2-7e52-a667-44d231917f2a
+~~~
+
+The reader thread was empty before the experiment:
+
+~~~text
+values: {}
+checkpoint: null
+checkpoint_id: null
+~~~
+
+Therefore it contained no checkpointed state from the writer.
+
+### Writer tool execution
+
+The writer agent was instructed to create:
+
+~~~text
+/memories/runtime-proof-b14-8426.txt
+~~~
+
+with exact contents:
+
+~~~text
+STOREBACKEND_RUNTIME_8426
+~~~
+
+The model invoked:
+
+~~~text
+write_file(
+    file_path="/memories/runtime-proof-b14-8426.txt",
+    content="STOREBACKEND_RUNTIME_8426"
+)
+~~~
+
+The tool completed successfully and the agent then returned:
+
+~~~text
+WRITE_OK
+~~~
+
+### Physical Runtime Store item
+
+Direct Runtime Store inspection revealed:
+
+~~~text
+namespace:
+    (
+        assistant_id,
+        "filesystem"
+    )
+
+key:
+    /runtime-proof-b14-8426.txt
+~~~
+
+with:
+
+~~~json
+{
+  "content": "STOREBACKEND_RUNTIME_8426",
+  "encoding": "utf-8"
+}
+~~~
+
+This matches the previously derived source-level mapping exactly:
+
+~~~text
+/memories/runtime-proof-b14-8426.txt
+        |
+        v
+CompositeBackend
+        |
+        v
+/runtime-proof-b14-8426.txt
+        |
+        v
+StoreBackend
+        |
+        v
+Runtime Store
+~~~
+
+### Runtime-owned Store
+
+The exported Runtime graph does not embed a custom Store.
+
+Its routed backend uses:
+
+~~~text
+StoreBackend(store=None)
+~~~
+
+which resolves the active Store through LangGraph `get_store()` during graph
+execution.
+
+The physical Store item therefore proves that the Runtime execution context
+successfully supplied the Store required by `StoreBackend`.
+
+### Cross-thread read
+
+The reader thread used the same assistant but had no previous state.
+
+The model invoked:
+
+~~~text
+read_file(
+    file_path="/memories/runtime-proof-b14-8426.txt"
+)
+~~~
+
+The tool returned:
+
+~~~text
+STOREBACKEND_RUNTIME_8426
+~~~
+
+and the final model response was exactly:
+
+~~~text
+STOREBACKEND_RUNTIME_8426
+~~~
+
+Therefore the memory written by one thread was successfully retrieved from a
+different thread.
+
+### Persistence scope
+
+The default legacy `StoreBackend` namespace is:
+
+~~~text
+(
+    assistant_id,
+    "filesystem"
+)
+~~~
+
+and does not include `thread_id`.
+
+The observed behavior therefore matches the source-level design:
+
+~~~text
+Thread A ----\
+              \
+Thread B ------> same Assistant
+              /
+Thread C ----/
+                  |
+                  v
+        assistant-scoped Store namespace
+~~~
+
+### Checkpoint versus Store persistence
+
+The Runtime experiments now empirically distinguish the two persistence
+domains.
+
+Checkpoint persistence:
+
+~~~text
+Thread
+    ->
+execution state
+    ->
+checkpoint DAG
+~~~
+
+Store persistence:
+
+~~~text
+Assistant namespace
+    ->
+namespace/key/value documents
+    ->
+cross-thread memory
+~~~
+
+A thread does not need to share checkpoint history with another thread to
+access the same Store-backed memory.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+writer and reader are different threads                              PASS
+writer invoked filesystem operation on virtual memory path           PASS
+Runtime Store contains exactly one expected item                     PASS
+Store namespace is assistant scoped                                  PASS
+Composite route became expected Store key                            PASS
+Store value contains exact marker                                    PASS
+Store value uses utf-8                                               PASS
+reader thread did not already contain marker                         PASS
+reader invoked filesystem operation on same virtual path             PASS
+reader result contains marker                                        PASS
+reader final AI response is exact marker                             PASS
+~~~
+
+### Main lesson
+
+The workshop's Runtime deployment architecture is now validated end to end:
+
+~~~text
+registered Deep Agent
+    |
+    +-- graph.checkpointer = None
+    |
+    +-- graph.store = None
+    |
+    v
+LangGraph Runtime
+    |
+    +-- owns checkpoint persistence
+    |
+    +-- supplies execution-context Store
+            |
+            v
+       StoreBackend
+            |
+            v
+      /memories/* files
+            |
+            v
+      cross-thread memory
+~~~
+
+The absence of embedded Store and Checkpointer objects in the registered graph
+is therefore intentional Runtime ownership, not missing persistence.
