@@ -1256,3 +1256,228 @@ checkpoint + values + as_node
 
 The next experiment will update the historical final checkpoint of Run 1 and
 compare the resulting lineage with the two already-existing descendants.
+
+## 0.12B9 — Historical State Surgery with `update_state`
+
+### Objective
+
+Create a third descendant of the final Run 1 checkpoint through explicit state
+mutation rather than graph execution.
+
+Run 1 final already had two execution descendants:
+
+~~~text
+                 C6
+                /  \
+               /    \
+              C7    B7
+           Run 2   historical run branch
+~~~
+
+The experiment adds a third descendant using:
+
+~~~text
+POST /threads/{thread_id}/state
+~~~
+
+### Manual update
+
+The update targeted C6 and supplied only:
+
+~~~text
+messages:
+    Human("MANUAL_STATE_UPDATE_9134")
+
+as_node:
+    __start__
+~~~
+
+No model execution was requested.
+
+The Runtime returned a new checkpoint:
+
+~~~text
+1f1ce80a-6e9c-6213-8006-d05110082cf7
+~~~
+
+whose parent was C6.
+
+### State reducer behavior
+
+The resulting `messages` channel contained:
+
+~~~text
+Human  Run 1 request
+AI     RUNTIME_CHECKPOINT_7319
+Human  MANUAL_STATE_UPDATE_9134
+~~~
+
+The update therefore did not replace the channel.
+
+The graph's messages reducer combined the existing state with the supplied
+update.
+
+Conceptually:
+
+~~~text
+existing channel state
+        +
+update_state values
+        |
+        v
+channel reducer
+        |
+        v
+new persisted state
+~~~
+
+`update_state` therefore follows graph channel/reducer semantics rather than
+behaving like a plain dictionary replacement.
+
+### Update checkpoint metadata
+
+The generated checkpoint had:
+
+~~~text
+source: update
+step: 6
+parent: C6
+~~~
+
+This distinguishes an explicit state mutation from ordinary Runtime
+transitions:
+
+~~~text
+source=input
+    -> run input checkpoint
+
+source=loop
+    -> normal graph transition
+
+source=update
+    -> explicit state update
+~~~
+
+### `as_node` and execution position
+
+The request used:
+
+~~~text
+as_node = "__start__"
+~~~
+
+The resulting checkpoint reported:
+
+~~~text
+next:
+    SkillsMiddleware.before_agent
+~~~
+
+with a pending task for the same node.
+
+Therefore `as_node` is not merely descriptive metadata.
+
+It affects the graph execution position by telling the Runtime to apply the
+state update as though the specified node had just executed.
+
+Conceptually:
+
+~~~text
+manual state values
+        +
+as_node="__start__"
+        |
+        v
+new checkpoint
+        |
+        v
+graph successor calculation
+        |
+        v
+SkillsMiddleware.before_agent
+~~~
+
+The Runtime state update therefore modifies both data state and control-flow
+position.
+
+### Third descendant
+
+C6 now has three independently created children:
+
+~~~text
+                         C6 step=5
+                       /     |     \
+                      /      |      \
+                     v       v       v
+                  C7         B7       U7
+                Run 2      Run      update_state
+                step=6     step=6    step=6
+~~~
+
+This further confirms that `metadata.step` is not a globally unique or
+wall-clock-ordered thread sequence.
+
+Different branches can contain distinct checkpoints at the same logical step.
+
+### Thread HEAD
+
+Before the manual update, the current thread HEAD was the historical execution
+branch tip.
+
+After the update, the current HEAD became the new update checkpoint.
+
+Therefore, in the pinned Runtime:
+
+~~~text
+update_state(historical checkpoint)
+    -> create alternate descendant
+    -> move current thread HEAD to that descendant
+~~~
+
+Older branches remain preserved in checkpoint history.
+
+### Pending execution
+
+Unlike the completed run checkpoints, the manual update checkpoint has a
+non-empty `next` field:
+
+~~~text
+next:
+    SkillsMiddleware.before_agent
+~~~
+
+It therefore represents a persisted graph state that is ready to continue
+execution rather than a completed workflow state.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+request targets Run-1 historical checkpoint                        PASS
+update checkpoint differs from Run-1 base                          PASS
+update checkpoint parent is Run-1 final                            PASS
+updated state has three messages                                   PASS
+updated state preserves Run-1 human message                        PASS
+updated state preserves Run-1 AI response                          PASS
+updated state contains manual human message                        PASS
+updated state excludes original Run-2 request                      PASS
+updated state excludes previous execution branch                   PASS
+~~~
+
+### Main lesson
+
+`update_state` is graph-aware state surgery.
+
+It can:
+
+~~~text
+select a historical checkpoint
+apply reducer-aware state changes
+attribute the change to a graph node
+create a new checkpoint branch
+position graph execution for continuation
+move the thread HEAD
+~~~
+
+without executing the model.
