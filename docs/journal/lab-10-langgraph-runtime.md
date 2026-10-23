@@ -562,3 +562,152 @@ Checkpoint
 
 A single thread can contain multiple runs and each run can generate multiple
 checkpoints.
+
+## 0.12B4 — State Continuity Across Runs
+
+### Objective
+
+Verify that separate runs executed against the same Runtime thread continue
+from previously persisted graph state.
+
+### Run 1
+
+The first run stored:
+
+~~~text
+Human:
+Return exactly RUNTIME_CHECKPOINT_7319 and nothing else.
+
+AI:
+RUNTIME_CHECKPOINT_7319
+~~~
+
+The resulting thread contained two messages.
+
+### Run 2 input
+
+The second request did not contain the token.
+
+It only asked:
+
+~~~text
+Return only the exact token I instructed you to return in the previous run.
+Do not use tools.
+~~~
+
+### Run 2 result
+
+The model returned:
+
+~~~text
+RUNTIME_CHECKPOINT_7319
+~~~
+
+The resulting thread contained four messages:
+
+~~~text
+0 Human   original token instruction
+1 AI      RUNTIME_CHECKPOINT_7319
+2 Human   reference to the previous run
+3 AI      RUNTIME_CHECKPOINT_7319
+~~~
+
+Therefore the second run was executed with the conversation state persisted by
+the first run.
+
+### Assertions
+
+All assertions passed:
+
+~~~text
+run-2 request does not contain token                               PASS
+run-2 result recovers token                                        PASS
+run-1 state has two messages                                       PASS
+run-2 state has four messages                                      PASS
+run-2 state preserves original human token request                 PASS
+run-2 state preserves original AI token response                   PASS
+run-2 state contains new human request                             PASS
+run-2 final checkpoint differs from run-1                          PASS
+run-2 has a parent checkpoint                                      PASS
+~~~
+
+### Runtime continuity model
+
+~~~text
+Thread A
+
+Run 1
+    |
+    +-- graph state
+    +-- checkpoints
+    |
+    v
+Runtime persistence
+    |
+    v
+Run 2
+    |
+    +-- previous messages restored
+    +-- new input appended
+    +-- new checkpoints generated
+~~~
+
+This confirms cross-run thread continuity even though the exported
+CompiledStateGraph itself has:
+
+~~~text
+checkpointer = None
+~~~
+
+### Run versus thread state
+
+The `/runs/wait` response for this experiment returned the accumulated messages
+rather than only the new run delta.
+
+The observed result therefore contained:
+
+~~~text
+Run 1 messages
++
+Run 2 messages
+~~~
+
+### Provider prompt caching
+
+The first model request reported approximately:
+
+~~~text
+cache_write_tokens: 6809
+cached_tokens: 0
+~~~
+
+The second reported:
+
+~~~text
+cached_tokens: 6809
+cache_write_tokens: 37
+~~~
+
+This is provider-level prompt caching and is separate from LangGraph thread
+persistence.
+
+LangGraph persistence determines what logical state is restored.
+
+Provider prompt caching determines whether a repeated prompt prefix can be
+reused efficiently by the model provider.
+
+### Checkpoint-lineage caveat
+
+The final Run 2 checkpoint's immediate parent is another checkpoint generated
+during Run 2.
+
+Therefore the current experiment proves cross-run state continuity but does not
+yet identify the exact checkpoint edge connecting:
+
+~~~text
+Run 1 final checkpoint
+    ->
+Run 2 initial checkpoint
+~~~
+
+That boundary will be inspected directly from checkpoint history next.
