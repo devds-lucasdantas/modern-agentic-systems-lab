@@ -6241,3 +6241,75 @@ graph reached END
 ~~~
 
 The scheduler ordering and per-Thread serialization model are now established.
+
+## 1.4 — Run execution modes and background execution
+
+### Objective
+
+Consolidate the Runtime's Run execution contract without repeating experiments
+already completed in sections 1.2 and 1.3.
+
+Separate the following dimensions:
+
+~~~text
+Run creation
+execution lifecycle
+transport / consumption mode
+Thread ownership
+background scheduling
+durability
+persistence
+~~~
+
+### Existing Runtime evidence
+
+The previous experiments already established:
+
+~~~text
+POST /threads/{thread_id}/runs
+    -> returns a persisted Run resource
+    -> execution proceeds independently
+
+POST /threads/{thread_id}/runs/wait
+    -> blocks until the execution attempt completes
+    -> returns graph output state rather than a Run resource
+    -> the underlying Run is still persisted
+
+POST /threads/{thread_id}/runs/stream
+    -> executes the same Run primitive
+    -> exposes execution through SSE
+    -> the Run remains a persisted lifecycle resource
+
+GET /threads/{thread_id}/runs/{run_id}/stream
+    -> attaches to an existing Run stream
+    -> can replay resumable stream history
+
+POST /runs
+    -> stateless API surface
+    -> still creates a Runtime-managed Thread internally
+    -> `on_completion` determines whether that Thread is retained
+
+after_seconds
+    -> persists a pending Run
+    -> shifts its effective `created_at`
+    -> controls scheduler eligibility
+
+Run scheduler
+    -> admits eligible pending Runs
+    -> orders them by `created_at`
+    -> serializes active execution per Thread
+~~~
+
+The remaining major question in this block is the precise `durability`
+contract.
+
+### 1.4A — Execution-mode and durability source inventory
+
+Determine:
+
+- how `durability=async`, `sync`, and `exit` are represented internally;
+- how durability affects checkpoint writes;
+- whether it changes Run lifecycle or only persistence timing;
+- how it interacts with background execution;
+- whether the public HTTP execution modes reuse the same underlying Run
+  primitive.
