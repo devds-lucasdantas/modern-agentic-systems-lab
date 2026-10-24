@@ -1348,3 +1348,234 @@ created for a stateless Run and comparing:
 The experiment will determine whether the temporary Thread is externally
 observable and whether the configured completion policy actually controls its
 persistence.
+
+### 1.2B results — Stateless Run Thread lifecycle
+
+Two stateless Runs were executed using:
+
+~~~text
+POST /runs
+~~~
+
+with identical execution behavior but different Thread completion policies:
+
+~~~text
+on_completion = keep
+on_completion = delete
+~~~
+
+### Stateless Run response
+
+Although the inspected OpenAPI document does not declare a response schema for
+the successful `POST /runs` response, the Runtime returned a Run-shaped object
+containing:
+
+~~~text
+run_id
+thread_id
+assistant_id
+metadata
+status
+kwargs
+multitask_strategy
+created_at
+updated_at
+~~~
+
+Both stateless Runs were initially returned with:
+
+~~~text
+status = pending
+~~~
+
+This is recorded as an observed contract difference between the OpenAPI schema
+and executable Runtime behavior.
+
+### Stateless execution creates a real Thread
+
+Both Run responses contained distinct Thread IDs.
+
+Therefore:
+
+~~~text
+POST /runs
+    |
+    v
+Runtime-created Thread
+    |
+    v
+Run associated with that Thread
+~~~
+
+Stateless execution does not mean execution without a Thread.
+
+### `on_completion = keep`
+
+The keep Run reached:
+
+~~~text
+status = success
+~~~
+
+After completion:
+
+~~~text
+GET /threads/{thread_id}
+    -> HTTP 200
+~~~
+
+The retained Thread was:
+
+~~~text
+status = idle
+~~~
+
+and its persisted values contained the input message, AI response and middleware
+state.
+
+Therefore `on_completion=keep` converts the automatically created Thread into a
+persisting Runtime resource.
+
+### `on_completion = delete`
+
+The delete Run was successfully created with its own Thread ID.
+
+After execution completed, both:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}
+~~~
+
+and:
+
+~~~text
+GET /threads/{thread_id}
+~~~
+
+could no longer retrieve the Thread-scoped execution resource.
+
+The Thread lookup returned:
+
+~~~text
+404
+Thread with ID ... not found
+~~~
+
+This validates that `on_completion=delete` performs Thread cleanup after the
+stateless execution completes.
+
+Because the public API exposes Run retrieval through its Thread path rather than
+a global `GET /runs/{run_id}`, this experiment establishes that the Run becomes
+unavailable through the Thread-scoped API after Thread deletion.
+
+It does not establish whether some internal Runtime record exists elsewhere.
+
+### Runtime `temporary` flag
+
+The executable Run representation exposed an additional value inside execution
+kwargs.
+
+For the keep policy:
+
+~~~text
+temporary = false
+~~~
+
+For the delete policy:
+
+~~~text
+temporary = true
+~~~
+
+This suggests that the Runtime internally represents the completion policy as
+temporary versus persistent Thread lifecycle.
+
+This field was observed in Runtime output and is not treated as a guaranteed
+public API field unless separately established by the OpenAPI contract.
+
+### Formal meaning of stateless execution
+
+The combined OpenAPI and Runtime evidence establishes:
+
+~~~text
+stateless
+    != no Thread
+
+stateless
+    != no state
+
+stateless
+    != no checkpointing
+
+stateless
+    = Runtime-managed Thread lifecycle
+~~~
+
+The difference between the two execution modes is therefore primarily ownership
+of Thread lifecycle.
+
+Stateful:
+
+~~~text
+caller identifies Thread
+    |
+    v
+Thread exists independently of one Run
+~~~
+
+Stateless:
+
+~~~text
+Runtime creates Thread
+    |
+    v
+Run executes
+    |
+    v
+on_completion
+    |
+    +-- keep
+    |     -> Thread persists
+    |
+    +-- delete
+          -> Thread removed
+~~~
+
+### Evidence
+
+~~~text
+[RUNTIME VALIDATED]
+
+POST /runs returns Run-shaped runtime data.
+
+Both stateless Runs received concrete Thread IDs.
+
+on_completion=keep:
+    Run -> success
+    Thread -> HTTP 200
+    Thread -> idle
+    state preserved
+
+on_completion=delete:
+    Thread created
+    execution completed
+    Thread -> HTTP 404
+
+Runtime kwargs:
+    keep   -> temporary=false
+    delete -> temporary=true
+~~~
+
+## 1.2C — Wait execution semantics
+
+### Objective
+
+Determine what the `/runs/wait` execution mode returns and how it relates to the
+persisted Run lifecycle.
+
+The experiment will compare:
+
+- request blocking behavior;
+- returned response body;
+- resulting persisted Run;
+- resulting Thread state.
