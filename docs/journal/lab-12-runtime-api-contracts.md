@@ -5694,3 +5694,206 @@ rollback:
 ~~~
 
 No model inference is required.
+
+### 1.3D1 results — State inheritance by the superseding Run
+
+Run B was allowed to start after superseding Run A but was configured with:
+
+~~~text
+interrupt_before = ["model"]
+~~~
+
+This allowed B to materialize its input and traverse the pre-model execution
+path without invoking the model.
+
+The experiment directly validates which Thread state B inherits.
+
+### `interrupt` inheritance
+
+Run A was actively running and had already materialized its input.
+
+Run B was then created with:
+
+~~~text
+multitask_strategy = interrupt
+~~~
+
+After B reached the pre-model breakpoint:
+
+~~~text
+Run A = interrupted
+Run B = success
+
+Thread.status = interrupted
+next          = ["model"]
+~~~
+
+The persisted message state contained:
+
+~~~text
+A
+B
+~~~
+
+Therefore B did not start from the state that existed before A.
+
+It continued from the partial state left by A and added its own input on top of
+that state.
+
+The observable semantics are:
+
+~~~text
+interrupt
+    -> supersede Run A
+    -> retain A's partial Thread state
+    -> execute Run B from that retained state
+~~~
+
+### `rollback` inheritance
+
+The same experiment was repeated with:
+
+~~~text
+multitask_strategy = rollback
+~~~
+
+After B reached the pre-model breakpoint:
+
+~~~text
+Run A = absent
+Run B = success
+
+Thread.status = interrupted
+next          = ["model"]
+~~~
+
+The persisted message state contained only:
+
+~~~text
+B
+~~~
+
+Run A and its materialized input were absent.
+
+Therefore B executed from the Thread state that existed before A.
+
+The observable semantics are:
+
+~~~text
+rollback
+    -> remove Run A
+    -> remove state produced by A
+    -> restore the pre-A Thread state
+    -> execute Run B from that restored state
+~~~
+
+### Final supersession distinction
+
+The Runtime evidence now supports the operational definitions:
+
+~~~text
+interrupt:
+    B continues FROM A's partial state
+
+rollback:
+    B continues IN PLACE OF A from the pre-A state
+~~~
+
+This is a persistence-consistency distinction, not merely a scheduling
+difference.
+
+### Run success does not imply graph completion
+
+Both Run B executions ended with:
+
+~~~text
+Run.status = success
+~~~
+
+while the Thread remained:
+
+~~~text
+Thread.status = interrupted
+next          = ["model"]
+~~~
+
+The graph had therefore not reached its terminal END state.
+
+The Runs stopped normally because of the configured execution breakpoint:
+
+~~~text
+interrupt_before = ["model"]
+~~~
+
+This establishes:
+
+~~~text
+Run.status = success
+    !=
+graph reached END
+~~~
+
+A successful Run represents successful completion of that particular execution
+attempt according to its control configuration.
+
+The persisted graph may still require continuation.
+
+### Run lifecycle versus graph execution position
+
+Clients that need to determine whether a workflow is fully complete must not
+rely exclusively on:
+
+~~~text
+Run.status
+~~~
+
+They must also consider persisted execution state such as:
+
+~~~text
+Thread.status
+ThreadState.next
+ThreadState.tasks
+~~~
+
+A valid combination is:
+
+~~~text
+Run.status    = success
+Thread.status = interrupted
+next          = ["model"]
+~~~
+
+### Three distinct interrupt concepts
+
+The experiments now distinguish at least three mechanisms:
+
+~~~text
+1. execution breakpoint
+   interrupt_before / interrupt_after
+
+2. Run lifecycle cancellation
+   action=interrupt
+
+3. graph-level HITL interruption
+   interrupt(...)
+~~~
+
+They have different lifecycle and persistence semantics and must not be treated
+as equivalent mechanisms.
+
+## 1.3E — Enqueue scheduler ordering
+
+### Objective
+
+Determine how multiple `enqueue` Runs on the same Thread are admitted for
+execution.
+
+Validate:
+
+- whether execution is strictly serialized;
+- how the scheduler selects among multiple eligible pending Runs;
+- whether ordering is FIFO by submission/creation time;
+- how Run ordering interacts with delayed `created_at`;
+- whether later Runs observe state produced by earlier queued Runs.
+
+Use execution breakpoints to avoid model inference where possible.
