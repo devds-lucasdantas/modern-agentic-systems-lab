@@ -827,3 +827,318 @@ by the caller or implicitly managed by the stateless Run API.
 Inspect the schemas that define checkpoint identity, resume commands,
 interrupts and execution-control behavior before performing new Runtime
 experiments.
+
+### 1.1C results — Checkpoint and execution-control contracts
+
+The execution-control model is composed from four primary schemas:
+
+~~~text
+CheckpointConfig
+Command
+Interrupt
+Send
+~~~
+
+### CheckpointConfig
+
+`CheckpointConfig` exposes the following optional coordinates:
+
+~~~text
+thread_id
+checkpoint_ns
+checkpoint_id
+checkpoint_map
+~~~
+
+The schema itself requires none of them.
+
+This means OpenAPI structural validation does not determine which combinations
+constitute a valid Runtime checkpoint reference.
+
+That question belongs to Runtime semantics rather than schema syntax.
+
+`checkpoint_ns` establishes checkpoint namespacing as part of the public
+contract, but its relationship to subgraph namespaces is not inferred here.
+
+### Command
+
+`Command` contains:
+
+~~~text
+update
+resume
+goto
+~~~
+
+with no required property.
+
+Their contract-level responsibilities are:
+
+~~~text
+update
+    -> update execution state
+
+resume
+    -> provide a value to interrupted execution
+
+goto
+    -> explicitly select subsequent node execution
+~~~
+
+`goto` accepts:
+
+~~~text
+node name
+node-name list
+Send
+Send list
+null
+~~~
+
+Command is therefore a general execution-control abstraction rather than only
+a human-in-the-loop resume mechanism.
+
+### Send
+
+`Send` requires:
+
+~~~text
+node
+input
+~~~
+
+and represents an explicit node target together with the value supplied to that
+node.
+
+Conceptually:
+
+~~~text
+Command.goto = "node"
+    -> route to node
+
+Command.goto = Send(node, input)
+    -> route to node with explicit input
+~~~
+
+### Interrupt
+
+The public Interrupt schema is intentionally small:
+
+~~~text
+id       optional string | null
+value    required object
+~~~
+
+The schema does not expose checkpoint identity, namespace, node identity or a
+resumable flag.
+
+Those relationships must not be inferred from the Interrupt object alone.
+
+### Interrupt versus resume
+
+Interrupt and Command.resume represent opposite sides of paused execution:
+
+~~~text
+execution
+    |
+    v
+Interrupt
+    -> persisted as observable Thread state
+
+later
+
+Command.resume
+    -> supplies a value back to interrupted execution
+~~~
+
+Checkpoint selection and interrupt resumption are distinct operations:
+
+~~~text
+CheckpointConfig
+    -> where persisted execution continues from
+
+Command.resume
+    -> value supplied to interrupted execution
+~~~
+
+### Transitive schema usage
+
+Execution-control schemas are referenced transitively through higher-level
+Runtime request and response schemas.
+
+Command and Send are used by:
+
+~~~text
+POST /runs
+POST /runs/batch
+POST /runs/stream
+POST /runs/wait
+
+POST /threads/{thread_id}/runs
+POST /threads/{thread_id}/runs/stream
+POST /threads/{thread_id}/runs/wait
+~~~
+
+CheckpointConfig is additionally part of stateful Run creation and ThreadState
+contracts.
+
+Interrupt appears in persisted ThreadState returned by state and history
+operations.
+
+This establishes an architectural separation:
+
+~~~text
+Run request
+    -> Command
+
+persisted paused execution
+    -> Interrupt
+~~~
+
+### Thread creation with supersteps
+
+An unexpected transitive reference from `POST /threads` to Command was traced
+to:
+
+~~~text
+ThreadCreate
+    |
+    v
+supersteps[]
+    |
+    v
+updates[]
+    |
+    v
+ThreadSuperstepUpdate
+    |
+    +-- values
+    +-- command
+    +-- as_node
+~~~
+
+`as_node` is required for every `ThreadSuperstepUpdate`.
+
+The contract therefore allows Thread creation to include structured superstep
+updates associated with specific nodes.
+
+This demonstrates that Thread creation is richer than creating an empty
+container.
+
+Whether supplied supersteps reproduce persisted checkpoint history exactly like
+normal graph execution remains a Runtime question and is not inferred from the
+schema alone.
+
+### Historical checkpoint lookup contracts
+
+The Runtime exposes two checkpoint-state lookup forms.
+
+Simple lookup:
+
+~~~text
+GET /threads/{thread_id}/state/{checkpoint_id}
+~~~
+
+Rich lookup:
+
+~~~text
+POST /threads/{thread_id}/state/checkpoint
+~~~
+
+The POST form requires:
+
+~~~text
+ThreadStateCheckpointRequest
+    |
+    +-- checkpoint: CheckpointConfig
+    +-- subgraphs: boolean
+~~~
+
+The body-based form therefore supports the richer composite checkpoint selector
+defined by `CheckpointConfig`, whereas the GET form exposes a checkpoint ID
+directly in the URL.
+
+The use of POST here should not itself be interpreted as state mutation.
+
+### Consolidated execution-control model
+
+~~~text
+                          Thread
+                            |
+                            v
+                     Checkpoint DAG
+                            |
+                            v
+                   CheckpointConfig
+                            |
+                            v
+                           Run
+                            |
+                         Command
+                     /      |      \
+                    v       v       v
+                 update   resume   goto
+                                   |
+                             +-----+-----+
+                             |           |
+                             v           v
+                           node         Send
+                                      /    \
+                                     v      v
+                                   node    input
+
+
+execution pause
+      |
+      v
+ Interrupt
+      |
+      v
+ThreadState.interrupts[]
+~~~
+
+### Main lesson
+
+Runtime execution control is not represented by one monolithic resume
+operation.
+
+The public contract separates:
+
+~~~text
+checkpoint selection
+state mutation
+interrupt observation
+interrupt resumption
+explicit routing
+node-targeted input
+~~~
+
+These primitives can be composed but retain distinct responsibilities.
+
+## 1.2 — Run lifecycle and execution modes
+
+### Goal
+
+Move from static API-contract inspection to empirical Runtime behavior.
+
+The next experiments will validate:
+
+- Run lifecycle transitions;
+- Thread lifecycle transitions;
+- stateful execution;
+- stateless execution;
+- wait semantics;
+- delayed execution;
+- streaming execution;
+- cancellation and interruption behavior.
+
+The Phase 0 experiments already established checkpoint persistence and
+historical branching, so those behaviors will not be repeated unless needed to
+explain a Run lifecycle result.
+
+## 1.2A — Stateful Run lifecycle baseline
+
+### Objective
+
+Observe the lifecycle of one delayed stateful Run from creation to terminal
+status while correlating Run status with Thread status.
