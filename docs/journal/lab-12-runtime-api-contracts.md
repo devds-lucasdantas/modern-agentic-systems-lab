@@ -3994,3 +3994,234 @@ and determine why a Run already marked `interrupted` by rollback cancellation
 does not subsequently reach the `UserRollback` worker handler.
 
 No model execution is required.
+
+### 1.2I2C results — Root cause of delayed pending rollback failure
+
+Source inspection established the complete causal path behind the failed
+rollback of a delayed pending Run.
+
+### Expected rollback worker path
+
+The Runtime normally implements rollback as:
+
+~~~text
+rollback request
+    |
+    v
+control payload = b"rollback"
+    |
+    v
+UserRollback
+    |
+    v
+worker status = "rollback"
+    |
+    v
+Threads.set_joint_status(...)
+    |
+    v
+Runs.delete(...)
+    |
+    +-- delete checkpoints associated with the Run
+    +-- delete the Run resource
+~~~
+
+This confirms that the OpenAPI rollback deletion semantics are reflected in the
+pinned implementation.
+
+### Pending cancellation branch
+
+`Runs.cancel` also contains an eager-cancellation path for pending Runs.
+
+For a pending Run with `action=rollback` and no active queues:
+
+~~~text
+Runs.delete(...)
+~~~
+
+is scheduled immediately.
+
+However, if queues already exist:
+
+~~~text
+if queues or action != "rollback":
+~~~
+
+the pending Run is instead changed to:
+
+~~~text
+status = interrupted
+~~~
+
+and its Thread is returned to:
+
+~~~text
+idle
+~~~
+
+while the rollback control payload is published for the execution machinery.
+
+### Scheduler admission gate
+
+The worker-side Run scheduler admits only pending Runs.
+
+Before yielding a Run for execution it checks:
+
+~~~text
+if run["status"] != "pending":
+    continue
+~~~
+
+and only admitted Runs are changed to:
+
+~~~text
+running
+~~~
+
+and subsequently enter `Runs.enter(...)`.
+
+### Delayed rollback failure mechanism
+
+The tested delayed Run followed this sequence:
+
+~~~text
+create delayed Run
+    |
+    v
+status = pending
+queue already exists
+    |
+    v
+cancel(action=rollback)
+    |
+    +-- publish b"rollback"
+    |
+    +-- queues exist
+            |
+            v
+       pending -> interrupted
+            |
+            v
+       Thread -> idle
+            |
+            v
+scheduled execution time arrives
+            |
+            v
+Runs.next(...)
+            |
+            v
+status != pending
+            |
+            X
+Run is skipped
+~~~
+
+Because the Run is skipped by scheduler admission:
+
+~~~text
+Runs.enter(...)
+    never executes
+
+listen_for_cancellation(...)
+    never executes
+
+b"rollback"
+    never becomes UserRollback
+
+worker status="rollback"
+    never occurs
+
+Runs.delete(...)
+    never occurs
+~~~
+
+The persisted outcome is consequently:
+
+~~~text
+Run.status = interrupted
+Run resource remains present
+
+Thread.status = idle
+
+checkpoint = None
+history    = []
+~~~
+
+### Classification
+
+The behavior is classified as:
+
+~~~text
+[PINNED RUNTIME BUG]
+~~~
+
+for the studied in-memory Runtime combination:
+
+~~~text
+delayed
++ pending
++ queue exists
++ action=rollback
+~~~
+
+The rollback contract and normal worker implementation both intend deletion.
+The bug results from the interaction between cancellation changing the Run from
+`pending` to `interrupted` and scheduler admission requiring the Run to remain
+`pending`.
+
+### Delayed `created_at` semantics
+
+Source inspection also confirms the previously observed delayed timestamp
+behavior.
+
+Run creation explicitly assigns approximately:
+
+~~~text
+created_at =
+    current_time + after_seconds
+~~~
+
+and the worker source documents that `created_at` includes `after_seconds`.
+
+Therefore, for delayed Runs in the pinned Runtime:
+
+~~~text
+created_at
+    -> scheduled execution/eligibility time
+~~~
+
+rather than strictly:
+
+~~~text
+resource submission time
+~~~
+
+This explains why cancellation before the scheduled time can produce:
+
+~~~text
+updated_at < created_at
+~~~
+
+The behavior is intentional in the implementation but semantically inconsistent
+with the simpler OpenAPI field description that calls `created_at` the time the
+Run was created.
+
+## 1.2I3 — Rollback during active checkpointed execution
+
+### Objective
+
+Validate rollback through the normal worker path rather than through the broken
+delayed-pending edge case.
+
+The experiment will:
+
+1. create a normal streaming Run;
+2. wait until graph input has materialized into a checkpoint;
+3. verify that the Run is actively `running`;
+4. issue `action=rollback&wait=true` while the worker is active;
+5. validate deletion of the Run;
+6. validate deletion of its checkpoint history;
+7. validate restoration of the empty Thread baseline.
+
+This distinguishes the normal rollback primitive from the delayed pending bug.
