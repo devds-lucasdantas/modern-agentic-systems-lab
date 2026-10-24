@@ -3379,3 +3379,253 @@ The experiment will determine:
 - preserved execution position;
 - graph-level interrupt state;
 - whether model inference was avoided.
+
+### 1.2I1 results — Explicit interrupt cancellation
+
+A delayed stateful Run was created with:
+
+~~~text
+after_seconds = 5
+~~~
+
+and was explicitly cancelled while still pending through:
+
+~~~text
+POST /threads/{thread_id}/runs/{run_id}/cancel
+    ?action=interrupt
+    &wait=true
+~~~
+
+The endpoint returned:
+
+~~~text
+HTTP 200
+body = {}
+~~~
+
+after approximately:
+
+~~~text
+0.502 seconds
+~~~
+
+### Run lifecycle
+
+The cancelled Run reached:
+
+~~~text
+Run.status = interrupted
+~~~
+
+Explicit `action=interrupt` therefore uses the same Run lifecycle status observed
+for disconnect-triggered cancellation.
+
+### Thread outcome differs by execution phase
+
+Unlike the previous disconnect-cancellation experiments, the Thread did not end
+in `interrupted`.
+
+Immediately after the cancel request returned:
+
+~~~text
+Run.status    = interrupted
+Thread.status = idle
+~~~
+
+The final Thread state remained idle.
+
+The key difference is that this Run was still delayed and pending when
+cancellation occurred.
+
+### No execution state had been materialized
+
+The final ThreadState contained:
+
+~~~text
+checkpoint = None
+next       = []
+tasks      = []
+interrupts = []
+messages   = []
+~~~
+
+Even the input human message had not entered persisted graph state.
+
+This establishes that Run creation and Thread reservation can occur before graph
+state materialization.
+
+The observed execution phases are therefore:
+
+~~~text
+Run resource creation
+        |
+        v
+pending / Thread busy
+        |
+        v
+execution-state materialization
+        |
+        +-- input persisted
+        +-- checkpoint created
+        |
+        v
+graph execution
+~~~
+
+The explicit cancellation occurred before execution-state materialization.
+
+### Cancellation is phase-sensitive
+
+The combined Runtime evidence now distinguishes at least two cancellation
+outcomes.
+
+Cancellation before execution-state materialization:
+
+~~~text
+Run    = interrupted
+Thread = idle
+
+checkpoint = None
+next       = []
+tasks      = []
+messages   = []
+~~~
+
+Cancellation after graph execution has begun:
+
+~~~text
+Run    = interrupted
+Thread = interrupted
+
+checkpoint retained
+next/tasks retained
+execution position retained
+~~~
+
+The terminal effect of cancellation therefore depends on the execution phase,
+not solely on which cancellation API triggered it.
+
+### `wait=true`
+
+For this delayed pending Run, the explicit cancellation call returned only after:
+
+~~~text
+Run    = interrupted
+Thread = idle
+~~~
+
+The immediate Thread lookup after the cancel response was already reconciled.
+
+Therefore, in this tested case:
+
+~~~text
+wait=true
+    -> behaved as a cancellation/reconciliation barrier
+~~~
+
+No claim is yet made about the exact contrast with `wait=false`, which has not
+been isolated experimentally.
+
+### Lifecycle interruption versus graph Interrupt
+
+The final state contained:
+
+~~~text
+interrupts = []
+~~~
+
+while the Run lifecycle was:
+
+~~~text
+interrupted
+~~~
+
+This further confirms that Run lifecycle interruption and graph-level Interrupt
+objects are independent concepts.
+
+### Delayed Run timestamp anomaly
+
+The delayed Run exposed:
+
+~~~text
+Thread.created_at:
+    2026-10-24T22:11:12.382100+00:00
+
+Run.created_at:
+    2026-10-24T22:11:17.385556+00:00
+
+Run.updated_at:
+    2026-10-24T22:11:12.386947+00:00
+~~~
+
+The Run `created_at` timestamp is approximately five seconds after submission,
+matching:
+
+~~~text
+after_seconds = 5
+~~~
+
+while cancellation updated the Run before that timestamp.
+
+Therefore:
+
+~~~text
+Run.updated_at < Run.created_at
+~~~
+
+is possible for a delayed Run in the studied Runtime.
+
+Combined with the previous delayed-Run experiment, this strongly suggests that
+`Run.created_at` for delayed execution behaves as a scheduled execution
+timestamp rather than a simple persistence-insertion timestamp.
+
+This differs from the plain-language OpenAPI description:
+
+~~~text
+"The time the run was created."
+~~~
+
+The finding is recorded as an OpenAPI/Runtime semantic mismatch pending source
+inspection.
+
+### Evidence
+
+~~~text
+[RUNTIME VALIDATED]
+
+explicit action=interrupt:
+    Run -> interrupted
+
+pending delayed cancellation:
+    Thread -> idle
+
+state:
+    no checkpoint
+    no messages
+    no tasks
+    no graph Interrupt
+
+wait=true:
+    response observed after Thread reconciliation
+
+model inference:
+    avoided
+~~~
+
+## 1.2I2 — Rollback cancellation baseline
+
+### Objective
+
+Validate `action=rollback` first against a delayed pending Run.
+
+The experiment will determine whether rollback:
+
+- removes the Run resource;
+- removes it from Thread Run history;
+- leaves the Thread idle;
+- leaves no checkpoint or graph state;
+- differs observably from `action=interrupt` for a Run that has not yet
+  materialized execution state.
+
+A later experiment can isolate rollback after checkpoint materialization if
+needed.
