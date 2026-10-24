@@ -3034,3 +3034,222 @@ The second client will disconnect after observing a persisted semantic event.
 
 This will determine whether disconnecting a joined stream can cancel the shared
 underlying Run independently of the original creator stream.
+
+### 1.2H results — Join-stream disconnect cancellation
+
+A Run was created through a streaming request configured with:
+
+~~~text
+on_disconnect = continue
+stream_resumable = true
+~~~
+
+The original creator stream remained connected.
+
+A second client then joined the same active Run through:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}/stream
+~~~
+
+using:
+
+~~~text
+cancel_on_disconnect = true
+~~~
+
+The joined client received one persisted semantic event and then intentionally
+closed only its own connection.
+
+### A joined stream can cancel the shared Run
+
+Immediately after the joined client disconnected, the shared execution was
+observed as:
+
+~~~text
+0.003s
+    Run    = interrupted
+    Thread = busy
+
+0.208s
+    Run    = interrupted
+    Thread = interrupted
+~~~
+
+The original creator stream was still connected during this transition.
+
+Therefore:
+
+~~~text
+joined stream disconnect
+        +
+cancel_on_disconnect=true
+        |
+        v
+shared Run interrupted
+~~~
+
+The cancellation behavior is global to the underlying Run rather than local to
+the joined stream attachment.
+
+### Creator attachment does not prevent cancellation
+
+The original creator stream used:
+
+~~~text
+on_disconnect = continue
+~~~
+
+and remained open.
+
+Nevertheless, disconnecting the joined stream configured with
+`cancel_on_disconnect=true` interrupted the Run.
+
+This rules out a model in which cancellation occurs only after all stream
+consumers disconnect.
+
+A stream attachment configured for cancellation can control the lifecycle of
+the shared execution independently of other active attachments.
+
+### Disconnect cancellation mechanisms converge
+
+The Runtime now has two empirically validated disconnect controls:
+
+~~~text
+creator stream:
+
+    on_disconnect=cancel
+
+
+joined stream:
+
+    cancel_on_disconnect=true
+~~~
+
+Both produced:
+
+~~~text
+Run.status    = interrupted
+Thread.status = interrupted
+~~~
+
+They act at different stream attachment points but converge on the same
+observable Run and Thread lifecycle outcome.
+
+### Lifecycle interruption is distinct from graph Interrupt
+
+The final ThreadState explicitly contained:
+
+~~~text
+interrupts = []
+~~~
+
+while:
+
+~~~text
+Run.status    = interrupted
+Thread.status = interrupted
+~~~
+
+This directly validates that the lifecycle status `interrupted` does not imply
+the existence of a graph-level `Interrupt` object.
+
+The concepts are therefore distinct:
+
+~~~text
+Run / Thread status = interrupted
+    -> execution lifecycle condition
+
+ThreadState.interrupts
+    -> graph-level interrupt payloads
+~~~
+
+### Execution position remained persisted
+
+The final state contained:
+
+~~~text
+next:
+    MemoryMiddleware.before_agent
+
+tasks:
+    MemoryMiddleware.before_agent
+~~~
+
+The previous disconnect-cancellation experiment stopped earlier at:
+
+~~~text
+SkillsMiddleware.before_agent
+~~~
+
+This demonstrates that cancellation preserves the execution position actually
+reached by the graph rather than restoring a fixed initial state.
+
+### Model execution was avoided
+
+The final Thread contained only the original human message.
+
+No assistant output marker was present:
+
+~~~text
+assistant_marker_found = false
+~~~
+
+The graph had not yet reached model execution.
+
+### Non-atomic Run and Thread lifecycle visibility
+
+As in the creator-disconnect cancellation experiment, there was an observable
+period where:
+
+~~~text
+Run    = interrupted
+Thread = busy
+~~~
+
+before the Thread became:
+
+~~~text
+interrupted
+~~~
+
+The repeated observation across two independent cancellation mechanisms
+strengthens the conclusion that Run and Thread lifecycle transitions are not
+necessarily atomically visible to polling clients.
+
+### Client implication
+
+`cancel_on_disconnect=true` should be treated as a Run lifecycle capability,
+not merely as a transport preference.
+
+For passive observers or secondary clients:
+
+~~~text
+cancel_on_disconnect = false
+~~~
+
+avoids allowing disappearance of that observer to terminate shared execution.
+
+A client should enable cancellation on disconnect only when it intentionally
+owns that lifecycle policy.
+
+## 1.2I — Explicit Run cancellation
+
+### Objective
+
+Inspect and validate the explicit Run cancellation endpoint.
+
+The goal is to compare explicit API cancellation with the two already validated
+transport-triggered mechanisms:
+
+- creator `on_disconnect=cancel`;
+- joined-stream `cancel_on_disconnect=true`.
+
+The experiment will determine:
+
+- the request contract;
+- the resulting Run status;
+- the resulting Thread status;
+- whether execution position is preserved;
+- whether graph-level interrupts remain absent;
+- whether explicit cancellation behaves like disconnect cancellation.
