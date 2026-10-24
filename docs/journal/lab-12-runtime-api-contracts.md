@@ -4896,3 +4896,156 @@ rollback:
 
 A separate experiment will also validate the actual HTTP behavior when
 `multitask_strategy` is omitted.
+
+### 1.3A source findings — Run persistence versus multitask orchestration
+
+Pinned source inspection shows that the in-memory `Runs.put` primitive does not
+directly implement the four multitask strategies.
+
+It accepts:
+
+~~~text
+multitask_strategy
+~~~
+
+but uses it primarily as Run creation data:
+
+- it is included in the authorization/create event;
+- it is persisted on the resulting Run resource.
+
+No strategy-specific branch such as:
+
+~~~text
+reject
+enqueue
+interrupt
+rollback
+~~~
+
+was found inside `Runs.put`.
+
+### In-flight Run discovery
+
+Before creating a Run, `Runs.put` discovers existing Runs on the same Thread
+whose lifecycle status is:
+
+~~~text
+pending
+running
+~~~
+
+These Runs are retained as:
+
+~~~text
+inflight_runs
+~~~
+
+### `prevent_insert_if_inflight`
+
+A separate internal flag exists:
+
+~~~text
+prevent_insert_if_inflight
+~~~
+
+When enabled and an in-flight Run exists, `Runs.put` does not insert a new Run.
+
+Instead it returns the existing in-flight Runs.
+
+This flag must not yet be equated with the public `reject` multitask strategy.
+Its callers still need to be traced.
+
+### New Run plus conflict set
+
+When insertion proceeds, `Runs.put` persists the new Run and returns an iterator
+containing:
+
+~~~text
+new Run
+followed by
+existing in-flight Runs
+~~~
+
+Conceptually:
+
+~~~text
+Runs.put(...)
+    |
+    +-- persist new Run
+    |
+    +-- expose conflicting in-flight Runs
+             |
+             v
+    higher orchestration layer
+~~~
+
+This strongly suggests a separation between:
+
+~~~text
+Run persistence primitive
+    -> Runs.put
+
+multitask conflict resolution
+    -> higher API/runtime orchestration layer
+~~~
+
+The precise orchestration layer has not yet been located.
+
+### Thread busy semantics
+
+Thread status logic treats the presence of any Run in:
+
+~~~text
+pending
+running
+~~~
+
+as sufficient to keep:
+
+~~~text
+Thread.status = busy
+~~~
+
+Therefore queued execution does not require a distinct Thread lifecycle state.
+
+A likely representation is:
+
+~~~text
+Run A = running
+Run B = pending
+Thread = busy
+~~~
+
+pending Runtime validation.
+
+### Internal versus public default
+
+`Runs.put` has a Python fallback:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+whereas the public HTTP schema declares:
+
+~~~text
+multitask_strategy = enqueue
+~~~
+
+Since `Runs.put` does not itself execute the strategy, this is not evidence of
+an HTTP behavioral mismatch.
+
+The API-to-primitive call path must be traced to establish which value is passed
+when the public request omits the field.
+
+## 1.3B — Multitask orchestration source trace
+
+### Objective
+
+Locate the caller of `Runs.put` and determine:
+
+- how `prevent_insert_if_inflight` is selected;
+- who consumes the returned new/in-flight Run sequence;
+- where `reject`, `enqueue`, `interrupt`, and `rollback` are applied;
+- whether interrupt/rollback reuse the cancellation primitives already studied;
+- how the public HTTP default `enqueue` reaches the persistence primitive.
