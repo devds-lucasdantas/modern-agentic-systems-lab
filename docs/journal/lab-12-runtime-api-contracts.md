@@ -1579,3 +1579,170 @@ The experiment will compare:
 - returned response body;
 - resulting persisted Run;
 - resulting Thread state.
+
+### 1.2C results — Wait execution semantics
+
+A stateful Run was executed through:
+
+~~~text
+POST /threads/{thread_id}/runs/wait
+~~~
+
+The HTTP request completed successfully after approximately:
+
+~~~text
+2.418 seconds
+~~~
+
+### Wait blocks until execution completion
+
+The request remained open while the graph executed.
+
+When the HTTP response was returned, subsequent inspection showed:
+
+~~~text
+Run.status    = success
+Thread.status = idle
+~~~
+
+and the final Thread state contained:
+
+~~~text
+next  = []
+tasks = []
+~~~
+
+The wait endpoint therefore provides blocking consumption of a Run execution.
+
+### Wait returns execution output, not the Run resource
+
+The HTTP response body was a graph-result object containing the final message
+state.
+
+It did not contain Run resource fields such as:
+
+~~~text
+run_id
+thread_id
+status
+created_at
+updated_at
+~~~
+
+This contrasts with the immediate Run-creation endpoint.
+
+Conceptually:
+
+~~~text
+POST /threads/{thread_id}/runs
+    -> returns Run resource immediately
+
+POST /threads/{thread_id}/runs/wait
+    -> waits
+    -> returns graph execution result
+~~~
+
+### Wait still creates a persisted Run
+
+After the wait request completed:
+
+~~~text
+GET /threads/{thread_id}/runs
+~~~
+
+returned exactly one Run.
+
+That Run contained:
+
+~~~text
+status = success
+~~~
+
+with its own:
+
+~~~text
+run_id
+thread_id
+assistant_id
+created_at
+updated_at
+~~~
+
+Therefore `/runs/wait` is not a separate execution primitive.
+
+It is a different consumption mode over the same underlying Run model.
+
+### Persistence at response time
+
+At the time the wait call returned:
+
+~~~text
+Run     = success
+Thread  = idle
+next    = []
+tasks   = []
+~~~
+
+and the final checkpoint already contained the exact output marker.
+
+The final:
+
+~~~text
+Run.updated_at
+Thread.updated_at
+Thread.state_updated_at
+~~~
+
+were identical in this experiment.
+
+As in the previous lifecycle experiment, timestamp equality is recorded as an
+observation rather than a platform guarantee.
+
+### Execution versus consumption
+
+The resulting model is:
+
+~~~text
+                     Run
+                      |
+           +----------+----------+
+           |                     |
+           v                     v
+    immediate create            wait
+           |                     |
+           v                     v
+    return Run resource    block until terminal
+                                 |
+                                 v
+                         return graph result
+
+           both create the same
+           persisted Run resource
+~~~
+
+This establishes an important distinction:
+
+~~~text
+Run
+    -> execution resource
+
+wait
+    -> execution-consumption mode
+~~~
+
+## 1.2D — Streaming execution baseline
+
+### Objective
+
+Determine how the streaming endpoint exposes an executing Run.
+
+The experiment will inspect:
+
+- HTTP content type;
+- time to response headers;
+- time to first event;
+- stream framing;
+- semantic stream event names;
+- Run identity exposed by the stream;
+- persisted Run after stream completion;
+- final Thread and checkpoint state.
