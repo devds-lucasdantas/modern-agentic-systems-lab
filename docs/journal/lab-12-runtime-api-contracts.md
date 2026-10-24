@@ -1914,3 +1914,273 @@ The experiment will request:
 
 This avoids repeating model execution unnecessarily while revealing the shape
 and purpose of each semantic stream channel.
+
+### 1.2E results — Semantic stream modes
+
+One stateful Run was streamed while requesting four semantic modes
+simultaneously:
+
+~~~text
+updates
+values
+messages
+checkpoints
+~~~
+
+This allowed the modes to be compared within the same execution.
+
+### Event counts
+
+The observed SSE event counts were:
+
+~~~text
+metadata             1
+
+updates              5
+values               3
+checkpoints           7
+
+messages/metadata    1
+messages/partial    13
+~~~
+
+### `updates`
+
+Update events were keyed by the graph node or middleware stage that produced
+the change.
+
+Observed sources included:
+
+~~~text
+SkillsMiddleware.before_agent
+PatchToolCallsMiddleware.before_agent
+MemoryMiddleware.before_agent
+model
+TodoListMiddleware.after_model
+~~~
+
+`updates` therefore represents incremental graph-state changes attributed to
+execution nodes or middleware.
+
+It is a delta-oriented stream mode.
+
+### `values`
+
+Value events contained the accumulated graph state.
+
+The first observed value event already contained the input human message.
+
+Compared with `updates`:
+
+~~~text
+updates
+    -> incremental delta
+
+values
+    -> accumulated state snapshot
+~~~
+
+Multiple updates can occur between value snapshots.
+
+### `checkpoints`
+
+Checkpoint events contained a richer execution snapshot including:
+
+~~~text
+config
+parent_config
+values
+metadata
+next
+tasks
+~~~
+
+The first checkpoint had:
+
+~~~text
+metadata.source = input
+metadata.step   = -1
+
+next:
+    __start__
+
+tasks:
+    __start__
+~~~
+
+Checkpoint streaming therefore exposes both application state and durable
+execution-control information.
+
+A checkpoint event should not be modeled as merely a value snapshot plus a
+checkpoint ID.
+
+### `messages`
+
+Requesting the `messages` semantic mode did not produce one generic `messages`
+event type.
+
+The observed wire-level event types were:
+
+~~~text
+messages/metadata
+messages/partial
+~~~
+
+### `messages/metadata`
+
+One metadata event was emitted for the model invocation.
+
+Its payload correlated the model execution with data including:
+
+~~~text
+run_id
+thread_id
+graph_id
+assistant_id
+langgraph_step
+langgraph_node
+checkpoint_ns
+model provider
+model name
+~~~
+
+This provides execution context for subsequent message chunks.
+
+### `messages/partial`
+
+The model response was emitted incrementally through multiple
+`messages/partial` events.
+
+The first partial event contained an AI message with empty content.
+
+Therefore one `messages/partial` event must not be equated with one model token.
+
+The safe interpretation is:
+
+~~~text
+messages/partial
+    -> incremental model-message chunk
+~~~
+
+Chunk boundaries are transport/model/provider behavior and are not treated as
+token boundaries.
+
+### Event ordering
+
+The observed execution interleaved multiple semantic channels.
+
+A simplified representation is:
+
+~~~text
+metadata
+
+checkpoint
+values
+
+checkpoint
+updates
+
+checkpoint
+updates
+values
+
+checkpoint
+updates
+checkpoint
+
+messages/metadata
+messages/partial
+messages/partial
+...
+
+updates(model)
+values
+checkpoint
+
+updates(after_model)
+checkpoint
+~~~
+
+This demonstrates that checkpoint persistence and state observation occur
+throughout graph execution rather than only after the final model output.
+
+The experiment does not claim that every checkpoint maps one-to-one to one
+graph node.
+
+### Semantic mode responsibilities
+
+The validated model is:
+
+~~~text
+updates
+    -> node/middleware state deltas
+
+values
+    -> accumulated state snapshots
+
+messages
+    -> incremental message/model output
+
+checkpoints
+    -> durable execution snapshots
+       including control-flow information
+~~~
+
+These modes expose different layers of the Runtime rather than alternate
+serializations of identical information.
+
+### Client implications
+
+A chat-oriented client can naturally consume:
+
+~~~text
+metadata
+messages/metadata
+messages/partial
+~~~
+
+for Run correlation and progressive output rendering.
+
+Execution-oriented clients can additionally consume:
+
+~~~text
+updates
+values
+checkpoints
+~~~
+
+for progress visualization, state synchronization and execution inspection.
+
+### Final persistence
+
+After the stream closed:
+
+~~~text
+Run.status = success
+
+ThreadState.next  = []
+ThreadState.tasks = []
+~~~
+
+and the final checkpoint contained the exact output marker.
+
+The semantic streams therefore remained correlated with the same persisted Run
+and Thread state established by previous experiments.
+
+## 1.2F — Resumable streaming contract
+
+### Objective
+
+Study the contract behind resumable streaming before executing it.
+
+The next step will inspect:
+
+- `stream_resumable`;
+- the persisted stream endpoint;
+- reconnect parameters;
+- whether replay is Run-scoped;
+- how a client identifies the point from which to resume.
+
+Other stream modes such as `tasks`, `events`, `debug`, `custom` and
+`messages-tuple` are intentionally deferred until a concrete architectural use
+case requires them.
