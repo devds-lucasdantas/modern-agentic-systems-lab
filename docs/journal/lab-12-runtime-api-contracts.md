@@ -4426,3 +4426,167 @@ Without executing another model:
 2. inspect the historical-state lookup implementation;
 3. inspect the `wait=true` cancellation response path;
 4. determine the correct client contract for both behaviors.
+
+### 1.2I3B results — Historical checkpoint existence semantics
+
+A negative-control lookup compared:
+
+1. the checkpoint ID that existed before active rollback; and
+2. a randomly generated checkpoint ID that had never existed.
+
+Both requests used:
+
+~~~text
+GET /threads/{thread_id}/state/{checkpoint_id}
+~~~
+
+### Missing checkpoints return synthetic empty state
+
+Both checkpoint IDs returned:
+
+~~~text
+HTTP 200
+~~~
+
+with equivalent normalized responses:
+
+~~~text
+values     = {}
+next       = []
+tasks      = []
+metadata   = null
+created_at = null
+
+parent_checkpoint = null
+interrupts         = []
+~~~
+
+The requested checkpoint ID and Thread ID were echoed into the response.
+
+After replacing only the checkpoint UUID with a placeholder, the two responses
+were identical:
+
+~~~text
+same_shape_and_content = true
+~~~
+
+Therefore, in the studied Runtime:
+
+~~~text
+HTTP 200 from /state/{checkpoint_id}
+    != proof that the checkpoint exists
+~~~
+
+The endpoint synthesizes an empty ThreadState for a missing checkpoint selector.
+
+### Correction to the previous rollback check
+
+The previous test used:
+
+~~~text
+checkpoint lookup returns 404
+~~~
+
+as the criterion for checkpoint deletion.
+
+That criterion is invalid for this Runtime.
+
+The earlier:
+
+~~~text
+historical_checkpoint_deleted = false
+~~~
+
+was therefore a false negative produced by the test, not evidence that the
+checkpoint survived rollback.
+
+### Active rollback checkpoint deletion
+
+Before rollback:
+
+~~~text
+current checkpoint:
+    populated
+
+history_count:
+    1
+~~~
+
+After rollback:
+
+~~~text
+current checkpoint:
+    None
+
+history_count:
+    0
+~~~
+
+The old checkpoint ID subsequently produced exactly the same synthetic empty
+state as a UUID that had never existed.
+
+Together with the source-validated `Runs.delete` implementation, which deletes
+checkpoints associated with the Run ID before deleting the Run, this establishes
+that the active rollback removed the Run's persisted checkpoint history.
+
+The active rollback checks can therefore be corrected to:
+
+~~~text
+Run deleted:
+    PASS
+
+Run absent from list:
+    PASS
+
+Thread restored to idle:
+    PASS
+
+current checkpoint removed:
+    PASS
+
+Run checkpoint history removed:
+    PASS
+
+history restored to baseline:
+    PASS
+
+messages restored to baseline:
+    PASS
+~~~
+
+### Checkpoint existence contract
+
+Clients must not use:
+
+~~~text
+GET /state/{checkpoint_id} -> HTTP 200
+~~~
+
+as an existence test.
+
+More meaningful evidence includes:
+
+- membership in Thread history;
+- non-null checkpoint metadata;
+- non-null checkpoint creation time;
+- populated state/control data.
+
+The historical-state endpoint behaves as a state materialization endpoint for a
+checkpoint selector rather than as a strict checkpoint-resource lookup.
+
+### Evidence status
+
+~~~text
+[RUNTIME VALIDATED]
+
+missing checkpoint:
+    HTTP 200
+    synthetic empty ThreadState
+
+rolled-back checkpoint:
+    same response as never-existing checkpoint
+
+active rollback:
+    Run and checkpoint lineage removed
+    Thread restored to baseline
+~~~
