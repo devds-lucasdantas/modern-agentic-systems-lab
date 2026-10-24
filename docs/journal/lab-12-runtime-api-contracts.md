@@ -396,3 +396,434 @@ response schemas rather than inferring semantics from endpoint names.
 Map the schemas that define Assistant, Thread, Run, State and Store operations
 and determine the exact identifiers, lifecycle fields and relationships exposed
 by the pinned Runtime API.
+
+### 1.1B results — Core resource schemas
+
+OpenAPI component inspection established the concrete resource relationships
+behind the endpoint inventory.
+
+### Graph and Assistant
+
+`AssistantCreate` requires `graph_id`.
+
+In the studied deployment the allowed graph ID is:
+
+~~~text
+deep_agent
+~~~
+
+`assistant_id` is a separate optional UUID that is generated automatically when
+not supplied.
+
+An Assistant can also contain:
+
+~~~text
+config
+context
+metadata
+name
+description
+version
+~~~
+
+Therefore Graph and Assistant are distinct concepts:
+
+~~~text
+registered Graph
+      |
+      | graph_id
+      v
+Assistant
+      |
+      +-- assistant_id
+      +-- config
+      +-- context
+      +-- metadata
+      +-- version
+~~~
+
+The Graph is the executable definition registered by the deployment.
+
+The Assistant is a configured and versioned execution identity created from
+that Graph.
+
+### Run target resolution
+
+Both `RunCreateStateless` and `RunCreateStateful` require a field named
+`assistant_id`.
+
+Despite its name, the field accepts either:
+
+~~~text
+Assistant UUID
+
+or
+
+Graph name
+~~~
+
+When a Graph name is supplied, the contract states that the first Assistant
+created from that Graph is selected.
+
+The field therefore behaves semantically as an execution-target selector rather
+than strictly as an Assistant UUID.
+
+### Stateless execution still uses a Thread
+
+`RunCreateStateless` contains:
+
+~~~text
+on_completion:
+    delete
+    keep
+~~~
+
+with `delete` as the default.
+
+The contract explicitly describes this as controlling the lifetime of the
+Thread created for a stateless Run.
+
+Therefore:
+
+~~~text
+stateless Run
+    !=
+Run without a Thread
+~~~
+
+The observed model is:
+
+~~~text
+POST /runs
+    |
+    v
+Runtime-created temporary Thread
+    |
+    v
+Run
+    |
+    v
+on_completion
+    |
+    +-- delete
+    |
+    +-- keep
+~~~
+
+Stateless execution means that the caller does not need to supply and manage a
+pre-existing persistent Thread.
+
+### Run resource
+
+The persisted `Run` schema requires:
+
+~~~text
+run_id
+thread_id
+assistant_id
+created_at
+updated_at
+status
+metadata
+kwargs
+multitask_strategy
+~~~
+
+Run status is explicitly modeled as:
+
+~~~text
+pending
+running
+error
+success
+timeout
+interrupted
+~~~
+
+A Run is therefore both an execution request and a lifecycle-managed Runtime
+resource.
+
+### Thread resource
+
+The Thread schema requires:
+
+~~~text
+thread_id
+created_at
+updated_at
+metadata
+status
+~~~
+
+Thread status is:
+
+~~~text
+idle
+busy
+interrupted
+error
+~~~
+
+Additional Thread fields can include:
+
+~~~text
+state_updated_at
+config
+values
+interrupts
+ttl
+extracted
+~~~
+
+Thread lifecycle and Run lifecycle are therefore related but distinct.
+
+### Stateful versus stateless Run creation
+
+Both Run creation contracts share capabilities including:
+
+~~~text
+assistant_id
+input
+command
+metadata
+config
+context
+webhook
+stream_mode
+stream_subgraphs
+stream_resumable
+feedback_keys
+after_seconds
+durability
+~~~
+
+Stateful Run creation additionally exposes:
+
+~~~text
+checkpoint
+interrupt_before
+interrupt_after
+multitask_strategy
+if_not_exists
+~~~
+
+Stateless Run creation instead exposes `on_completion` to control the temporary
+Thread lifetime.
+
+### Concurrency
+
+Stateful Run creation exposes the following `multitask_strategy` values:
+
+~~~text
+reject
+rollback
+interrupt
+enqueue
+~~~
+
+The selected strategy is also a required property of the persisted Run object.
+
+Concurrency behavior on a shared Thread is therefore part of the core Runtime
+contract.
+
+The exact semantics of each strategy remain to be validated experimentally.
+
+### Durability
+
+Both Run creation contracts expose:
+
+~~~text
+durability:
+    sync
+    async
+    exit
+~~~
+
+with `async` as the default.
+
+The older `checkpoint_during` field is marked deprecated in favor of
+`durability`.
+
+Checkpoint persistence timing is therefore an explicit execution policy.
+
+### Streaming configuration
+
+Run creation exposes semantic stream modes:
+
+~~~text
+values
+messages
+messages-tuple
+tasks
+checkpoints
+updates
+events
+debug
+custom
+~~~
+
+Additional controls include:
+
+~~~text
+stream_subgraphs
+stream_resumable
+~~~
+
+Transport-level streaming and semantic stream mode must therefore be treated as
+different layers.
+
+### Delayed execution
+
+Both stateful and stateless Run creation expose:
+
+~~~text
+after_seconds
+~~~
+
+for future execution.
+
+This establishes a distinction between:
+
+~~~text
+one-shot delayed execution
+    -> after_seconds
+
+recurring/scheduled execution
+    -> Cron resources
+~~~
+
+### ThreadState
+
+The formal Thread state contract contains:
+
+~~~text
+values
+next
+tasks
+checkpoint
+metadata
+created_at
+parent_checkpoint
+interrupts
+~~~
+
+This confirms that persisted state contains both application state and execution
+control information.
+
+### ThreadStateUpdate
+
+The update contract contains:
+
+~~~text
+values
+checkpoint
+as_node
+~~~
+
+`as_node` is explicitly described as updating state as if the selected node had
+just executed.
+
+This formally confirms the state-surgery behavior previously validated
+empirically in Phase 0.
+
+### Store
+
+`StorePutRequest` requires:
+
+~~~text
+namespace
+key
+value
+~~~
+
+and optionally supports:
+
+~~~text
+index
+ttl
+~~~
+
+A returned Store `Item` contains:
+
+~~~text
+namespace
+key
+value
+created_at
+updated_at
+~~~
+
+The OpenAPI description explicitly identifies Store Items as a mechanism for
+cross-Thread memories.
+
+This reinforces the architecture:
+
+~~~text
+ThreadState / Checkpoints
+    -> execution persistence
+
+Store
+    -> cross-Thread data persistence
+~~~
+
+### Formal resource model
+
+The resulting Phase 1 resource model is:
+
+~~~text
+                    Deployment
+                        |
+                        v
+                registered Graph
+                        |
+                        | graph_id
+                        v
+                    Assistant
+                        |
+                        | assistant_id
+                        v
+                       Run
+                    /       \
+                   /         \
+                  v           v
+           Stateless       Stateful
+              |               |
+              v               v
+      temporary Thread      Thread
+        delete / keep         |
+                              +------+
+                              |      |
+                              v      v
+                             Runs  State
+                                     |
+                                     v
+                                Checkpoint DAG
+
+
+                    Store
+                      |
+              namespace + key
+                      |
+                      v
+                    Item
+
+             cross-Thread persistence
+~~~
+
+### Main lesson
+
+The Runtime does not divide cleanly into stateless and stateful execution
+engines.
+
+Thread is a foundational execution concept in both modes.
+
+The difference is primarily whether Thread lifecycle is explicitly controlled
+by the caller or implicitly managed by the stateless Run API.
+
+## 1.1C — Checkpoint and execution-control contracts
+
+### Objective
+
+Inspect the schemas that define checkpoint identity, resume commands,
+interrupts and execution-control behavior before performing new Runtime
+experiments.
