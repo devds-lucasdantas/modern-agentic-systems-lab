@@ -5323,3 +5323,189 @@ Also test whether another conflicting Run is rejected even while the Thread
 resource incorrectly reports `idle`.
 
 No model execution is required.
+
+### 1.3C1 results — Stable Thread status drift after multitask interrupt
+
+The previous multitask `interrupt` result:
+
+~~~text
+Run A = interrupted
+Run B = pending
+Thread = idle
+~~~
+
+was reproduced and observed repeatedly.
+
+The Runtime was sampled every 250 ms for approximately two seconds.
+
+Every sample reported:
+
+~~~text
+Run A = interrupted
+Run B = pending
+Thread = idle
+~~~
+
+Therefore this was not merely a sub-second reconciliation window.
+
+### Thread status is not authoritative for in-flight execution
+
+The experiment establishes:
+
+~~~text
+Thread.status = idle
+~~~
+
+does not imply:
+
+~~~text
+no pending or running Run exists
+~~~
+
+A pending Run remained persisted throughout the entire observation window.
+
+The Thread status is therefore better modeled as a denormalized lifecycle
+projection than as an authoritative query of current Run existence.
+
+### Conflict detection does not rely solely on Thread status
+
+While the Thread still reported:
+
+~~~text
+idle
+~~~
+
+and Run B remained:
+
+~~~text
+pending
+~~~
+
+a third Run C was submitted with:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+The Runtime returned:
+
+~~~text
+HTTP 409
+~~~
+
+and Run C was not persisted.
+
+Therefore the multitask conflict mechanism detected the existing in-flight Run
+despite the Thread resource reporting `idle`.
+
+Conceptually:
+
+~~~text
+Thread.status
+    != authoritative in-flight Run index
+
+multitask conflict detection
+    -> uses execution state beyond Thread.status
+~~~
+
+This is consistent with the pinned persistence primitives, which explicitly
+inspect Runs whose status is `pending` or `running`.
+
+### Reconciliation as a side effect of rejected creation
+
+An additional behavior was observed.
+
+Before submitting Run C:
+
+~~~text
+Thread = idle
+Run B  = pending
+~~~
+
+After the rejected Run C request:
+
+~~~text
+Thread = busy
+Run B  = pending
+~~~
+
+even though C was not persisted.
+
+Therefore the Run creation/conflict path caused the Thread lifecycle projection
+to become reconciled with the existing pending Run.
+
+This further supports the model that `Thread.status` is mutable denormalized
+state rather than a value dynamically calculated from Runs on every read.
+
+### Likely source-correlated mechanism
+
+Pinned source previously showed that interrupting a pending Run can directly set
+the Thread status to:
+
+~~~text
+idle
+~~~
+
+before marking that Run:
+
+~~~text
+interrupted
+~~~
+
+The observed multitask behavior is consistent with the following sequence:
+
+~~~text
+create Run B
+    -> B pending
+    -> Thread busy
+
+interrupt Run A
+    -> A interrupted
+    -> cancellation path writes Thread idle
+
+no immediate reconciliation
+    -> B remains pending
+    -> Thread remains idle
+
+later Run creation attempt
+    -> conflict path observes pending B
+    -> Thread becomes busy again
+~~~
+
+Because the public multitask orchestration implementation is outside the
+inspected Python source boundary, this causal sequence is classified as:
+
+~~~text
+[SOURCE-CORRELATED]
+[RUNTIME VALIDATED]
+~~~
+
+rather than fully source validated.
+
+### Client implication
+
+Clients should not use:
+
+~~~text
+Thread.status == idle
+~~~
+
+as the sole test for whether a Thread has active or queued execution.
+
+The Runtime's Run creation/conflict contract is more authoritative than
+client-side inference from the Thread lifecycle projection.
+
+## 1.3D — Active multitask supersession
+
+### Objective
+
+Compare `interrupt` and `rollback` when Run A is actually running and has
+already materialized checkpoint state.
+
+Determine whether Run B:
+
+- preserves or removes Run A;
+- preserves or removes Run A checkpoint lineage;
+- inherits state produced by A;
+- starts from the pre-A Thread baseline;
+- leaves Thread lifecycle consistent after supersession.
