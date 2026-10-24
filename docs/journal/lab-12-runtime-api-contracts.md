@@ -1142,3 +1142,209 @@ explain a Run lifecycle result.
 
 Observe the lifecycle of one delayed stateful Run from creation to terminal
 status while correlating Run status with Thread status.
+
+### 1.2A results — Stateful Run lifecycle baseline
+
+A delayed stateful Run was created against a newly created Thread using:
+
+~~~text
+assistant selector:
+    deep_agent
+
+after_seconds:
+    3
+
+multitask_strategy:
+    enqueue
+
+durability:
+    async
+~~~
+
+The observed lifecycle was:
+
+~~~text
+0.01s
+    Run    = pending
+    Thread = busy
+
+4.20s
+    Run    = running
+    Thread = busy
+
+8.22s
+    Run    = success
+    Thread = idle
+~~~
+
+### Run lifecycle
+
+The experiment directly observed:
+
+~~~text
+pending
+    |
+    v
+running
+    |
+    v
+success
+~~~
+
+This validates that delayed execution creates a Run resource before graph
+execution begins.
+
+`after_seconds` therefore does not merely delay creation of the Run resource.
+
+The Run exists in `pending` state before execution enters `running`.
+
+### Thread occupation begins while the Run is pending
+
+The most important observation was:
+
+~~~text
+Run = pending
+Thread = busy
+~~~
+
+The Thread became busy before the delayed Run transitioned to running.
+
+For the tested combination:
+
+~~~text
+stateful Run
+multitask_strategy = enqueue
+after_seconds = 3
+~~~
+
+Thread occupation therefore begins when the Run is accepted into its execution
+lifecycle, not only when graph execution is actively running.
+
+This observation is specific to the tested Runtime behavior and is not yet
+generalized to every multitask strategy.
+
+### Graph-name Assistant resolution
+
+The Run was created using:
+
+~~~text
+assistant_id = "deep_agent"
+~~~
+
+The persisted Run contained the concrete Assistant UUID:
+
+~~~text
+47c35ef5-979e-5ab8-8dce-a69ded2244ab
+~~~
+
+This empirically validates the OpenAPI statement that a graph name can be used
+as the Run execution selector and resolved to an Assistant.
+
+### Run and Thread lifecycle are correlated but distinct
+
+The terminal Run state was:
+
+~~~text
+Run.status = success
+~~~
+
+while the terminal Thread state was:
+
+~~~text
+Thread.status = idle
+~~~
+
+Run and Thread therefore have separate lifecycle state machines, but their
+transitions are operationally correlated.
+
+The observed state can be summarized as:
+
+~~~text
+create delayed Run
+        |
+        v
+Run=pending
+Thread=busy
+        |
+        v
+Run=running
+Thread=busy
+        |
+        v
+Run=success
+Thread=idle
+~~~
+
+### Terminal execution state
+
+The final ThreadState contained:
+
+~~~text
+next  = []
+tasks = []
+~~~
+
+and a final checkpoint whose message history ended with the exact marker
+requested by the Run.
+
+This establishes consistency between:
+
+~~~text
+Run terminal status
+Thread terminal status
+graph execution completion
+checkpointed state
+~~~
+
+### Timestamp observation
+
+For this execution, the final:
+
+~~~text
+Run.updated_at
+Thread.updated_at
+Thread.state_updated_at
+~~~
+
+were identical.
+
+This is recorded as an observation only.
+
+The experiment does not establish that these timestamps are guaranteed to be
+transactionally identical for all executions.
+
+### Evidence
+
+~~~text
+[RUNTIME VALIDATED]
+
+Run:
+    pending -> running -> success
+
+Thread:
+    busy while Run pending
+    busy while Run running
+    idle after Run success
+
+Graph-name selector:
+    deep_agent -> concrete Assistant UUID
+
+Final state:
+    next=[]
+    tasks=[]
+    output marker persisted
+~~~
+
+## 1.2B — Stateless Run Thread lifecycle
+
+### Objective
+
+Validate what "stateless" means operationally by observing the temporary Thread
+created for a stateless Run and comparing:
+
+- `on_completion = keep`;
+- `on_completion = delete`.
+
+The experiment will determine whether the temporary Thread is externally
+observable and whether the configured completion policy actually controls its
+persistence.
