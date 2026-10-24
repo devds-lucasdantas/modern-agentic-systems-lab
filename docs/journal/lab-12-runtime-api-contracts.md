@@ -5138,3 +5138,188 @@ For each strategy:
 
 The experiment also includes a fifth case where `multitask_strategy` is omitted
 to validate the public OpenAPI default.
+
+### 1.3C results — Pending conflict strategy matrix
+
+All four public multitask strategies were validated against an existing delayed
+pending Run without allowing model execution.
+
+The observed matrix was:
+
+~~~text
+strategy     HTTP    Run A          Run B          Thread
+---------------------------------------------------------
+reject       409     pending        absent         busy
+enqueue      200     pending        pending        busy
+interrupt    200     interrupted    pending        idle
+rollback     200     absent         pending        busy
+omitted      200     pending        pending        busy
+~~~
+
+For the omitted case, Run B persisted:
+
+~~~text
+multitask_strategy = enqueue
+~~~
+
+### `reject`
+
+When Run B used:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+the Runtime returned:
+
+~~~text
+HTTP 409
+~~~
+
+and the response stated that the Thread was already running a task.
+
+Run B was not persisted.
+
+Run A remained unchanged as:
+
+~~~text
+pending
+~~~
+
+Therefore `reject` is a pre-insertion conflict rejection at the observable API
+level.
+
+### `enqueue`
+
+When B used `enqueue`, both Runs remained persisted:
+
+~~~text
+Run A = pending
+Run B = pending
+Thread = busy
+~~~
+
+This validates that queued execution is represented through Run lifecycle state
+rather than through a distinct public `queued` status.
+
+Execution ordering has not yet been tested.
+
+### Public omission default
+
+When `multitask_strategy` was omitted from the HTTP request, Run B persisted:
+
+~~~text
+multitask_strategy = enqueue
+~~~
+
+and behaved identically to the explicit enqueue case.
+
+Therefore:
+
+~~~text
+public HTTP omission default = enqueue
+~~~
+
+is now Runtime validated.
+
+The internal `Runs.put(... multitask_strategy="reject")` default does not
+represent the public HTTP default.
+
+### `rollback`
+
+When B used:
+
+~~~text
+multitask_strategy = rollback
+~~~
+
+the previously pending Run A disappeared from the Run list.
+
+The resulting state was:
+
+~~~text
+Run A = absent
+Run B = pending
+Thread = busy
+~~~
+
+This differs from the previously validated explicit cancellation edge case:
+
+~~~text
+POST .../runs/{run_a}/cancel?action=rollback
+~~~
+
+on a delayed pending queued Run, where A became `interrupted` and remained
+persisted.
+
+Therefore the public behavior of:
+
+~~~text
+multitask_strategy = rollback
+~~~
+
+is not behaviorally equivalent to the broken explicit delayed-pending rollback
+path observed in section 1.2I2.
+
+The orchestration implementation is outside the inspected Python source
+boundary, so the internal mechanism is not inferred.
+
+### `interrupt` and Thread status inconsistency
+
+When B used:
+
+~~~text
+multitask_strategy = interrupt
+~~~
+
+the resulting resources were:
+
+~~~text
+Run A = interrupted
+Run B = pending
+Thread = idle
+~~~
+
+The `idle` Thread status is unexpected because the pinned Thread status logic
+normally treats any pending or running Run as sufficient to keep the Thread
+`busy`.
+
+This demonstrates at least a momentary inconsistency between:
+
+~~~text
+Thread.status
+~~~
+
+and:
+
+~~~text
+Run lifecycle state
+~~~
+
+during multitask interruption.
+
+A source-correlated explanation is that pending-Run cancellation can directly
+set the Thread to `idle` while interrupting A without immediately reconciling
+the newly created pending B.
+
+Because the multitask orchestration layer itself is outside the inspected
+Python source, this causal mechanism is not yet classified as source validated.
+
+## 1.3C1 — Thread status consistency after multitask interrupt
+
+### Objective
+
+Determine whether:
+
+~~~text
+Run B = pending
+Thread = idle
+~~~
+
+is merely a short reconciliation window or a stable state while B remains
+delayed.
+
+Also test whether another conflicting Run is rejected even while the Thread
+resource incorrectly reports `idle`.
+
+No model execution is required.
