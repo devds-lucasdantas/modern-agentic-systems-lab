@@ -6060,3 +6060,184 @@ Validate:
 - actual execution completes in B -> C -> A order;
 - no two Runs execute concurrently on the Thread;
 - persisted message order follows execution order rather than submission order.
+
+### 1.3E1 results — Scheduled execution order
+
+Three Runs were submitted to the same Thread in HTTP submission order:
+
+~~~text
+A
+B
+C
+~~~
+
+They were assigned different delays:
+
+~~~text
+A: after_seconds = 6
+B: after_seconds = 2
+C: after_seconds = 4
+~~~
+
+Their resulting scheduled `created_at` order was:
+
+~~~text
+B
+C
+A
+~~~
+
+### Execution followed scheduled order
+
+The observed lifecycle transitions included:
+
+~~~text
+B:
+    pending -> running -> success
+
+C:
+    pending -> running -> success
+
+A:
+    pending -> success
+~~~
+
+The short `running` interval for A was not captured by polling, but its
+completion timestamp and persisted state establish its execution after C.
+
+Completion order was:
+
+~~~text
+B
+C
+A
+~~~
+
+which exactly matched ascending `created_at`.
+
+Therefore Runtime behavior confirms the source-derived scheduler rule:
+
+~~~text
+enqueue execution order
+    = eligible Runs ordered by created_at
+    != HTTP submission FIFO
+~~~
+
+### Per-Thread execution remained serialized
+
+No observation contained multiple Runs in the `running` state on the same
+Thread.
+
+The observed sequence was effectively:
+
+~~~text
+B running
+    |
+    v
+B success
+    |
+    v
+C running
+    |
+    v
+C success
+    |
+    v
+A running / success
+~~~
+
+This Runtime evidence agrees with the source scheduler gate that prevents a Run
+from being admitted while another Run on the same Thread is already running.
+
+### State materialization follows execution order
+
+The final persisted message sequence was:
+
+~~~text
+B
+C
+A
+~~~
+
+rather than the submission sequence:
+
+~~~text
+A
+B
+C
+~~~
+
+Therefore queued Runs materialize their inputs into Thread state in actual
+execution order.
+
+Conceptually:
+
+~~~text
+execute B
+    -> state = [B]
+
+execute C
+    -> state = [B, C]
+
+execute A
+    -> state = [B, C, A]
+~~~
+
+Each later queued Run therefore observes state produced by previously executed
+Runs according to scheduler order.
+
+### Operational definition of `enqueue`
+
+For the studied Runtime:
+
+~~~text
+enqueue
+    = persist Run as pending
+    + wait for temporal eligibility
+    + order eligible Runs by created_at
+    + serialize active execution per Thread
+    + materialize Thread state in execution order
+~~~
+
+A more precise description than FIFO is:
+
+~~~text
+scheduled per-Thread serialized execution
+~~~
+
+### Run success versus graph completion
+
+All three Runs completed with:
+
+~~~text
+status = success
+~~~
+
+while the final Thread state still contained:
+
+~~~text
+next = ["model"]
+~~~
+
+because every Run used:
+
+~~~text
+interrupt_before = ["model"]
+~~~
+
+This independently reinforces:
+
+~~~text
+Run.status = success
+    !=
+graph reached END
+~~~
+
+### Evidence status
+
+~~~text
+[SOURCE VALIDATED]
+[RUNTIME VALIDATED]
+~~~
+
+The scheduler ordering and per-Thread serialization model are now established.
