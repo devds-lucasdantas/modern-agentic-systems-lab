@@ -5049,3 +5049,92 @@ Locate the caller of `Runs.put` and determine:
 - where `reject`, `enqueue`, `interrupt`, and `rollback` are applied;
 - whether interrupt/rollback reuse the cancellation primitives already studied;
 - how the public HTTP default `enqueue` reaches the persistence primitive.
+
+### 1.3B results — Multitask orchestration source boundary
+
+A repository-wide search across the pinned Python site-packages found no Python
+call site for:
+
+~~~text
+Runs.put(...)
+~~~
+
+and no implementation of:
+
+~~~text
+create_valid_run(...)
+~~~
+
+within the inspected packages.
+
+A broad search for:
+
+~~~text
+multitask_strategy
+MultitaskStrategy
+reject
+enqueue
+interrupt
+rollback
+~~~
+
+also found no strategy-resolution logic beyond the schema definitions and the
+`Runs.put` persistence primitive.
+
+### Source boundary
+
+The observable architecture is therefore:
+
+~~~text
+public Runtime API
+        |
+        | multitask conflict orchestration
+        | [not visible in inspected Python packages]
+        v
+Runs.put(...)
+        |
+        +-- persist Run
+        +-- expose existing in-flight Runs
+~~~
+
+`Runs.put` itself does not implement the four public multitask policies.
+
+Further source searching inside these pinned Python packages is therefore
+unlikely to reveal the orchestration logic.
+
+The four strategies will be treated as public Runtime contracts and validated
+empirically through the HTTP API.
+
+### Evidence status
+
+~~~text
+[SOURCE VALIDATED]
+
+Runs.put:
+    persistence primitive
+    discovers in-flight Runs
+    persists multitask_strategy
+    does not resolve the strategy
+
+[IMPLEMENTATION BOUNDARY]
+
+public multitask orchestration:
+    outside inspected Python source
+~~~
+
+## 1.3C — Pending conflict strategy matrix
+
+### Objective
+
+Validate all four stateful multitask strategies without model inference.
+
+For each strategy:
+
+1. create a fresh Thread;
+2. create Run A with a long `after_seconds` delay;
+3. submit delayed Run B against the same busy Thread;
+4. inspect the HTTP response, both Run resources, and Thread lifecycle;
+5. clean up every remaining pending/running Run before its scheduled execution.
+
+The experiment also includes a fifth case where `multitask_strategy` is omitted
+to validate the public OpenAPI default.
