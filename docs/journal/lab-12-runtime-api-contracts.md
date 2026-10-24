@@ -2814,3 +2814,223 @@ begins and determine:
 - whether the Thread returns to idle;
 - whether graph/model execution is avoided;
 - what state remains persisted after cancellation.
+
+### 1.2G results — Disconnect cancellation
+
+A delayed streaming Run was created with:
+
+~~~text
+after_seconds      = 5
+stream_resumable   = true
+on_disconnect      = cancel
+durability         = async
+~~~
+
+The client received the initial metadata event and then intentionally closed
+the streaming connection.
+
+### Cancellation lifecycle status
+
+After disconnect, the Run transitioned to:
+
+~~~text
+Run.status = interrupted
+~~~
+
+The Runtime therefore represents this cancellation mechanism through the
+existing `interrupted` Run lifecycle state rather than through a separate
+`cancelled` status.
+
+### Thread also becomes interrupted
+
+The Thread did not return to `idle`.
+
+Its final lifecycle state was:
+
+~~~text
+Thread.status = interrupted
+~~~
+
+The observed model is therefore:
+
+~~~text
+stream disconnect
+        |
+on_disconnect=cancel
+        |
+        v
+Run interrupted
+        |
+        v
+Thread interrupted
+~~~
+
+Cancellation preserves an interrupted execution context rather than restoring
+the Thread to an idle empty state.
+
+### Run and Thread transitions are not observationally atomic
+
+Polling immediately after disconnect observed:
+
+~~~text
+0.009s
+    Run    = interrupted
+    Thread = busy
+
+0.262s
+    Run    = interrupted
+    Thread = interrupted
+~~~
+
+This demonstrates that Run and Thread lifecycle transitions can have a visible
+intermediate period.
+
+A client must not assume that observing a terminal Run status implies that the
+Thread lifecycle has already reached its corresponding final state.
+
+This also qualifies earlier observations where final Run and Thread update
+timestamps were equal: equal final timestamps do not establish atomic lifecycle
+visibility.
+
+### Execution-control state is preserved
+
+The final ThreadState contained:
+
+~~~text
+next:
+    SkillsMiddleware.before_agent
+
+tasks:
+    SkillsMiddleware.before_agent
+~~~
+
+This differs from successful completion, where previous experiments observed:
+
+~~~text
+next  = []
+tasks = []
+~~~
+
+The cancellation therefore retained a checkpointed execution position and
+pending graph task.
+
+The experiment does not yet establish that this execution position can be
+continued by another Run.
+
+It establishes only that cancellation preserves execution-control state.
+
+### Model execution was avoided
+
+The final Thread state contained only the original human message.
+
+No assistant output containing the marker was present:
+
+~~~text
+assistant_marker_found = false
+~~~
+
+The next graph node remained:
+
+~~~text
+SkillsMiddleware.before_agent
+~~~
+
+This provides strong evidence that cancellation occurred before model
+inference.
+
+### Lifecycle interruption versus graph Interrupt
+
+The `interrupted` lifecycle status must not be conflated with the graph-level
+`Interrupt` schema studied earlier.
+
+The current experiment establishes:
+
+~~~text
+Run.status    = interrupted
+Thread.status = interrupted
+~~~
+
+as a result of transport-triggered cancellation.
+
+It does not establish that `ThreadState.interrupts` contains a graph-level
+Interrupt object.
+
+The concepts remain distinct:
+
+~~~text
+Run / Thread interrupted status
+    -> lifecycle condition
+
+ThreadState.interrupts
+    -> graph-level interrupt payload
+~~~
+
+### Successful versus cancelled terminal state
+
+The currently validated contrast is:
+
+~~~text
+successful execution:
+
+    Run    = success
+    Thread = idle
+    next   = []
+    tasks  = []
+
+
+disconnect cancellation:
+
+    Run    = interrupted
+    Thread = interrupted
+    next   = pending node
+    tasks  = pending task
+~~~
+
+### Evidence
+
+~~~text
+[RUNTIME VALIDATED]
+
+on_disconnect=cancel:
+    Run -> interrupted
+    Thread -> interrupted
+
+temporary lifecycle window:
+    Run=interrupted
+    Thread=busy
+
+checkpoint after cancellation:
+    next and tasks preserved
+
+model execution:
+    not observed
+~~~
+
+## 1.2H — Join-stream disconnect cancellation
+
+### Objective
+
+Validate the independent cancellation mechanism exposed by the Run join
+endpoint:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}/stream
+    ?cancel_on_disconnect=true
+~~~
+
+The experiment will keep the original creating stream attached with:
+
+~~~text
+on_disconnect=continue
+~~~
+
+while a second client joins the same active Run with:
+
+~~~text
+cancel_on_disconnect=true
+~~~
+
+The second client will disconnect after observing a persisted semantic event.
+
+This will determine whether disconnecting a joined stream can cancel the shared
+underlying Run independently of the original creator stream.
