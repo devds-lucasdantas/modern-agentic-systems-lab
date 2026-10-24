@@ -2310,3 +2310,200 @@ Last-Event-ID: -1
 
 will test whether the complete persisted stream can be replayed after Run
 completion.
+
+### 1.2F1 results — Disconnect, resume and full replay
+
+A stateful Run was created with:
+
+~~~text
+stream_resumable = true
+on_disconnect    = continue
+stream_mode      = updates
+~~~
+
+The initial streaming response returned:
+
+~~~text
+Content-Location:
+/threads/{thread_id}/runs/{run_id}
+~~~
+
+The Run ID in this location exactly matched the Run ID emitted by the initial
+`metadata` SSE event.
+
+### Disconnect does not cancel with `on_disconnect=continue`
+
+The client intentionally closed the initial SSE connection after receiving the
+first three events.
+
+After disconnect, the Run was observed transitioning:
+
+~~~text
+running
+    |
+    v
+success
+~~~
+
+Therefore, for the tested policy:
+
+~~~text
+client disconnect
+    != Run cancellation
+~~~
+
+### Resume with `Last-Event-ID`
+
+The last event ID observed before disconnect was:
+
+~~~text
+1792879233990-0
+~~~
+
+Joining:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}/stream
+Last-Event-ID: 1792879233990-0
+~~~
+
+returned subsequent persisted events beginning with a later event ID.
+
+This validates the documented resume mechanism.
+
+### Full replay
+
+Joining the completed Run with:
+
+~~~text
+Last-Event-ID: -1
+~~~
+
+returned the complete persisted semantic stream for the requested `updates`
+mode.
+
+Replay remained available after:
+
+~~~text
+Run.status = success
+~~~
+
+### Initial metadata is not part of persisted replay
+
+The live stream began with:
+
+~~~text
+event: metadata
+~~~
+
+containing:
+
+~~~text
+run_id
+attempt
+~~~
+
+That event had an SSE ID but did not appear in the full historical replay.
+
+The full replay began with semantic `updates` events instead.
+
+Therefore the initial connection metadata appears to be connection/bootstrap
+metadata rather than part of the persisted semantic stream history.
+
+This distinction is recorded from Runtime behavior rather than inferred from
+the OpenAPI schema.
+
+### Semantic replay completeness
+
+The original comparison:
+
+~~~text
+initial + resumed == full replay
+~~~
+
+returned false because the initial sequence included the non-replayed metadata
+event.
+
+When that connection-level metadata event is excluded, the semantic event
+sequence observed before disconnect plus the resumed sequence exactly matches
+the full persisted replay in this experiment.
+
+Conceptually:
+
+~~~text
+initial semantic events
+        +
+resumed semantic events
+        =
+full persisted semantic replay
+~~~
+
+for the tested disconnect position.
+
+### Duplicate SSE event IDs
+
+A significant additional observation was that multiple distinct semantic events
+can share the same SSE event ID.
+
+Observed examples included:
+
+~~~text
+id = 1792879233990-0
+    SkillsMiddleware.before_agent
+    PatchToolCallsMiddleware.before_agent
+
+id = 1792879235627-0
+    model
+    TodoListMiddleware.after_model
+~~~
+
+Therefore:
+
+~~~text
+SSE event ID
+    != proven unique semantic-event identity
+~~~
+
+The ID may represent a persistence cursor or grouped stream position rather than
+one unique SSE event.
+
+The exact implementation is not inferred here.
+
+### Open question
+
+The current experiment disconnected only after all observed events sharing the
+last event ID had already been received.
+
+A remaining edge case is:
+
+~~~text
+event A
+    id = N
+    received
+
+event B
+    id = N
+    not yet received
+
+disconnect
+
+resume:
+    Last-Event-ID = N
+~~~
+
+It remains to be determined whether event B is replayed or skipped.
+
+This behavior is operationally important for exactly-once-like client stream
+consumption and will be validated before resumable streaming is considered
+complete.
+
+## 1.2F2 — Duplicate-ID resume cursor granularity
+
+### Objective
+
+Disconnect after the first semantic event of the initial stream and compare the
+resumed sequence with a later full replay.
+
+If multiple persisted events share that event's ID, determine whether resuming
+from that ID reproduces unseen events with the same ID or begins strictly after
+the entire ID group.
