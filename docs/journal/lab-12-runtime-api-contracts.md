@@ -3629,3 +3629,183 @@ The experiment will determine whether rollback:
 
 A later experiment can isolate rollback after checkpoint materialization if
 needed.
+
+### 1.2I2 results — Rollback of a pending delayed Run
+
+A delayed stateful Run was created with:
+
+~~~text
+after_seconds = 5
+~~~
+
+while the Thread initially had:
+
+~~~text
+checkpoint = None
+history    = []
+~~~
+
+The pending Run was cancelled through:
+
+~~~text
+POST /threads/{thread_id}/runs/{run_id}/cancel
+    ?action=rollback
+    &wait=true
+~~~
+
+The endpoint returned:
+
+~~~text
+HTTP 200
+body = {}
+~~~
+
+after approximately:
+
+~~~text
+0.501 seconds
+~~~
+
+### Thread state was restored to baseline
+
+After rollback:
+
+~~~text
+Thread.status = idle
+
+checkpoint = None
+next        = []
+tasks       = []
+interrupts  = []
+messages    = []
+history     = []
+~~~
+
+The Thread therefore returned to the same observable execution-state baseline
+that existed before Run creation.
+
+### The Run was not deleted
+
+Contrary to the OpenAPI description of the rollback action, the Run remained
+retrievable:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}
+    -> HTTP 200
+~~~
+
+and remained present in:
+
+~~~text
+GET /threads/{thread_id}/runs
+~~~
+
+with:
+
+~~~text
+status = interrupted
+~~~
+
+The observed checks were:
+
+~~~text
+run_deleted:
+    false
+
+run_absent_from_list:
+    false
+
+thread_idle:
+    true
+
+checkpoint_absent:
+    true
+
+history_restored_to_baseline:
+    true
+~~~
+
+The OpenAPI description states that rollback deletes the Run and associated
+checkpoints.
+
+The current Runtime observation does not match the Run-deletion portion of that
+description.
+
+This is recorded as a provisional OpenAPI/Runtime semantic mismatch until
+delayed cleanup and the pinned implementation are inspected.
+
+### Pending interrupt versus pending rollback
+
+The previous `action=interrupt` experiment and the current rollback experiment
+both occurred before execution-state materialization.
+
+Both produced:
+
+~~~text
+Run.status    = interrupted
+Thread.status = idle
+
+checkpoint = None
+messages   = []
+history    = []
+~~~
+
+Therefore pending cancellation does not yet expose the strongest semantic
+difference between `interrupt` and `rollback`.
+
+There were no execution checkpoints for rollback to remove.
+
+A checkpoint-materialized Run is required to validate rollback semantics
+properly.
+
+### `wait=true`
+
+As with explicit interrupt cancellation, the rollback request returned only
+after the Thread was already reconciled to:
+
+~~~text
+idle
+~~~
+
+This strengthens the evidence that `wait=true` behaves as a cancellation
+completion barrier for pending delayed Runs.
+
+### Delayed timestamp behavior repeated
+
+The Run exposed:
+
+~~~text
+created_at:
+    2026-10-24T22:13:34.211910+00:00
+
+updated_at:
+    2026-10-24T22:13:29.213247+00:00
+~~~
+
+Again:
+
+~~~text
+updated_at < created_at
+~~~
+
+by approximately the configured:
+
+~~~text
+after_seconds = 5
+~~~
+
+This repeats the previously observed delayed-Run timestamp behavior and further
+supports the interpretation that `created_at` functions as a scheduled
+execution timestamp for delayed Runs in the studied Runtime.
+
+## 1.2I2B — Rollback cleanup and implementation audit
+
+### Objective
+
+Before exercising rollback against materialized checkpoint history:
+
+1. determine whether the pending rollback Run is deleted asynchronously later;
+2. inspect the pinned Runtime implementation for `interrupt` versus `rollback`;
+3. distinguish documented behavior from implementation behavior.
+
+No additional model execution is required.
