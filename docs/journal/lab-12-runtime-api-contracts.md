@@ -4225,3 +4225,204 @@ The experiment will:
 7. validate restoration of the empty Thread baseline.
 
 This distinguishes the normal rollback primitive from the delayed pending bug.
+
+### 1.2I3 results — Rollback during active checkpointed execution
+
+A normal non-delayed Run was started through the streaming endpoint.
+
+Before rollback the Runtime had already materialized execution state:
+
+~~~text
+Run.status    = running
+Thread.status = busy
+
+checkpoint:
+    1f1cff96-0e84-66aa-8000-c36857c8bbef
+
+next:
+    SkillsMiddleware.before_agent
+
+history_count:
+    1
+~~~
+
+The Run was then cancelled through:
+
+~~~text
+POST /threads/{thread_id}/runs/{run_id}/cancel
+    ?action=rollback
+    &wait=true
+~~~
+
+### Active rollback reached the normal worker path
+
+After the request completed:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}
+    -> HTTP 404
+
+GET /threads/{thread_id}/runs
+    -> []
+~~~
+
+The Run resource was therefore deleted.
+
+This contrasts directly with the previously identified delayed-pending rollback
+bug.
+
+### Thread state was restored to baseline
+
+After rollback:
+
+~~~text
+Thread.status = idle
+
+checkpoint = None
+next       = []
+tasks      = []
+interrupts = []
+messages   = []
+
+history_count = 0
+~~~
+
+The Thread therefore returned to the observable state that existed before this
+Run started.
+
+The Run input itself disappeared from Thread state.
+
+### Interrupt versus rollback
+
+The Runtime evidence now establishes a strong semantic distinction.
+
+`action=interrupt` after execution-state materialization:
+
+~~~text
+Run remains addressable
+Run.status = interrupted
+
+Thread.status = interrupted
+
+checkpoint retained
+next/tasks retained
+execution position retained
+~~~
+
+`action=rollback` during active execution:
+
+~~~text
+Run deleted
+
+Thread.status = idle
+
+current execution checkpoint removed
+Run-generated history removed
+messages restored to prior baseline
+~~~
+
+Rollback is therefore not merely another spelling of interruption.
+
+It is a destructive cancellation primitive intended to remove persistence
+effects associated with the Run.
+
+### Delayed pending bug is isolated from normal rollback
+
+The active rollback succeeded through the expected worker path.
+
+The previously observed failure is therefore specifically associated with:
+
+~~~text
+delayed
++ pending
++ existing queue
++ action=rollback
+~~~
+
+rather than with the rollback primitive generally.
+
+### `wait=true`
+
+The active rollback request returned after approximately:
+
+~~~text
+0.005 seconds
+~~~
+
+Immediately after the response:
+
+~~~text
+Run lookup      -> 404
+Run list        -> empty
+Thread          -> idle
+current state   -> baseline
+history         -> baseline
+~~~
+
+This strengthens the evidence that `wait=true` behaves as a completion barrier
+for the rollback operation.
+
+### Cancellation response body
+
+Although rollback completed successfully, the HTTP 200 response body was:
+
+~~~json
+{
+  "__error__": {
+    "error": "UserRollback",
+    "message": "An internal error occurred"
+  }
+}
+~~~
+
+`UserRollback` is the internal control exception used by the normal worker
+rollback path.
+
+The response therefore appears to expose a serialized terminal execution result
+while the HTTP-level cancellation operation itself succeeds.
+
+The exact endpoint behavior will be source-audited before defining client
+handling rules.
+
+### Historical checkpoint lookup nuance
+
+A lookup of the checkpoint ID that existed before rollback returned HTTP 200,
+but the returned object contained:
+
+~~~text
+values     = {}
+next       = []
+tasks      = []
+metadata   = null
+created_at = null
+~~~
+
+while the requested checkpoint ID was echoed in the response.
+
+At the same time:
+
+~~~text
+current checkpoint = None
+history_count      = 0
+~~~
+
+and the pinned Runtime source deletes checkpoints associated with the rolled
+back Run.
+
+Therefore HTTP 200 alone cannot yet be interpreted as evidence that the
+historical checkpoint survived.
+
+A negative-control lookup and source inspection are required to determine
+whether the endpoint synthesizes an empty response for a missing checkpoint.
+
+## 1.2I3B — Historical checkpoint and wait-response semantics
+
+### Objective
+
+Without executing another model:
+
+1. compare the rolled-back checkpoint lookup with a definitely nonexistent
+   checkpoint ID;
+2. inspect the historical-state lookup implementation;
+3. inspect the `wait=true` cancellation response path;
+4. determine the correct client contract for both behaviors.
