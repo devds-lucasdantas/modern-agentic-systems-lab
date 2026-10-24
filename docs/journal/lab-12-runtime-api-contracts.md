@@ -4590,3 +4590,186 @@ active rollback:
     Run and checkpoint lineage removed
     Thread restored to baseline
 ~~~
+
+### 1.2I3B results — `UserRollback` wait-result semantics
+
+Source inspection established the Python-side path that produces the
+`UserRollback` payload observed during active rollback.
+
+### Worker stream error propagation
+
+When graph stream consumption raises an exception, the worker stream layer
+publishes an event with:
+
+~~~text
+mode = error
+~~~
+
+whose payload is the serialized exception.
+
+The exception is then re-raised.
+
+`UserRollback` is deliberately treated as a control-flow exception rather than
+as an ordinary graph failure.
+
+Its serializer representation is:
+
+~~~json
+{
+  "error": "UserRollback",
+  "message": "An internal error occurred"
+}
+~~~
+
+The worker subsequently handles `UserRollback` through the rollback persistence
+path already validated in the previous experiment.
+
+### Stream join does not construct `__error__`
+
+The in-memory `Runs.Stream.join` implementation:
+
+- restores persisted stream messages;
+- decodes their event mode and payload;
+- yields matching events;
+- waits for new events;
+- exits once the Run is no longer pending or running.
+
+It does not construct the HTTP result envelope:
+
+~~~json
+{
+  "__error__": ...
+}
+~~~
+
+### Source boundary
+
+A search of the inspected pinned Python packages did not locate the HTTP cancel
+handler or the code that wraps the serialized terminal error payload in the
+`__error__` field.
+
+The evidence boundary is therefore:
+
+~~~text
+[SOURCE VALIDATED]
+
+worker:
+    UserRollback
+        ->
+    stream event "error"
+        ->
+    serialized payload:
+        {
+          "error": "UserRollback",
+          "message": "An internal error occurred"
+        }
+
+
+[NOT VISIBLE IN INSPECTED PYTHON SOURCE]
+
+higher HTTP/runtime layer:
+    terminal error result
+        ->
+    {
+      "__error__": ...
+    }
+~~~
+
+No implementation language or hidden transport layer is inferred beyond this
+evidence.
+
+### `wait=true` result interpretation
+
+The active rollback request returned:
+
+~~~text
+HTTP 200
+~~~
+
+with:
+
+~~~json
+{
+  "__error__": {
+    "error": "UserRollback",
+    "message": "An internal error occurred"
+  }
+}
+~~~
+
+while all persistence-side rollback checks succeeded:
+
+~~~text
+Run deleted
+Run absent from Thread Run list
+Thread restored to idle
+current checkpoint removed
+Run checkpoint history removed
+messages restored to baseline
+~~~
+
+Therefore, for the studied Runtime:
+
+~~~text
+__error__.error == UserRollback
+~~~
+
+in a successful HTTP rollback response is not evidence that the rollback
+operation failed.
+
+It represents the terminal outcome of the execution that was intentionally
+aborted by the rollback control signal.
+
+This establishes an important distinction:
+
+~~~text
+HTTP cancellation operation outcome
+    !=
+cancelled execution outcome
+~~~
+
+### `1.2I` consolidated findings
+
+~~~text
+interrupt before state materialization:
+    Run    -> interrupted
+    Thread -> idle
+    no graph state persisted
+
+interrupt after state materialization:
+    Run    -> interrupted
+    Thread -> interrupted
+    execution position retained
+
+rollback during active execution:
+    Run deleted
+    Run checkpoints deleted
+    Thread restored to prior baseline
+
+rollback of delayed pending queued Run:
+    pinned Runtime bug
+    Run becomes interrupted before scheduler admission
+    worker rollback path becomes unreachable
+    Run is not deleted
+
+wait=true:
+    empirically behaves as a cancellation completion barrier
+
+graph Interrupt:
+    independent from Run/Thread lifecycle status
+
+historical checkpoint lookup:
+    HTTP 200 is not an existence test
+~~~
+
+### Evidence status
+
+~~~text
+[OPENAPI VALIDATED]
+[SOURCE VALIDATED]
+[RUNTIME VALIDATED]
+~~~
+
+The remaining `__error__` envelope transformation lies outside the inspected
+Python source boundary and is not required to establish the observable API
+contract.
