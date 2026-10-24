@@ -4773,3 +4773,126 @@ historical checkpoint lookup:
 The remaining `__error__` envelope transformation lies outside the inspected
 Python source boundary and is not required to establish the observable API
 contract.
+
+## 1.3 — Run concurrency and multitask strategies
+
+### 1.3A contract inventory
+
+Stateful Run creation exposes:
+
+~~~text
+multitask_strategy:
+    reject
+    rollback
+    interrupt
+    enqueue
+~~~
+
+The public OpenAPI default is:
+
+~~~text
+enqueue
+~~~
+
+The option belongs to stateful Run creation and therefore defines how a new Run
+should interact with other execution already associated with the target Thread.
+
+Conceptually:
+
+~~~text
+Thread
+  |
+  +-- active Run A
+          |
+          +-- Run B creation
+                  |
+                  v
+          multitask_strategy
+~~~
+
+The precise persistence and lifecycle semantics of each strategy will be
+established from pinned source and Runtime experiments rather than inferred
+from the option names.
+
+### API default versus internal function default
+
+Pinned source inspection found an internal in-memory Runtime function whose
+Python signature defaults:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+while the public HTTP schema defaults:
+
+~~~text
+multitask_strategy = enqueue
+~~~
+
+This is not yet classified as a behavioral mismatch.
+
+A likely layered model is:
+
+~~~text
+HTTP schema
+    default = enqueue
+        |
+        v
+API layer passes explicit value
+        |
+        v
+internal Runtime function
+    fallback = reject
+~~~
+
+The call path will be inspected before drawing conclusions.
+
+For clients using the public Runtime API, the OpenAPI contract currently defines
+the omission default as `enqueue`.
+
+### Related stateful Run controls
+
+The same creation contract also exposes:
+
+~~~text
+if_not_exists:
+    reject
+    create
+
+after_seconds:
+    schedule execution in the future
+
+checkpoint:
+    select execution checkpoint
+
+command:
+    execution-time control input
+~~~
+
+These controls are orthogonal to `multitask_strategy` unless source or Runtime
+evidence establishes an interaction.
+
+### Questions for source validation
+
+For each strategy determine:
+
+~~~text
+reject:
+    Is the second Run created?
+    What HTTP/lifecycle result represents rejection?
+
+enqueue:
+    Is the second Run persisted as pending?
+    What ordering rule is used?
+
+interrupt:
+    Is the existing Run cancelled using the ordinary interrupt primitive?
+    What execution state does the new Run inherit?
+
+rollback:
+    Is the existing Run cancelled using the rollback primitive?
+    Is the old Run and its checkpoint lineage removed before the new Run runs?
+~~~
+
+A separate experiment will also validate the actual HTTP behavior when
+`multitask_strategy` is omitted.
