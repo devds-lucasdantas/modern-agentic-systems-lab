@@ -76,40 +76,83 @@ learning path remains reproducible without mixing upstream history with our own.
 The repository should grow incrementally. Directories and abstractions are added
 when the laboratory introduces them, rather than being scaffolded prematurely.
 
+<!-- current-status:start -->
+
 ## Current status
 
-Phase 0 — Deep Agents is complete.
+The project is currently in **Phase 1 — Agent Runtime & Protocols**.
 
-The laboratory has incrementally validated:
+### Runtime foundations
 
-- Deep Agents construction and framework boundaries;
-- planning and filesystem behavior;
-- custom tools;
-- backend and persistence abstractions;
-- subagents;
-- human-in-the-loop;
-- long-term memory;
-- AGENTS.md instruction memory;
-- Skills and progressive disclosure;
-- LangGraph Runtime resources, checkpoints, branching and Store integration.
+Completed:
 
-The detailed Phase 0 synthesis is available at:
+- ✅ Agent, Thread and Run
+- ✅ State and checkpoints
+- ✅ Store and persistence
+- ✅ Streaming
+- ✅ Run cancellation and rollback semantics
+- ✅ Multitask strategies and supersession
+- ✅ Per-Thread scheduling and serialization
 
-- `docs/journal/lab-11-phase-0-review.md`.
+In progress:
 
-The current architectural model is maintained at:
+- 🚧 Background Runs and durability
 
-- `docs/architecture.md`.
+Next:
 
-Phase 1 will move from agent internals toward runtime contracts, streaming and
-interoperability.
+- ⬜ Agent Protocol
+- ⬜ Agent Streaming Protocol
+- ⬜ MCP
+- ⬜ A2A
 
-See:
+### Runtime model validated so far
 
-- `ROADMAP.md` for the learning sequence;
-- `CURRENT.md` for the exact continuation point;
-- `docs/architecture.md` for the current system model;
-- `docs/radar.md` for the technology and architecture radar;
-- `docs/adr/` for architecture decisions;
-- `docs/journal/` for experiment records;
-- `references/README.md` for pinned external material.
+```text
+registered Graph
+      |
+      v
+  Assistant
+      |
+      v
+     Run
+      |
+      +----------------------+
+      |                      |
+      v                      v
+   Thread                stream / wait
+      |
+      v
+State / Checkpoints
+
+Store
+  |
+  +-- independent cross-thread persistence
+```
+
+Key findings include:
+
+- stateful and stateless Runs share the same underlying Run execution model;
+- stateless Runs still use Runtime-managed Threads;
+- Run lifecycle and persisted graph execution position are separate dimensions;
+- `Run.status=success` does not necessarily mean the graph reached `END`;
+- checkpoint history supports resume, time travel and branching;
+- Store persistence is independent from checkpoint persistence;
+- resumable SSE streams use cursor groups rather than unique event IDs;
+- `interrupt` preserves partial state while `rollback` restores prior state;
+- `enqueue` is scheduled per-Thread serialized execution, ordered by eligible
+  `created_at`, not strict HTTP submission FIFO;
+- `Thread.status` is a denormalized lifecycle projection and must not be treated
+  as an authoritative in-flight Run index.
+
+The current experiment block is:
+
+```text
+Background Runs
+    -> execution modes
+    -> durability: sync / async / exit
+```
+
+See [`CURRENT.md`](CURRENT.md) for the exact continuation point and
+[`ROADMAP.md`](ROADMAP.md) for the full learning path.
+
+<!-- current-status:end -->

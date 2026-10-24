@@ -6313,3 +6313,179 @@ Determine:
 - how it interacts with background execution;
 - whether the public HTTP execution modes reuse the same underlying Run
   primitive.
+
+### 1.4A source findings — Execution surfaces and durability compatibility
+
+OpenAPI and pinned source inspection establish two separate dimensions:
+
+~~~text
+execution / consumption surface
+~~~
+
+and:
+
+~~~text
+durability policy
+~~~
+
+They must not be conflated.
+
+### Public execution surfaces
+
+The Runtime exposes:
+
+~~~text
+POST /runs
+    -> Create Background Run
+    -> stateless Run contract
+
+POST /threads/{thread_id}/runs
+    -> Create Background Run
+    -> stateful Run contract
+
+POST /threads/{thread_id}/runs/wait
+    -> Create Run, Wait for Output
+
+POST /threads/{thread_id}/runs/stream
+    -> Create Run, Stream Output
+
+GET /threads/{thread_id}/runs/{run_id}/stream
+    -> Join Run Stream
+~~~
+
+Combined with the Runtime experiments already completed, the model is:
+
+~~~text
+Run
+    = execution primitive
+
+background POST
+    = asynchronous resource-oriented submission
+
+/wait
+    = blocking consumption of a Run execution
+
+/stream
+    = SSE consumption of a Run execution
+
+join stream
+    = attachment to an already-created Run
+~~~
+
+The transport or consumption mode does not define a separate execution
+primitive.
+
+### Durability contract
+
+Pinned LangGraph source defines:
+
+~~~text
+Durability =
+    "sync"
+    | "async"
+    | "exit"
+~~~
+
+The public Run creation schemas expose the same three-mode durability contract.
+
+The exact persistence guarantees of each mode still require source inspection.
+
+### Legacy `checkpoint_during` bridge
+
+Pinned Runtime stream code includes compatibility logic between:
+
+~~~text
+durability
+~~~
+
+and the older:
+
+~~~text
+checkpoint_during
+~~~
+
+boolean.
+
+Observed forward compatibility mapping:
+
+~~~text
+checkpoint_during = true
+    -> durability = async
+
+checkpoint_during = false
+    -> durability = exit
+~~~
+
+Observed reverse compatibility mapping:
+
+~~~text
+durability = async
+    -> checkpoint_during = true
+
+durability = exit
+    -> checkpoint_during = false
+~~~
+
+There is no equivalent legacy boolean representation for:
+
+~~~text
+durability = sync
+~~~
+
+Therefore `checkpoint_during` is not a complete representation of the current
+durability contract.
+
+### Architectural distinction
+
+The current model is:
+
+~~~text
+                 Run execution
+                       |
+        +--------------+--------------+
+        |              |              |
+        v              v              v
+ background           wait          stream
+ submission        consumption     consumption
+
+
+                 persistence policy
+                       |
+        +--------------+--------------+
+        |              |              |
+        v              v              v
+       sync           async           exit
+~~~
+
+Execution surface and durability are orthogonal concerns.
+
+### Evidence status
+
+~~~text
+[OPENAPI VALIDATED]
+
+background / wait / stream / join surfaces
+
+[SOURCE VALIDATED]
+
+Durability =
+    sync
+    async
+    exit
+
+legacy compatibility:
+    checkpoint_during=true  <-> async
+    checkpoint_during=false <-> exit
+
+[UNRESOLVED]
+
+exact checkpoint persistence guarantees:
+    sync
+    async
+    exit
+~~~
+
+### Next source question
+
+Trace the LangGraph checkpoint write path to determine exactly when each
+durability mode waits for persistence relative to graph execution.

@@ -18,15 +18,69 @@
 
 ## Phase 1 — Agent Runtime & Protocols
 
-- [ ] Agent, Thread and Run
-- [ ] State and checkpoints
-- [ ] Store and persistence
-- [ ] Streaming
-- [ ] Background runs
-- [ ] Agent Protocol
-- [ ] Agent Streaming Protocol
-- [ ] MCP
-- [ ] A2A
+### Runtime contracts
+
+- [x] 1.1 Runtime API contracts
+  - [x] Agent, Thread and Run resource model
+  - [x] Graph vs Assistant
+  - [x] Stateful vs stateless Run contracts
+  - [x] State and checkpoint contracts
+  - [x] Store and persistence contracts
+  - [x] Execution-control schemas
+  - [x] Streaming surface inventory
+  - [x] Runtime interoperability surface inventory
+
+- [x] 1.2 Run lifecycle and streaming execution
+  - [x] Stateful Run lifecycle
+  - [x] Stateless Runtime-managed Threads
+  - [x] Wait execution semantics
+  - [x] SSE streaming baseline
+  - [x] Semantic stream modes
+  - [x] Resumable streams
+  - [x] Last-Event-ID replay
+  - [x] Duplicate cursor semantics
+  - [x] Disconnect continuation and cancellation
+  - [x] Explicit interrupt and rollback cancellation
+  - [x] Checkpoint preservation and rollback semantics
+
+- [x] 1.3 Run concurrency and multitask strategies
+  - [x] Multitask strategy contract
+  - [x] reject
+  - [x] enqueue
+  - [x] interrupt
+  - [x] rollback
+  - [x] Thread-status drift under pending interruption
+  - [x] Active supersession
+  - [x] State inheritance
+  - [x] Scheduler eligibility and ordering
+  - [x] Per-Thread execution serialization
+
+### Background execution
+
+- [ ] 1.4 Run execution modes and background execution
+  - [x] Background Run creation
+  - [x] Stateful background Runs
+  - [x] Stateless Runtime-managed Threads
+  - [x] Wait consumption mode
+  - [x] Stream consumption mode
+  - [x] Delayed execution with after_seconds
+  - [x] Scheduler eligibility and ordering
+  - [x] Per-Thread serialization
+  - [ ] Durability: sync
+  - [ ] Durability: async
+  - [ ] Durability: exit
+  - [ ] Final execution-mode contract
+
+### Protocols
+
+- [ ] 1.5 Agent Protocol
+- [ ] 1.6 Agent Streaming Protocol
+- [ ] 1.7 MCP
+- [ ] 1.8 A2A
+
+### Phase review
+
+- [ ] 1.9 Runtime and protocols review
 
 ## Phase 2 — Agent ↔ UI
 

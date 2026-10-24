@@ -1,320 +1,426 @@
-# Current checkpoint
-
-## Repository
-
-Repository:
-
-~~~text
-modern-agentic-systems-lab
-~~~
-
-The repository is an incremental, reproducible and versioned laboratory for
-modern agentic-system architecture.
-
-The primary external reference for Phase 0 is the Interrupt 2026 Deep Agents
-workshop pinned to:
-
-~~~text
-3d3287cf1e51250934c11aff182d90ccfaf0e66d
-~~~
-
-The reference clone lives under:
-
-~~~text
-.reference/interrupt26-deepagents
-~~~
-
-and remains outside the learning repository history.
+# Current Work
 
 ## Current phase
 
-Phase 0 — Deep Agents is complete.
+Phase 1 — Agent Runtime & Protocols
 
-Completed roadmap items:
+Current block:
 
 ~~~text
-0.1  Repository and environment setup
-0.2  Explore the Interrupt 2026 workshop
-0.3  Minimal Deep Agent
-0.4  Planning and filesystem
-0.5  Custom tools
-0.6  Backends
-0.7  Subagents
-0.8  Human-in-the-loop
-0.9  Long-term memory
-0.10 AGENTS.md
-0.11 Skills
-0.12 LangGraph Runtime and Studio
-0.13 Phase review
+1.4 Run execution modes and background execution
+    -> durability
+    -> persistence guarantees
 ~~~
 
-All Phase 0 roadmap items are complete.
+## Completed
 
-The Phase 0 synthesis is preserved in:
+### Phase 0 — Deep Agents
+
+Phase 0 is complete.
+
+The repository has validated:
+
+- Deep Agents harness architecture;
+- planning and filesystem;
+- tools;
+- StateBackend, FilesystemBackend, StoreBackend and CompositeBackend;
+- subagents;
+- human-in-the-loop;
+- long-term memory;
+- AGENTS.md instruction memory;
+- SkillsMiddleware and progressive disclosure;
+- LangGraph Runtime and Studio integration.
+
+### Phase 1 — Runtime foundations
+
+The following Lab 12 blocks are complete:
 
 ~~~text
-docs/journal/lab-11-phase-0-review.md
+1.1 Runtime API contracts
+1.2 Run lifecycle and streaming execution
+1.3 Run concurrency and multitask strategies
 ~~~
 
-## Current architecture
+Those blocks collectively cover:
 
-The current architecture is documented in:
+- Agent, Assistant, Thread and Run;
+- State and checkpoints;
+- Store and persistence;
+- streaming and resumable streaming;
+- cancellation and rollback;
+- concurrency and multitask strategies;
+- scheduler behavior.
 
-~~~text
-docs/architecture.md
-~~~
+## Established Runtime model
 
-The current architecture version is:
-
-~~~text
-Version 0.3 — Phase 0 consolidated architecture
-~~~
-
-The detailed evidence and synthesis are documented in:
+### Resources
 
 ~~~text
-docs/journal/lab-11-phase-0-review.md
-~~~
-
-## Phase 0 architecture established
-
-The validated framework relationship is:
-
-~~~text
-Application
+Deployment
     |
     v
-Deep Agents
+registered Graph
     |
     v
-LangChain agent abstractions
-    |
-    v
-LangGraph execution substrate
-~~~
-
-`create_deep_agent()` produces a compiled LangGraph.
-
-The Phase 0 experiments established the following execution model:
-
-~~~text
 Assistant
     |
     v
-Thread
-    |
-    +-- Run
-    |    |
-    |    +-- checkpoint
-    |    +-- checkpoint
-    |
-    +-- Run
-         |
-         +-- checkpoint
-
-Checkpoint history can branch into a DAG.
+Run
 ~~~
 
-Historical checkpoints can be:
+Stateful execution additionally uses a caller-owned Thread.
 
-- inspected;
-- used as the base of new Runs;
-- branched without destroying existing descendants;
-- modified through `update_state`;
-- resumed when pending execution remains.
+Stateless execution still uses a Thread internally, but its lifecycle is managed
+by the Runtime.
 
-## Persistence model
+### Run lifecycle
 
-Checkpoint persistence and Store persistence have distinct responsibilities.
+Run is the execution-attempt resource.
+
+Observed statuses include:
+
+~~~text
+pending
+running
+success
+interrupted
+error
+timeout
+~~~
+
+Run lifecycle and persisted graph execution position are separate dimensions.
+
+In particular:
+
+~~~text
+Run.status = success
+~~~
+
+does not imply:
+
+~~~text
+graph reached END
+~~~
+
+A successful Run can leave:
+
+~~~text
+Thread.status = interrupted
+ThreadState.next != []
+~~~
+
+when execution stops at a configured breakpoint.
+
+### State and checkpoints
+
+Thread state contains both application state and graph execution-control state.
+
+Important fields include:
+
+~~~text
+values
+next
+tasks
+checkpoint
+parent_checkpoint
+interrupts
+~~~
+
+Checkpoint history forms a lineage/DAG that supports:
+
+- historical inspection;
+- branching;
+- time travel;
+- resume;
+- direct state mutation.
+
+A lookup through:
+
+~~~text
+GET /threads/{thread_id}/state/{checkpoint_id}
+~~~
+
+must not be used as an existence check.
+
+Missing checkpoint selectors can return HTTP 200 with a synthetic empty
+ThreadState.
+
+### Store
+
+Store is independent from Thread checkpoint persistence.
+
+Conceptually:
 
 ~~~text
 Checkpointer
-    -> execution state
-    -> Thread history
-    -> pause/resume
-    -> branching and time travel
+    -> execution persistence
 
 Store
-    -> namespace/key/value data
-    -> long-term application memory
-    -> cross-Thread persistence
+    -> cross-thread application / memory persistence
 ~~~
 
-The Runtime deployment graph intentionally embeds neither a custom Store nor a
-custom Checkpointer.
+StoreBackend can resolve the Runtime-owned Store.
 
-LangGraph Runtime owns checkpoint persistence and supplies the execution-context
-Store.
+### Streaming
 
-## Backend model
+A Run can be consumed through SSE without changing the underlying execution
+primitive.
 
-The workshop filesystem architecture is:
+Validated semantic stream modes include:
 
 ~~~text
-Agent filesystem tools
-        |
-        v
-CompositeBackend
-     /       \
-    /         \
-default       /memories/
-  |               |
-  v               v
-Filesystem      StoreBackend
-Backend             |
-  |                 v
-  v             LangGraph Store
-disk
+updates
+values
+messages
+checkpoints
 ~~~
 
-`/memories/*` is therefore a virtual file interface over Store-backed memory.
+Resumable streams use persisted cursor IDs.
 
-The Runtime experiment validated cross-Thread memory end to end.
+Multiple semantic events may share one cursor ID, so a cursor must be treated as
+a group boundary rather than as a unique event identifier.
 
-## Context engineering
+### Cancellation
 
-Phase 0 distinguished three primary instruction/context mechanisms:
+`interrupt` and `rollback` have distinct persistence semantics.
 
 ~~~text
-system_prompt
-    -> application-defined base instructions
+interrupt
+    -> terminate execution
+    -> preserve already-materialized Thread state
 
-AGENTS.md
-    -> always-loaded instruction memory
-
-Skills
-    -> metadata catalog
-    -> full instructions loaded on demand
+rollback
+    -> terminate execution
+    -> delete the superseded Run
+    -> delete its checkpoint lineage
+    -> restore prior Thread state
 ~~~
 
-AGENTS.md and Skill catalog data can become checkpointed middleware state,
-which means resumed Threads may observe snapshots older than their current
-backing files.
-
-## Delegation and control
-
-Subagents provide:
-
-- context isolation;
-- capability isolation;
-- specialist routing;
-- configurable Skill scope.
-
-Human-in-the-loop provides an execution boundary supporting:
-
-- approve;
-- edit;
-- reject;
-- batched decisions;
-- nested subagent interrupts.
-
-## Preserved workshop patches
-
-The learning repository preserves the workshop changes required by the
-experiments:
+A pinned Runtime bug was identified for explicit rollback of a delayed pending
+Run with an existing queue:
 
 ~~~text
-patches/interrupt26-gpt-6-luna.patch
-patches/interrupt26-store-wiring.patch
-patches/interrupt26-runtime-store-ownership.patch
+pending
++ delayed
++ queued
++ explicit action=rollback
+    ->
+Run becomes interrupted before scheduler admission
+    ->
+worker rollback path is never reached
+    ->
+Run remains persisted
 ~~~
 
-These patches preserve reproducibility without committing modifications inside
-the external reference clone.
+Normal active rollback works correctly.
 
-## Known pinned-stack quirks
+### Multitask strategies
 
-The Phase 0 review records several compatibility observations:
-
-- the pinned LangGraph API generation is end-of-life;
-- Runtime development persistence is in-memory;
-- Store point-GET namespace serialization remains unresolved;
-- the observed namespace-list response differs from the inspected OpenAPI
-  response schema;
-- legacy StoreBackend assistant-ID namespace detection is deprecated;
-- StoreBackend documentation disagrees with its executable V1/V2 default;
-- the environment emits a non-blocking LangChain serializer deprecation
-  warning.
-
-These are intentionally preserved as findings rather than patched away inside
-the pinned workshop.
-
-## Production gaps
-
-Phase 0 does not claim production readiness.
-
-Deferred areas include:
-
-- durable Runtime persistence;
-- explicit production Store namespace design;
-- authentication;
-- authorization and RBAC;
-- sandboxing;
-- observability;
-- evaluations;
-- resilience and retries;
-- concurrency policy;
-- security hardening.
-
-These topics are handled by later phases of the roadmap.
-
-## Environment restoration
-
-Restore the pinned workshop reference with:
-
-~~~bash
-./scripts/bootstrap-reference.sh
-cd .reference/interrupt26-deepagents
-uv sync --locked
-~~~
-
-Use the locked workshop Python environment through:
-
-~~~bash
-uv run --locked python
-~~~
-
-Do not use the system Python for workshop dependency inspection.
-
-`.env`, `.venv`, credentials and machine-specific runtime state are intentionally
-excluded from repository history.
-
-## Next
-
-Begin **Phase 1 — Agent Runtime & Protocols**.
-
-Phase 1 should reuse rather than repeat the Runtime knowledge already validated
-during Phase 0.
-
-The first Phase 1 objective is to formalize the runtime resource model and API
-contracts around:
-
-- Agent / Assistant;
-- Thread;
-- Run;
-- State;
-- checkpoints;
-- Store;
-- persistence.
-
-After that, the phase expands into:
-
-- streaming;
-- background runs;
-- Agent Protocol;
-- Agent Streaming Protocol;
-- MCP;
-- A2A.
-
-Its goal is to move from:
+Public stateful Run creation supports:
 
 ~~~text
-How does the agent harness work internally?
+reject
+enqueue
+interrupt
+rollback
 ~~~
 
-to:
+Observed semantics:
 
 ~~~text
-How is the agent exposed, operated, streamed and connected as a runtime
-service?
+reject
+    -> HTTP 409
+    -> conflicting Run is not persisted
+
+enqueue
+    -> persist as pending
+    -> scheduled per-Thread serialized execution
+
+interrupt
+    -> supersede old Run
+    -> old Run remains interrupted
+    -> partial state survives
+    -> new Run continues from that partial state
+
+rollback
+    -> supersede old Run
+    -> old Run is removed
+    -> old Run state/checkpoints are removed
+    -> new Run starts from the pre-old-Run state
+~~~
+
+The public HTTP default is:
+
+~~~text
+enqueue
+~~~
+
+### Thread status caveat
+
+Thread.status is a denormalized lifecycle projection and is not authoritative
+for in-flight Run existence.
+
+A validated state was:
+
+~~~text
+Thread.status = idle
+Run.status    = pending
+~~~
+
+Multitask conflict detection still correctly rejected another Run.
+
+Clients must not use `Thread.status == idle` as the sole execution-availability
+test.
+
+### Scheduler
+
+The pinned in-memory scheduler:
+
+1. selects Runs whose status is `pending`;
+2. requires `created_at < now`;
+3. orders eligible Runs by ascending `created_at`;
+4. prevents simultaneous `running` Runs on the same Thread.
+
+Delayed Run creation assigns approximately:
+
+~~~text
+created_at =
+    submission time + after_seconds
+~~~
+
+Therefore enqueue ordering is scheduled eligibility ordering, not strict HTTP
+submission FIFO.
+
+Runtime validation confirmed:
+
+~~~text
+submission:
+    A -> B -> C
+
+scheduled:
+    B -> C -> A
+
+execution:
+    B -> C -> A
+
+persisted message order:
+    B -> C -> A
+~~~
+
+## Current block — Background runs
+
+Existing evidence already establishes:
+
+~~~text
+POST /runs
+    -> stateless background Run
+
+POST /threads/{thread_id}/runs
+    -> stateful background Run
+
+POST /threads/{thread_id}/runs/wait
+    -> create Run and wait for output
+
+POST /threads/{thread_id}/runs/stream
+    -> create Run and consume through SSE
+
+GET /threads/{thread_id}/runs/{run_id}/stream
+    -> join an existing Run stream
+~~~
+
+`after_seconds` schedules future worker eligibility.
+
+The remaining major contract is durability.
+
+## Durability source findings
+
+LangGraph defines:
+
+~~~text
+sync
+async
+exit
+~~~
+
+The pinned Runtime also contains compatibility translation between the current
+`durability` option and the older `checkpoint_during` boolean.
+
+Observed source mapping includes:
+
+~~~text
+checkpoint_during = true
+    -> durability = async
+
+checkpoint_during = false
+    -> durability = exit
+
+durability = async
+    -> checkpoint_during = true
+
+durability = exit
+    -> checkpoint_during = false
+~~~
+
+`sync` has no equivalent representation in the legacy boolean bridge.
+
+The exact persistence guarantees of:
+
+~~~text
+sync
+async
+exit
+~~~
+
+still need to be established from pinned LangGraph source and Runtime evidence.
+
+## Next step
+
+Inspect the LangGraph durability definition and checkpoint write path.
+
+Then validate the three durability modes with minimal execution experiments.
+
+After durability is complete:
+
+~~~text
+1.4 Run execution modes and background execution -> complete
+~~~
+
+and proceed to:
+
+~~~text
+Agent Protocol
+Agent Streaming Protocol
+MCP
+A2A
+~~~
+
+## Reference environment
+
+Pinned workshop:
+
+~~~text
+.reference/interrupt26-deepagents
+commit:
+3d3287cf1e51250934c11aff182d90ccfaf0e66d
+~~~
+
+The reference clone intentionally contains local uncommitted patches and must
+not be reset or committed.
+
+Runtime development server:
+
+~~~text
+http://127.0.0.1:2024
+~~~
+
+Pinned Runtime-related packages include:
+
+~~~text
+deepagents              0.5.3
+langchain               1.2.15
+langchain-core          1.3.3
+langgraph               1.1.9
+langgraph-cli           0.4.24
+langgraph-sdk           0.3.13
+langgraph-runtime-inmem 0.28.0
 ~~~
