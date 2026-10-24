@@ -2184,3 +2184,129 @@ The next step will inspect:
 Other stream modes such as `tasks`, `events`, `debug`, `custom` and
 `messages-tuple` are intentionally deferred until a concrete architectural use
 case requires them.
+
+### 1.2F contract — Resumable streaming
+
+The Runtime exposes a dedicated join endpoint:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}/stream
+~~~
+
+Its purpose is to join an existing Run stream.
+
+### Resumable stream gate
+
+The join contract supports:
+
+~~~text
+Last-Event-ID
+~~~
+
+but the API explicitly requires the Run to have been created with:
+
+~~~text
+stream_resumable = true
+~~~
+
+for stream resumption.
+
+This establishes a persistence mechanism distinct from graph checkpoint
+persistence:
+
+~~~text
+checkpoint persistence
+    -> graph execution state
+
+resumable stream persistence
+    -> emitted stream events
+~~~
+
+### Event cursor
+
+The reconnect cursor uses the SSE `Last-Event-ID` convention.
+
+The contract states:
+
+~~~text
+Last-Event-ID: <event-id>
+    -> resume after the last event received
+
+Last-Event-ID: -1
+    -> stream all events
+~~~
+
+### Content-Location
+
+The streaming Run-creation endpoint returns a `Content-Location` response
+header.
+
+The contract describes it as the URL of the created Run that can later be used
+to join its stream.
+
+Conceptually:
+
+~~~text
+POST /threads/{thread_id}/runs/stream
+        |
+        +-- SSE
+        |
+        +-- Content-Location
+                |
+                v
+        existing Run resource
+~~~
+
+### Disconnect policies
+
+Streaming Run creation extends the normal stateful Run contract with:
+
+~~~text
+on_disconnect:
+    continue
+    cancel
+~~~
+
+with `continue` as the default.
+
+The later join endpoint independently exposes:
+
+~~~text
+cancel_on_disconnect: boolean
+~~~
+
+with `false` as the default.
+
+These controls occur at different stream attachment points and are not treated
+as interchangeable.
+
+### Resume hypothesis
+
+The next Runtime experiment will validate:
+
+~~~text
+create resumable stream
+        |
+        v
+receive events with IDs
+        |
+        X disconnect
+        |
+        v
+Run continues
+        |
+        v
+reconnect with Last-Event-ID
+        |
+        v
+receive remaining persisted events
+~~~
+
+A second replay using:
+
+~~~text
+Last-Event-ID: -1
+~~~
+
+will test whether the complete persisted stream can be replayed after Run
+completion.
