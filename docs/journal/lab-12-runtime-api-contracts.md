@@ -3809,3 +3809,188 @@ Before exercising rollback against materialized checkpoint history:
 3. distinguish documented behavior from implementation behavior.
 
 No additional model execution is required.
+
+### 1.2I2B results — Rollback implementation audit
+
+Delayed cleanup was checked after the scheduled execution time.
+
+The Run remained:
+
+~~~text
+HTTP 200
+status = interrupted
+~~~
+
+and remained present in the Thread Run list.
+
+The Thread itself remained at its pre-execution baseline:
+
+~~~text
+checkpoint = None
+history    = []
+~~~
+
+Therefore no delayed Run deletion occurred.
+
+### Source: rollback deletion is intentionally implemented
+
+The pinned in-memory Runtime implements Run deletion through `Runs.delete`.
+
+That operation first deletes checkpoints associated with the target Run and
+then removes the Run from the Runtime Run store.
+
+`Threads.set_joint_status` explicitly accepts the internal status:
+
+~~~text
+rollback
+~~~
+
+and handles it by invoking:
+
+~~~text
+Runs.delete(...)
+~~~
+
+Therefore deletion of the Run and its associated checkpoints is part of the
+actual implementation intent, not merely the OpenAPI description.
+
+### Source: worker rollback path
+
+The cancellation listener maps the control payload:
+
+~~~text
+b"rollback"
+~~~
+
+to:
+
+~~~text
+UserRollback
+~~~
+
+The worker handles `UserRollback` by assigning the internal status:
+
+~~~text
+rollback
+~~~
+
+and calling:
+
+~~~text
+Threads.set_joint_status(
+    ...,
+    run_status="rollback",
+    checkpoint=None,
+)
+~~~
+
+which in turn deletes the Run.
+
+The intended asynchronous rollback path is therefore:
+
+~~~text
+rollback request
+    |
+    v
+control message
+    |
+    v
+UserRollback
+    |
+    v
+worker status = rollback
+    |
+    v
+set_joint_status
+    |
+    v
+Runs.delete
+    |
+    +-- delete Run checkpoints
+    +-- delete Run
+~~~
+
+### Source: pending queued special case
+
+`Runs.cancel` contains a distinct branch for pending Runs.
+
+Conceptually:
+
+~~~text
+pending + rollback + no active queues
+    -> eager Runs.delete
+
+pending + queues
+    -> send rollback control message
+    -> mark Run interrupted
+    -> expect active execution machinery to process cancellation
+~~~
+
+The tested delayed Run entered the second path.
+
+It was marked:
+
+~~~text
+interrupted
+~~~
+
+instead of being eagerly deleted.
+
+However, the expected later worker rollback was never observed.
+
+### Classification
+
+The evidence now distinguishes the observed behavior from a simple OpenAPI
+documentation problem.
+
+Both the OpenAPI contract and the pinned implementation intend rollback to
+delete the Run and associated checkpoints.
+
+The tested combination:
+
+~~~text
+pending
++ queued
++ delayed
++ action=rollback
+~~~
+
+instead remained persisted as:
+
+~~~text
+status = interrupted
+~~~
+
+even after the scheduled execution time.
+
+This is therefore classified as:
+
+~~~text
+[PINNED RUNTIME IMPLEMENTATION EDGE CASE / BUG]
+~~~
+
+pending inspection of the delayed worker-entry path.
+
+The precise reason the rollback control message is not subsequently consumed
+has not yet been established.
+
+## 1.2I2C — Delayed worker-entry audit
+
+### Objective
+
+Trace the lifecycle between:
+
+~~~text
+pending delayed Run
+    |
+    v
+queued execution
+    |
+    v
+Runs.enter / worker entry
+~~~
+
+and determine why a Run already marked `interrupted` by rollback cancellation
+does not subsequently reach the `UserRollback` worker handler.
+
+No model execution is required.
