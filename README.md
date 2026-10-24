@@ -93,14 +93,14 @@ Completed:
 - ✅ Run cancellation and rollback semantics
 - ✅ Multitask strategies and supersession
 - ✅ Per-Thread scheduling and serialization
+- ✅ Background Runs and durability
 
 In progress:
 
-- 🚧 Background Runs and durability
+- 🚧 Agent Protocol
 
 Next:
 
-- ⬜ Agent Protocol
 - ⬜ Agent Streaming Protocol
 - ⬜ MCP
 - ⬜ A2A
@@ -147,9 +147,10 @@ Key findings include:
 The current experiment block is:
 
 ```text
-Background Runs
-    -> execution modes
-    -> durability: sync / async / exit
+Agent Protocol
+    -> protocol contract
+    -> Runtime mapping
+    -> interoperability boundary
 ```
 
 See [`CURRENT.md`](CURRENT.md) for the exact continuation point and

@@ -7,9 +7,10 @@ Phase 1 — Agent Runtime & Protocols
 Current block:
 
 ~~~text
-1.4 Run execution modes and background execution
-    -> durability
-    -> persistence guarantees
+1.5 Agent Protocol
+    -> protocol contract
+    -> Runtime mapping
+    -> interoperability boundary
 ~~~
 
 ## Completed
@@ -39,6 +40,7 @@ The following Lab 12 blocks are complete:
 1.1 Runtime API contracts
 1.2 Run lifecycle and streaming execution
 1.3 Run concurrency and multitask strategies
+1.4 Run execution modes and background execution
 ~~~
 
 Those blocks collectively cover:
@@ -307,92 +309,115 @@ persisted message order:
     B -> C -> A
 ~~~
 
-## Current block — Background runs
+## Completed block — Run execution modes and background execution
 
-Existing evidence already establishes:
+The Runtime execution-mode contract is established.
+
+Public execution surfaces:
 
 ~~~text
 POST /runs
     -> stateless background Run
+    -> Runtime-managed Thread lifecycle
 
 POST /threads/{thread_id}/runs
     -> stateful background Run
 
 POST /threads/{thread_id}/runs/wait
-    -> create Run and wait for output
+    -> blocking output consumption
 
 POST /threads/{thread_id}/runs/stream
-    -> create Run and consume through SSE
+    -> SSE output consumption
 
 GET /threads/{thread_id}/runs/{run_id}/stream
-    -> join an existing Run stream
+    -> attach to existing Run stream
 ~~~
 
-`after_seconds` schedules future worker eligibility.
+These are different consumption surfaces over the same underlying Run
+execution model.
 
-The remaining major contract is durability.
+Delayed execution and scheduling are also established:
 
-## Durability source findings
+~~~text
+after_seconds
+    -> shifts effective created_at
+    -> controls scheduler eligibility
 
-LangGraph defines:
+enqueue
+    -> pending Run
+    -> eligible-created_at ordering
+    -> per-Thread serialization
+~~~
+
+Durability semantics are established as:
 
 ~~~text
 sync
+    -> incremental checkpoint persistence
+    -> persistence awaited before next superstep
+
 async
+    -> incremental checkpoint persistence
+    -> persistence overlaps subsequent execution
+    -> writes remain ordered
+    -> outstanding persistence drained on exit
+
 exit
+    -> no ordinary incremental checkpoint persistence
+    -> final checkpoint and pending writes flushed at execution exit
 ~~~
 
-The pinned Runtime also contains compatibility translation between the current
-`durability` option and the older `checkpoint_during` boolean.
-
-Observed source mapping includes:
-
-~~~text
-checkpoint_during = true
-    -> durability = async
-
-checkpoint_during = false
-    -> durability = exit
-
-durability = async
-    -> checkpoint_during = true
-
-durability = exit
-    -> checkpoint_during = false
-~~~
-
-`sync` has no equivalent representation in the legacy boolean bridge.
-
-The exact persistence guarantees of:
+Runtime validation with an execution stopped before `model` produced:
 
 ~~~text
 sync
+    history steps = [3, 2, 1, 0, -1]
+
 async
+    history steps = [3, 2, 1, 0, -1]
+
 exit
+    history steps = [3]
 ~~~
 
-still need to be established from pinned LangGraph source and Runtime evidence.
-
-## Next step
-
-Inspect the LangGraph durability definition and checkpoint write path.
-
-Then validate the three durability modes with minimal execution experiments.
-
-After durability is complete:
+All three modes preserved:
 
 ~~~text
-1.4 Run execution modes and background execution -> complete
+Run.status    = success
+Thread.status = interrupted
+next          = ["model"]
 ~~~
 
-and proceed to:
+The experiment also identified a pinned Runtime/OpenAPI observability quirk:
 
 ~~~text
-Agent Protocol
-Agent Streaming Protocol
-MCP
-A2A
+OpenAPI GET /history default limit = 10
+
+pinned in-memory State.list default = 1
 ~~~
+
+An explicit history `limit` must therefore be used when checkpoint cardinality
+matters to an experiment.
+
+The legacy `checkpoint_during` compatibility adapter is asymmetric in the
+durability-aware Runtime path and must not be modeled as a bidirectional
+equivalence.
+
+## Current block — Agent Protocol
+
+The next objective is to move from Runtime-specific execution mechanics to the
+protocol boundary.
+
+Questions to establish:
+
+1. What exactly constitutes the Agent Protocol contract in the pinned stack?
+2. Which existing Runtime resources map directly to protocol concepts?
+3. Which Runtime operations are LangGraph-specific extensions?
+4. How are Runs, Threads, state and errors represented at the protocol boundary?
+5. Which parts are transport-neutral and which depend on HTTP?
+6. How does Agent Protocol relate to the later Agent Streaming Protocol block?
+
+The first step is source and contract inventory before new Runtime experiments.
 
 ## Reference environment
 

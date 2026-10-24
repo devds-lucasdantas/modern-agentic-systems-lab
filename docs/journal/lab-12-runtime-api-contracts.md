@@ -6406,17 +6406,32 @@ checkpoint_during
 
 boolean.
 
-Observed forward compatibility mapping:
+The compatibility adapter is asymmetric.
+
+For Runtime stacks with native durability support:
+
+~~~text
+USE_DURABILITY = true
+~~~
+
+the adapter preserves an explicitly supplied `durability` value.
+
+Legacy compatibility behaves as:
 
 ~~~text
 checkpoint_during = true
     -> durability = async
 
 checkpoint_during = false
-    -> durability = exit
+    -> no explicit durability value is produced by this branch
 ~~~
 
-Observed reverse compatibility mapping:
+The apparent `else "exit"` expression in the adapter is unreachable for
+`checkpoint_during=false` because the enclosing condition itself requires
+`checkpoint_during` to be truthy.
+
+For older stacks without native durability support, the reverse compatibility
+path maps:
 
 ~~~text
 durability = async
@@ -6426,14 +6441,11 @@ durability = exit
     -> checkpoint_during = false
 ~~~
 
-There is no equivalent legacy boolean representation for:
+`durability=sync` has no equivalent representation in the legacy boolean
+contract.
 
-~~~text
-durability = sync
-~~~
-
-Therefore `checkpoint_during` is not a complete representation of the current
-durability contract.
+The pinned stack uses native durability support because its LangGraph version is
+newer than the feature threshold used by `USE_DURABILITY`.
 
 ### Architectural distinction
 
@@ -6489,3 +6501,442 @@ exact checkpoint persistence guarantees:
 
 Trace the LangGraph checkpoint write path to determine exactly when each
 durability mode waits for persistence relative to graph execution.
+
+## 1.4B — Durability at an interrupted execution boundary
+
+### Objective
+
+Compare:
+
+~~~text
+sync
+async
+exit
+~~~
+
+using equivalent stateful Runs stopped before model execution with:
+
+~~~text
+interrupt_before = ["model"]
+~~~
+
+This allows durability behavior to be studied without requiring model
+inference.
+
+### Final execution boundary
+
+All three durability modes converged to the same externally visible execution
+boundary:
+
+~~~text
+Run.status    = success
+Thread.status = interrupted
+next          = ["model"]
+tasks         = ["model"]
+input marker  = persisted
+~~~
+
+Therefore:
+
+~~~text
+Run.status = success
+~~~
+
+continues to mean that the Run attempt completed successfully, not necessarily
+that the graph reached `END`.
+
+All three modes preserve the configured execution breakpoint after an orderly
+Run exit.
+
+### Initial history observation
+
+The first history query was performed without an explicit `limit`.
+
+It returned:
+
+~~~text
+sync  history_count = 1
+async history_count = 1
+exit  history_count = 1
+~~~
+
+This initially appeared to make final checkpoint-history cardinality
+indistinguishable between durability modes.
+
+That interpretation was incorrect.
+
+### History observability quirk
+
+The OpenAPI contract describes:
+
+~~~text
+GET /threads/{thread_id}/history
+
+limit default = 10
+~~~
+
+but the pinned in-memory Runtime implementation contains:
+
+~~~text
+State.list(... limit=1 ...)
+~~~
+
+Empirically:
+
+~~~text
+GET /history
+    -> one snapshot
+
+GET /history?limit=10
+    -> multiple snapshots when available
+~~~
+
+For the tested `sync` Thread:
+
+~~~text
+limit=1
+    -> 1 snapshot
+
+limit=10
+    -> 5 snapshots
+
+limit=100
+    -> 5 snapshots
+~~~
+
+Therefore the original `history_count=1` result was an observation-window
+artifact rather than evidence that all three durability modes produced the same
+checkpoint lineage.
+
+This is recorded as an OpenAPI / pinned Runtime default-behavior drift.
+
+## 1.4C — Explicit checkpoint-lineage durability validation
+
+### Objective
+
+Repeat checkpoint-history inspection with an explicit sufficiently large
+history limit:
+
+~~~text
+limit = 100
+~~~
+
+and compare the checkpoint lineage produced by:
+
+~~~text
+sync
+async
+exit
+~~~
+
+for otherwise equivalent executions.
+
+### Runtime result — `sync`
+
+The `sync` execution persisted five checkpoints:
+
+~~~text
+step  3  source=loop   next=["model"]
+
+step  2  source=loop
+         next=["MemoryMiddleware.before_agent"]
+
+step  1  source=loop
+         next=["PatchToolCallsMiddleware.before_agent"]
+
+step  0  source=loop
+         next=["SkillsMiddleware.before_agent"]
+
+step -1  source=input
+         next=["__start__"]
+~~~
+
+Result:
+
+~~~text
+history_count = 5
+~~~
+
+### Runtime result — `async`
+
+The `async` execution persisted the same five-step lineage:
+
+~~~text
+step  3  source=loop   next=["model"]
+
+step  2  source=loop
+         next=["MemoryMiddleware.before_agent"]
+
+step  1  source=loop
+         next=["PatchToolCallsMiddleware.before_agent"]
+
+step  0  source=loop
+         next=["SkillsMiddleware.before_agent"]
+
+step -1  source=input
+         next=["__start__"]
+~~~
+
+Result:
+
+~~~text
+history_count = 5
+~~~
+
+### Runtime result — `exit`
+
+The `exit` execution exposed only the final execution-boundary checkpoint:
+
+~~~text
+step 3
+source=loop
+next=["model"]
+~~~
+
+Result:
+
+~~~text
+history_count = 1
+~~~
+
+No incremental checkpoints for steps:
+
+~~~text
+-1
+0
+1
+2
+~~~
+
+were present in the persisted history.
+
+### Comparison
+
+~~~text
+sync:
+    checkpoint steps = [3, 2, 1, 0, -1]
+    history_count    = 5
+
+async:
+    checkpoint steps = [3, 2, 1, 0, -1]
+    history_count    = 5
+
+exit:
+    checkpoint steps = [3]
+    history_count    = 1
+~~~
+
+Validated checks:
+
+~~~text
+sync_count == async_count
+    -> true
+
+exit_count < sync_count
+    -> true
+
+exit_count < async_count
+    -> true
+~~~
+
+### Runtime interpretation
+
+The Runtime evidence validates the persistence-shape distinction established by
+source inspection.
+
+`sync` and `async` both provide incremental checkpoint persistence.
+
+Their difference is temporal rather than structural.
+
+~~~text
+sync
+    step completes
+        |
+        v
+    checkpoint submitted
+        |
+        v
+    persistence awaited
+        |
+        v
+    next superstep
+~~~
+
+~~~text
+async
+    step completes
+        |
+        +-----------------------+
+        |                       |
+        v                       v
+    checkpoint              next superstep
+    persistence
+        |
+        v
+    ordered checkpoint pipeline
+~~~
+
+The BackgroundExecutor drains outstanding persistence work when the execution
+context exits.
+
+`exit` instead suppresses ordinary incremental checkpoint persistence:
+
+~~~text
+intermediate execution
+        |
+        v
+in-process state / pending writes
+        |
+        v
+execution boundary
+        |
+        v
+final checkpoint + pending-write flush
+~~~
+
+The final interrupted boundary therefore remains durable even though the
+intermediate checkpoint lineage is absent.
+
+### Consolidated durability contract
+
+~~~text
+                         sync          async          exit
+
+incremental
+checkpoints               yes            yes           no
+
+wait before
+next superstep            yes            no            n/a
+
+checkpoint write
+ordering                   yes            yes           n/a
+
+compute / persistence
+overlap                    no             yes           n/a
+
+drain outstanding
+persistence on exit        yes            yes           yes
+
+final execution
+boundary persisted         yes            yes           yes
+~~~
+
+### Failure-window interpretation
+
+The primary operational difference between the modes appears while execution is
+still active.
+
+~~~text
+sync
+    latest completed superstep has already crossed a durable boundary
+
+async
+    graph execution may temporarily advance ahead of durable persistence
+
+exit
+    intermediate execution does not normally cross incremental durable
+    checkpoint boundaries
+~~~
+
+An orderly execution exit can make all three modes converge to a durable final
+boundary.
+
+Abrupt process-failure semantics were not directly exercised by this Runtime
+experiment and are therefore not inferred beyond the source-established
+persistence behavior.
+
+### Evidence
+
+~~~text
+[OPENAPI VALIDATED]
+
+durability:
+    sync
+    async
+    exit
+
+[SOURCE VALIDATED]
+
+sync:
+    checkpoint persistence is awaited before the next superstep
+
+async:
+    checkpoint persistence overlaps subsequent execution
+    checkpoint writes remain ordered
+    outstanding background persistence is drained on execution exit
+
+exit:
+    ordinary incremental checkpoint persistence is skipped
+    current checkpoint and pending writes are flushed at the execution boundary
+
+[RUNTIME VALIDATED]
+
+sync:
+    incremental checkpoint lineage persisted
+
+async:
+    incremental checkpoint lineage persisted
+
+exit:
+    only the final execution-boundary checkpoint persisted
+
+all modes:
+    final interrupt_before=["model"] boundary persisted
+~~~
+
+### Main lesson
+
+Durability is orthogonal to the HTTP Run consumption surface.
+
+~~~text
+Run execution surface
+    -> background
+    -> wait
+    -> stream
+
+Durability policy
+    -> sync
+    -> async
+    -> exit
+~~~
+
+The former determines how execution is submitted or consumed.
+
+The latter determines when execution progress crosses durable checkpoint
+boundaries.
+
+## 1.4 conclusion — Run execution modes and background execution
+
+The Runtime's background execution contract is now established.
+
+~~~text
+POST /threads/{thread_id}/runs
+    -> persisted background Run
+
+POST /runs
+    -> background Run with Runtime-managed Thread lifecycle
+
+POST /threads/{thread_id}/runs/wait
+    -> same Run execution model with blocking output consumption
+
+POST /threads/{thread_id}/runs/stream
+    -> same Run execution model with SSE consumption
+
+GET /threads/{thread_id}/runs/{run_id}/stream
+    -> attach to an existing Run stream
+
+after_seconds
+    -> scheduled future worker eligibility
+
+enqueue
+    -> scheduled per-Thread serialized execution
+
+durability
+    -> persistence timing policy
+~~~
+
+`sync`, `async`, and `exit` are now established through combined OpenAPI,
+source-code and Runtime evidence.
+
+Phase 1 can proceed from Runtime execution mechanics to protocol-level
+interoperability.

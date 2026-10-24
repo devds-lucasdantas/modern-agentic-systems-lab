@@ -57,7 +57,7 @@
 
 ### Background execution
 
-- [ ] 1.4 Run execution modes and background execution
+- [x] 1.4 Run execution modes and background execution
   - [x] Background Run creation
   - [x] Stateful background Runs
   - [x] Stateless Runtime-managed Threads
@@ -66,10 +66,10 @@
   - [x] Delayed execution with after_seconds
   - [x] Scheduler eligibility and ordering
   - [x] Per-Thread serialization
-  - [ ] Durability: sync
-  - [ ] Durability: async
-  - [ ] Durability: exit
-  - [ ] Final execution-mode contract
+  - [x] Durability: sync
+  - [x] Durability: async
+  - [x] Durability: exit
+  - [x] Final execution-mode contract
 
 ### Protocols
 
