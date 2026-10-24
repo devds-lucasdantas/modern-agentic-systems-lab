@@ -2590,3 +2590,227 @@ Last-Event-ID = duplicated ID
 ~~~
 
 replays any event carrying that same ID or advances past the complete group.
+
+### 1.2F3 results — Duplicate-ID cursor semantics
+
+The previously completed resumable Run contained a persisted duplicate-ID
+group:
+
+~~~text
+1792879324747-0
+    model
+
+1792879324747-0
+    TodoListMiddleware.after_model
+~~~
+
+A join was then performed using:
+
+~~~text
+Last-Event-ID: 1792879324747-0
+~~~
+
+The response contained:
+
+~~~text
+0 events
+~~~
+
+and no event carrying that same ID was replayed.
+
+### Confirmed cursor semantics
+
+This establishes that, for the tested Runtime:
+
+~~~text
+SSE ID
+    != unique semantic-event identifier
+~~~
+
+and:
+
+~~~text
+Last-Event-ID
+    -> advances beyond all persisted events
+       sharing that cursor ID
+~~~
+
+The ID therefore behaves as a persisted stream cursor or cursor-group identity,
+not as a unique identity for each SSE frame.
+
+### Client gap risk
+
+Consider a persisted group:
+
+~~~text
+ID = B
+    event 1
+    event 2
+~~~
+
+If a client:
+
+~~~text
+receives event 1
+persists Last-Event-ID = B
+disconnects before event 2
+~~~
+
+and later reconnects using:
+
+~~~text
+Last-Event-ID: B
+~~~
+
+the Runtime advances beyond the complete B group.
+
+The unseen second event is therefore not replayed.
+
+Persisting every received SSE ID immediately is not a safe resumable-stream
+strategy for this Runtime.
+
+### Safe cursor strategy
+
+A robust client should distinguish:
+
+~~~text
+committed cursor
+    -> last completely observed ID group
+
+current cursor
+    -> ID group currently being consumed
+~~~
+
+For a stream:
+
+~~~text
+A event 1
+A event 2
+B event 3
+~~~
+
+the transition from A to B proves that the A group is complete.
+
+Only then should A become the durable reconnect cursor.
+
+Conceptually:
+
+~~~text
+receive A
+    -> current=A
+
+receive A
+    -> still current=A
+
+receive B
+    -> commit A
+    -> current=B
+~~~
+
+If the connection fails while B is being consumed, reconnect from A.
+
+This may replay already observed members of group B, but avoids skipping unseen
+members of that group.
+
+The resulting delivery strategy is closer to:
+
+~~~text
+at-least-once group replay
+    +
+idempotent or buffered client processing
+~~~
+
+than to exactly-once event delivery.
+
+### Clean stream completion
+
+When a stream closes normally, the final current cursor group can be treated as
+complete.
+
+For durable side effects, clients should otherwise avoid acknowledging the
+current cursor group before either:
+
+- observing the next distinct cursor ID; or
+- observing normal stream completion.
+
+### Bootstrap metadata
+
+The initial `metadata` SSE event was previously shown not to participate in full
+historical replay.
+
+It should therefore be treated as live connection/bootstrap metadata rather
+than as a durable semantic-stream cursor unless additional Runtime behavior
+establishes otherwise.
+
+### Resumable-stream model
+
+~~~text
+Run
+ |
+ +-- stream_resumable=true
+         |
+         v
+ persisted semantic stream
+         |
+         +-- cursor A
+         |    +-- event
+         |    +-- event
+         |
+         +-- cursor B
+              +-- event
+              +-- event
+
+
+Last-Event-ID = A
+        |
+        v
+skip complete A group
+        |
+        v
+replay B onward
+~~~
+
+### Evidence status
+
+~~~text
+[RUNTIME VALIDATED]
+
+Content-Location identifies the created Run.
+
+on_disconnect=continue:
+    disconnect does not cancel Run.
+
+Last-Event-ID:
+    resumes persisted semantic stream.
+
+Last-Event-ID=-1:
+    replays persisted semantic history.
+
+bootstrap metadata:
+    not included in full replay.
+
+SSE IDs:
+    may be shared by multiple events.
+
+duplicate cursor:
+    resumes strictly after the complete cursor group.
+~~~
+
+## 1.2G — Disconnect cancellation
+
+### Objective
+
+Validate the opposite disconnect policy:
+
+~~~text
+on_disconnect = cancel
+~~~
+
+The experiment will disconnect a streaming request before delayed execution
+begins and determine:
+
+- whether the Run is cancelled;
+- what terminal Run status represents cancellation;
+- whether the Thread returns to idle;
+- whether graph/model execution is avoided;
+- what state remains persisted after cancellation.
