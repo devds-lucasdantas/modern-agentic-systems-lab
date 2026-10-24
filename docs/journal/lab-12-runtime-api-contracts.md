@@ -2507,3 +2507,86 @@ resumed sequence with a later full replay.
 If multiple persisted events share that event's ID, determine whether resuming
 from that ID reproduces unseen events with the same ID or begins strictly after
 the entire ID group.
+
+### 1.2F2 results — First-event disconnect
+
+A second resumable Run disconnected immediately after the first semantic event.
+
+The cursor event was:
+
+~~~text
+id = 1792879322666-0
+event = updates
+source = SkillsMiddleware.before_agent
+~~~
+
+After disconnect the Run continued:
+
+~~~text
+running
+    |
+    v
+success
+~~~
+
+Joining with:
+
+~~~text
+Last-Event-ID: 1792879322666-0
+~~~
+
+started with the next persisted event:
+
+~~~text
+1792879322667-0
+PatchToolCallsMiddleware.before_agent
+~~~
+
+The cursor event itself was not replayed.
+
+### Duplicate-ID edge case was not triggered at the disconnect position
+
+For the selected cursor ID:
+
+~~~text
+events observed before disconnect with ID:
+    1
+
+events in full replay with ID:
+    1
+~~~
+
+Therefore no unseen same-ID event existed at that particular disconnect
+position.
+
+The original duplicate-ID question remained unresolved by this cursor.
+
+### However, the same Run produced a later duplicate ID
+
+The full replay contained:
+
+~~~text
+1792879324747-0
+    model
+
+1792879324747-0
+    TodoListMiddleware.after_model
+~~~
+
+The completed Run therefore already contains a persisted duplicate-ID group
+that can be used to test cursor semantics without another model execution.
+
+## 1.2F3 — Duplicate-ID cursor semantics
+
+### Objective
+
+Use the existing completed Run and join from an SSE ID shared by two persisted
+events.
+
+Determine whether:
+
+~~~text
+Last-Event-ID = duplicated ID
+~~~
+
+replays any event carrying that same ID or advances past the complete group.
