@@ -3253,3 +3253,129 @@ The experiment will determine:
 - whether execution position is preserved;
 - whether graph-level interrupts remain absent;
 - whether explicit cancellation behaves like disconnect cancellation.
+
+### 1.2I contract — Explicit Run cancellation
+
+The Runtime exposes an explicit Thread-scoped cancellation endpoint:
+
+~~~text
+POST /threads/{thread_id}/runs/{run_id}/cancel
+~~~
+
+It accepts two query controls.
+
+### Cancellation action
+
+~~~text
+action:
+    interrupt
+    rollback
+~~~
+
+with:
+
+~~~text
+interrupt
+~~~
+
+as the default.
+
+The OpenAPI contract describes the actions as:
+
+~~~text
+interrupt
+    -> cancel the Run
+
+rollback
+    -> cancel the Run
+    -> delete the Run
+    -> delete associated checkpoints
+~~~
+
+Cancellation therefore has at least two distinct persistence semantics.
+
+### Wait behavior
+
+The endpoint also exposes:
+
+~~~text
+wait: boolean
+~~~
+
+with:
+
+~~~text
+false
+~~~
+
+as the default.
+
+The contract does not by itself establish whether `wait=true` waits only for
+Run cancellation or for complete Thread lifecycle reconciliation.
+
+That behavior will be validated empirically.
+
+### Bulk cancellation
+
+A second endpoint exists:
+
+~~~text
+POST /runs/cancel
+~~~
+
+It supports the same:
+
+~~~text
+action:
+    interrupt
+    rollback
+~~~
+
+and accepts a `RunsCancel` body.
+
+The body supports one of two selectors:
+
+~~~text
+status:
+    pending
+    running
+    all
+~~~
+
+or:
+
+~~~text
+thread_id
+run_ids[]
+~~~
+
+The bulk endpoint therefore provides administrative cancellation over sets of
+Runs, while the Thread-scoped endpoint targets one concrete execution.
+
+Bulk cancellation is deferred until a concrete operational use case requires
+it.
+
+## 1.2I1 — Explicit interrupt cancellation
+
+### Objective
+
+Create a delayed stateful Run and explicitly cancel it before model execution
+using:
+
+~~~text
+action=interrupt
+wait=true
+~~~
+
+Then compare the result with the already validated disconnect-triggered
+cancellation mechanisms.
+
+The experiment will determine:
+
+- the cancel endpoint response body;
+- whether `wait=true` waits for Thread reconciliation;
+- final Run status;
+- final Thread status;
+- preserved execution position;
+- graph-level interrupt state;
+- whether model inference was avoided.
