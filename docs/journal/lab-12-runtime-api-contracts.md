@@ -5897,3 +5897,166 @@ Validate:
 - whether later Runs observe state produced by earlier queued Runs.
 
 Use execution breakpoints to avoid model inference where possible.
+
+### 1.3E source findings — Enqueue scheduler ordering
+
+Pinned source establishes how the in-memory Runtime selects pending Runs for
+execution.
+
+### Eligibility
+
+`Runs.next` considers only Runs satisfying:
+
+~~~text
+status = pending
+created_at < current time
+~~~
+
+A future-scheduled Run therefore remains pending and is not eligible for worker
+admission until its `created_at` has passed.
+
+### Ordering
+
+Eligible Runs are sorted ascending by:
+
+~~~text
+created_at
+~~~
+
+before worker admission.
+
+The scheduler therefore uses:
+
+~~~text
+earliest eligible created_at first
+~~~
+
+rather than strict HTTP submission order.
+
+This matters because delayed Runs are created with approximately:
+
+~~~text
+created_at =
+    submission time + after_seconds
+~~~
+
+Therefore `after_seconds` directly affects queue eligibility and ordering.
+
+The operational model is:
+
+~~~text
+submission order
+    != necessarily execution order
+
+execution ordering key
+    = scheduled eligibility time (`created_at`)
+~~~
+
+### Per-Thread serialization
+
+Before promoting a pending Run to `running`, the scheduler checks whether
+another Run on the same Thread is already:
+
+~~~text
+running
+~~~
+
+If so, the candidate remains pending.
+
+Otherwise the scheduler changes:
+
+~~~text
+pending -> running
+~~~
+
+Therefore the in-memory Runtime serializes active execution per Thread.
+
+Conceptually:
+
+~~~text
+same Thread:
+
+Run A = running
+Run B = pending
+Run C = pending
+
+B and C remain pending until the running Run releases the Thread.
+~~~
+
+### Runtime-wide concurrency
+
+The queue loop can request multiple Runs according to available worker
+capacity.
+
+The serialization check is scoped by:
+
+~~~text
+thread_id
+~~~
+
+rather than globally.
+
+Therefore the scheduler model is:
+
+~~~text
+across Threads:
+    concurrent execution is possible
+
+within one Thread:
+    active execution is serialized
+~~~
+
+### Enqueue operational definition
+
+For the studied Runtime:
+
+~~~text
+enqueue
+    = persist Run as pending
+    + defer worker admission until eligible
+    + order eligible Runs by created_at
+    + prevent simultaneous running Runs on one Thread
+~~~
+
+This is better described as scheduled per-Thread serialization than as simple
+FIFO queueing.
+
+### Equal-time ordering
+
+Python's stable sort and the in-memory list representation may preserve
+insertion order when Runs have identical `created_at` values.
+
+This is treated as an implementation detail of the studied in-memory Runtime,
+not as a public API guarantee.
+
+## 1.3E1 — Scheduled-order Runtime validation
+
+### Objective
+
+Empirically validate that execution order follows scheduled `created_at`
+rather than HTTP submission order.
+
+Create three Runs on one Thread in submission order:
+
+~~~text
+A
+B
+C
+~~~
+
+but assign delays that make scheduled order:
+
+~~~text
+B
+C
+A
+~~~
+
+Each Run will stop before the model node so no model inference is required.
+
+Validate:
+
+- all three initially persist as pending;
+- actual execution completes in B -> C -> A order;
+- no two Runs execute concurrently on the Thread;
+- persisted message order follows execution order rather than submission order.
