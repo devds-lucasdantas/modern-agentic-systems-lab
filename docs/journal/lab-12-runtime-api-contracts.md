@@ -5509,3 +5509,188 @@ Determine whether Run B:
 - inherits state produced by A;
 - starts from the pre-A Thread baseline;
 - leaves Thread lifecycle consistent after supersession.
+
+### 1.3D results — Active multitask supersession
+
+`interrupt` and `rollback` were compared while Run A was actively executing and
+had already materialized checkpoint state.
+
+Run B was delayed so that its own input would not be materialized during the
+observation window.
+
+This isolates the persistence effects of superseding Run A.
+
+### Active `interrupt`
+
+Before Run B:
+
+~~~text
+Run A  = running
+Thread = busy
+
+history_count = 1
+
+current checkpoint:
+    next = SkillsMiddleware.before_agent
+
+messages:
+    Run A input
+~~~
+
+Run B was then created with:
+
+~~~text
+multitask_strategy = interrupt
+~~~
+
+After supersession:
+
+~~~text
+Run A = interrupted
+Run B = pending
+Thread = busy
+
+history_count = 1
+
+messages:
+    Run A input remains present
+~~~
+
+The current checkpoint also remained present.
+
+Therefore active multitask interruption preserves the partial Thread state
+produced by the superseded Run.
+
+### Interrupt is not an instantaneous checkpoint freeze
+
+The checkpoint immediately before Run B was:
+
+~~~text
+next = SkillsMiddleware.before_agent
+~~~
+
+After A became interrupted, the surviving checkpoint was:
+
+~~~text
+next = MemoryMiddleware.before_agent
+~~~
+
+with a different checkpoint ID.
+
+Therefore the active Run progressed between the observation point and the point
+at which cancellation took effect.
+
+The operational model is:
+
+~~~text
+interrupt request
+    |
+    v
+active execution observes cancellation
+    |
+    v
+latest persisted partial state survives
+~~~
+
+`interrupt` must not be interpreted as an atomic freeze at the checkpoint
+visible at request time.
+
+### Active `rollback`
+
+Before Run B:
+
+~~~text
+Run A  = running
+Thread = busy
+
+checkpoint != None
+history_count = 1
+
+messages:
+    Run A input
+~~~
+
+Run B was created with:
+
+~~~text
+multitask_strategy = rollback
+~~~
+
+After supersession:
+
+~~~text
+Run A = absent
+Run B = pending
+Thread = busy
+
+checkpoint = None
+next       = []
+
+history_count = 0
+messages      = []
+~~~
+
+Run A's input was no longer present.
+
+Therefore active multitask rollback:
+
+~~~text
+deletes Run A
+deletes Run A checkpoint lineage
+removes state materialized by Run A
+restores the Thread to its pre-A baseline
+~~~
+
+### Operational distinction
+
+The Runtime evidence establishes:
+
+~~~text
+interrupt
+    = supersede execution while preserving partial Thread state
+
+rollback
+    = supersede execution while erasing state produced by the superseded Run
+~~~
+
+This distinction is about persistence semantics, not merely execution
+scheduling.
+
+### Thread lifecycle consistency
+
+Unlike the pending-Run interrupt edge case observed in section 1.3C1, active
+interruption produced:
+
+~~~text
+Run A = interrupted
+Run B = pending
+Thread = busy
+~~~
+
+The previously observed `Thread=idle` drift therefore appears specific to the
+pending cancellation path rather than to multitask interruption in general.
+
+## 1.3D1 — State inheritance by the superseding Run
+
+### Objective
+
+Validate what Run B actually sees when it begins after superseding Run A.
+
+Without invoking the model:
+
+- interrupt A and start B;
+- pause B immediately before the `model` node;
+- inspect Thread messages;
+- repeat with rollback.
+
+Expected question:
+
+~~~text
+interrupt:
+    does B start from state containing A + B?
+
+rollback:
+    does B start from state containing only B?
+~~~
+
+No model inference is required.
