@@ -7,10 +7,10 @@ Phase 1 — Agent Runtime & Protocols
 Current block:
 
 ~~~text
-1.5 Agent Protocol
-    -> protocol contract
-    -> Runtime mapping
-    -> interoperability boundary
+1.5 Agent Server API boundary and interoperability mapping
+    -> 1.5B Runtime concepts vs interoperability concepts
+    -> protocol integration boundary
+    -> service-specific vs portable contracts
 ~~~
 
 ## Completed
@@ -403,21 +403,35 @@ The legacy `checkpoint_during` compatibility adapter is asymmetric in the
 durability-aware Runtime path and must not be modeled as a bidirectional
 equivalence.
 
-## Current block — Agent Protocol
+## Current block — Agent Server API boundary and interoperability mapping
 
-The next objective is to move from Runtime-specific execution mechanics to the
-protocol boundary.
+The source inventory established that the pinned stack contains distinct
+LangGraph REST/SDK and LangChain Agent Streaming Protocol contracts.
 
-Questions to establish:
+The next objective is to map Runtime-specific execution concepts against
+portable interoperability concepts without treating those contracts as
+identical.
 
-1. What exactly constitutes the Agent Protocol contract in the pinned stack?
-2. Which existing Runtime resources map directly to protocol concepts?
-3. Which Runtime operations are LangGraph-specific extensions?
-4. How are Runs, Threads, state and errors represented at the protocol boundary?
-5. Which parts are transport-neutral and which depend on HTTP?
-6. How does Agent Protocol relate to the later Agent Streaming Protocol block?
+The 1.5A source inventory established:
 
-The first step is source and contract inventory before new Runtime experiments.
+1. `langgraph-api` implements the LangGraph Agent Server REST API;
+2. `langgraph-sdk` provides client and schema bindings for that API;
+3. `langchain-protocol` provides generated bindings for the LangChain Agent
+   Streaming Protocol;
+4. no direct implementation link between the pinned Agent Server REST API and
+   `langchain-protocol` was identified in the inspected Python source;
+5. MCP and A2A are separate protocol integrations exposed by the Agent Server.
+
+The next questions for 1.5B are:
+
+1. Which validated Runtime concepts have direct equivalents in portable protocol
+   contracts?
+2. Which concepts are specific to the LangGraph Agent Server resource model?
+3. Which lifecycle semantics require adaptation rather than direct type mapping?
+4. Which concepts belong to service management rather than agent
+   interoperability?
+5. Which boundaries should be carried forward into the later LangChain Agent
+   Streaming Protocol, MCP and A2A experiments?
 
 ## Reference environment
 

@@ -27,10 +27,10 @@ Validated foundations
     durability
 
 In progress
-    Agent Protocol
+    Agent Server API boundary and interoperability mapping
 
 Next in Phase 1
-    Agent Streaming Protocol
+    LangChain Agent Streaming Protocol
     MCP
     A2A
 
@@ -121,25 +121,24 @@ Patterns to keep on the radar:
 
 ## 2. Agent Interoperability Protocols
 
-### Agent Protocol
+### Agent Server API boundary and interoperability
 
 Status: **In progress — Phase 1 section 1.5.**
 
-Investigate standardized concepts such as:
+Investigate the boundary between:
 
-- Agent;
-- Thread;
-- Run;
-- Store;
-- background execution;
-- run lifecycle;
-- client/runtime separation.
+- LangGraph Agent Server REST resources;
+- LangGraph SDK client schemas;
+- Runtime-specific lifecycle semantics;
+- portable agent execution concepts;
+- independent protocol integrations.
 
 Important question:
 
-What belongs to an interoperability contract versus a specific LangGraph SDK?
+Which validated Runtime concepts are service-specific implementation details,
+and which concepts reappear in portable interoperability contracts?
 
-### Agent Streaming Protocol
+### LangChain Agent Streaming Protocol
 
 Status: **Next — Phase 1 section 1.6.**
 
@@ -601,7 +600,7 @@ framework marketing language:
 5. What is the difference between Agent, Thread and Run?
 6. What belongs in a checkpoint versus a Store?
 7. How does streaming travel from runtime to frontend?
-8. How do Agent Protocol and AG-UI differ?
+8. How do the Agent Server API, LangChain Agent Streaming Protocol and AG-UI differ?
 9. Where does MCP fit and where does it not fit?
 10. When is A2A useful?
 11. What is the difference between state, context, memory and RAG?

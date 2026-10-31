@@ -1111,8 +1111,8 @@ agent execution?
 The next boundary is interoperability:
 
 ~~~text
-Agent Protocol
-Agent Streaming Protocol
+Agent Server API boundary and interoperability mapping
+LangChain Agent Streaming Protocol
 MCP
 A2A
 ~~~

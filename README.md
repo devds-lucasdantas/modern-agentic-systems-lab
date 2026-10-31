@@ -26,7 +26,7 @@ The laboratory will progressively study and reproduce:
 - subagents and skills;
 - human-in-the-loop;
 - short- and long-term memory;
-- Agent Protocol and streaming protocols;
+- Agent Server API boundaries and agent streaming protocols;
 - AG-UI and agent/frontend interaction;
 - MCP and A2A;
 - RAG, Agentic RAG, hybrid retrieval, reranking and GraphRAG;
@@ -109,11 +109,11 @@ Completed:
 
 In progress:
 
-- 🚧 Agent Protocol
+- 🚧 Agent Server API boundary and interoperability mapping
 
 Next:
 
-- ⬜ Agent Streaming Protocol
+- ⬜ LangChain Agent Streaming Protocol
 - ⬜ MCP
 - ⬜ A2A
 
@@ -159,10 +159,10 @@ Key findings include:
 The current experiment block is:
 
 ```text
-Agent Protocol
-    -> protocol contract
-    -> Runtime mapping
-    -> interoperability boundary
+Agent Server API boundary
+    -> Runtime-specific vs portable concepts
+    -> interoperability mapping
+    -> protocol integration boundary
 ```
 
 See [`CURRENT.md`](CURRENT.md) for the exact continuation point and
