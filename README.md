@@ -113,8 +113,8 @@ In progress:
 
 Next:
 
-- 🚧 LangChain Agent Streaming Protocol
-- ⬜ MCP
+- ✅ LangChain Agent Streaming Protocol
+- 🚧 MCP
 - ⬜ A2A
 
 ### Runtime model validated so far

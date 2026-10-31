@@ -1802,3 +1802,335 @@ This completes the State, HITL and topology contract analysis.
 The remaining section 1.6D can focus on transport implementation, mapping to the
 pinned Agent Server stack, and protocol evolution.
 
+
+---
+
+# 1.6D — Transport, implementation boundary and protocol evolution
+
+## Pinned implementation boundary
+
+The pinned environment contains `langchain-protocol 0.0.12`, but source
+inspection found no direct `langchain_protocol` imports in:
+
+~~~text
+langgraph_api
+langgraph_sdk
+langgraph_runtime_inmem
+deepagents
+~~~
+
+The historical protocol command literals were also absent from those packages.
+
+The dependency reaches the environment through:
+
+~~~text
+deepagents
+  -> langchain
+    -> langchain-core
+      -> langchain-protocol
+~~~
+
+Therefore package presence does not establish Runtime implementation wiring.
+
+## Pinned Agent Server streaming
+
+The pinned Agent Server implements its established REST/SSE model, including:
+
+~~~text
+POST /runs/stream
+POST /threads/{thread_id}/runs/stream
+GET  /threads/{thread_id}/runs/{run_id}/stream
+~~~
+
+These are Agent Server Run-stream surfaces rather than the Agent Streaming
+Protocol command/event transport.
+
+## Legacy Thread join stream
+
+The pinned stack also exposes:
+
+~~~text
+GET /threads/{thread_id}/stream
+~~~
+
+Source inspection proves that this route is:
+
+~~~text
+join_thread_stream
+    -> EventSourceResponse
+    -> Threads.Stream.join(...)
+~~~
+
+The pinned SDK exposes the same operation as:
+
+~~~text
+client.threads.join_stream(...)
+~~~
+
+using:
+
+~~~text
+ThreadStreamMode
+Last-Event-ID
+~~~
+
+with modes such as:
+
+~~~text
+run_modes
+lifecycle
+state_update
+~~~
+
+This is the pre-v3 Thread join SSE contract.
+
+It is not an implementation of the Agent Streaming Protocol despite the
+overlapping path.
+
+## Pinned stream-mode caveat
+
+The inspected server source reads:
+
+~~~text
+stream_modes
+~~~
+
+while the pinned SDK sends:
+
+~~~text
+stream_mode
+~~~
+
+No dedicated behavioral experiment was performed for this parameter.
+
+This is therefore recorded as a probable pinned source mismatch rather than as
+an empirically confirmed Runtime bug.
+
+## Pinned WebSocket boundary
+
+No matching Agent Streaming Protocol WebSocket implementation was found in the
+pinned API, SDK or in-memory Runtime.
+
+The historical CDDL specifies WebSocket support, but the pinned Runtime stack
+does not show implementation evidence for that transport.
+
+## Product-transformer boundary
+
+The historical CDDL describes product-specific lifecycle enrichment such as a
+DeepAgents `SubagentTransformer`.
+
+No matching transformer implementation was found in the pinned Python
+DeepAgents package or workshop.
+
+The protocol specification therefore covered ecosystem behavior broader than
+the capabilities visible in this pinned workshop.
+
+## Historical provenance
+
+The Python binding distributed as `langchain-protocol 0.0.12` was proven
+byte-identical to the Python binding migrated into Agent Protocol PR #72.
+
+The migrated CDDL identifies itself as version 0.0.13.
+
+The historical relationship is therefore:
+
+~~~text
+PyPI 0.0.12 binding
+        ==
+PR #72 Python binding
+        <- generated from
+PR #72 protocol.cddl
+~~~
+
+The migrated CDDL can be used as the historical source corresponding to the
+pinned grammar while preserving the version-label distinction.
+
+## Current protocol and implementation
+
+The current protocol snapshot inspected during this lab declares version
+`0.0.20`.
+
+Unlike the pinned SDK, the current LangGraph SDK directly imports
+`langchain_protocol` and exposes a thread-centric protocol streaming surface.
+
+Conceptually:
+
+~~~text
+langchain-protocol
+        |
+        v
+ThreadStream
+        |
+        +-- protocol command dispatch
+        +-- typed event projections
+        |
+        +---------+---------+
+        |                   |
+        v                   v
+      SSE                 WebSocket
+~~~
+
+## Current SSE transport
+
+The inspected current synchronous SSE transport defaults to:
+
+~~~text
+POST /threads/{thread_id}/commands
+POST /threads/{thread_id}/stream/events
+~~~
+
+and imports the protocol `Event` type directly from `langchain_protocol`.
+
+This is concrete implementation wiring for the command/event protocol that was
+not present in the pinned SDK.
+
+## Current WebSocket transport
+
+The current SDK also contains a protocol WebSocket transport.
+
+It connects to:
+
+~~~text
+/threads/{thread_id}/stream/events
+~~~
+
+and sends an initial:
+
+~~~text
+subscription.subscribe
+~~~
+
+protocol envelope over the socket.
+
+General command request/response dispatch still uses the HTTP command sidecar.
+
+The current implementation is therefore hybrid rather than requiring every
+command to travel exclusively over WebSocket.
+
+## Specification route versus implementation route
+
+The historical/current protocol prose describes the conceptual SSE transport
+around:
+
+~~~text
+/threads/:thread_id/stream
+~~~
+
+while the inspected current SDK implementation uses:
+
+~~~text
+/threads/{thread_id}/stream/events
+~~~
+
+with:
+
+~~~text
+/threads/{thread_id}/commands
+~~~
+
+for command request/response.
+
+Protocol-design paths and concrete implementation paths must therefore be
+distinguished when they differ.
+
+## Protocol evolution
+
+The historical Run command was:
+
+~~~text
+run.input
+~~~
+
+while the current protocol uses:
+
+~~~text
+run.start
+~~~
+
+The underlying Thread state-machine concept remains recognizable:
+
+~~~text
+no active Run
+    -> start
+
+interrupted Run
+    -> resume
+
+active Run
+    -> inject
+~~~
+
+The current contract additionally supports richer tracing context.
+
+## HITL evolution
+
+Historical `input.respond` represented a single correlated interrupt response.
+
+The current protocol supports richer forms including:
+
+~~~text
+single interrupt response
+batch interrupt response
+update
+goto
+config
+metadata
+~~~
+
+This evolves the wire model toward a richer representation of LangGraph
+`Command` semantics.
+
+## Content-delta evolution
+
+Historically, `content-block-delta` carried a `ContentBlock` interpreted as an
+incremental update.
+
+The current protocol defines explicit delta variants including:
+
+~~~text
+TextDelta
+ReasoningDelta
+DataDelta
+ToolCallDelta
+BlockDelta
+~~~
+
+with explicit append or shallow-merge semantics.
+
+This is substantive protocol evolution rather than a naming-only change.
+
+## Final contract boundary
+
+The final architectural distinction is:
+
+~~~text
+Agent Server REST API
+    -> persistent execution and resource service
+
+Agent Streaming Protocol
+    -> thread-centric command / response / event interaction contract
+
+MCP / A2A
+    -> interoperability projections over Agent Server execution
+~~~
+
+A platform may implement all of these surfaces without making them the same
+protocol.
+
+## 1.6 final conclusion
+
+Section 1.6 established that the pinned `langchain-protocol 0.0.12` defines a
+real command/event grammar, but the pinned `langgraph-api 0.8.1` /
+`langgraph-sdk 0.3.13` stack does not show direct implementation wiring for it.
+
+The pinned Run and Thread streaming surfaces belong to older Agent Server
+REST/SSE contracts.
+
+The current LangGraph SDK does contain direct Agent Streaming Protocol wiring,
+including protocol imports, command dispatch, SSE transport and WebSocket
+transport.
+
+Section 1.6 is complete.
+
+The next Phase 1 block is section 1.7 — MCP.
+

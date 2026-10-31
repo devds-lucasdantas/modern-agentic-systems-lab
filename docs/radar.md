@@ -28,12 +28,12 @@ Validated foundations
 
 Validated
     Agent Server API boundary and interoperability mapping
-
-In progress
     LangChain Agent Streaming Protocol
 
-Next in Phase 1
+In progress
     MCP
+
+Next in Phase 1
     A2A
 
 Later phases
@@ -142,7 +142,7 @@ and which concepts reappear in portable interoperability contracts?
 
 ### LangChain Agent Streaming Protocol
 
-Status: **In progress — Phase 1 section 1.6.**
+Status: **Validated — Phase 1 section 1.6 complete.**
 
 Keep on the radar:
 
@@ -176,7 +176,7 @@ streaming protocols.
 
 ### MCP
 
-Status: **Planned — Phase 1 section 1.7.**
+Status: **In progress — Phase 1 section 1.7.**
 
 Model Context Protocol should be studied as an integration protocol for:
 

@@ -7,11 +7,11 @@ Phase 1 — Agent Runtime & Protocols
 Current block:
 
 ~~~text
-1.6 LangChain Agent Streaming Protocol
-    -> 1.6D Transport, implementation boundary and protocol evolution
-    -> SSE / HTTP / WebSocket transport mapping
-    -> pinned Agent Server implementation evidence
-    -> historical 0.0.12 / migrated 0.0.13 / current protocol evolution
+1.7 MCP
+    -> MCP protocol contract and transport model
+    -> Assistant-as-Tool projection
+    -> pinned Agent Server MCP adapter
+    -> schema, execution, error and session semantics
 ~~~
 
 ## Completed
@@ -667,23 +667,49 @@ were declared for future transformer support.
 The historical protocol is portable at the wire level while remaining closely
 aligned with LangGraph execution concepts.
 
-## Current sub-block — 1.6D Transport, implementation boundary and protocol evolution
+## Completed block — 1.6 LangChain Agent Streaming Protocol
+
+Section 1.6 established the full protocol and implementation boundary.
+
+~~~text
+Agent Streaming Protocol
+    -> thread-centric command / response / event contract
+
+Pinned langchain-protocol 0.0.12
+    -> generated protocol bindings
+    -> historical CDDL recovered through Agent Protocol PR #72
+
+Pinned Agent Server
+    -> REST Run / Thread SSE contracts
+    -> no direct Agent Streaming Protocol implementation wiring found
+
+Current LangGraph SDK
+    -> direct langchain_protocol integration
+    -> protocol command dispatch
+    -> SSE and WebSocket transports
+~~~
+
+The pinned `GET /threads/{thread_id}/stream` was proven to be the legacy
+`join_thread_stream` SSE surface using `ThreadStreamMode` and `Last-Event-ID`,
+not the Agent Streaming Protocol transport.
+
+The final architecture keeps Agent Server REST and Agent Streaming Protocol as
+distinct contracts that can be implemented by the same platform.
+
+## Current block — 1.7 MCP
 
 Questions:
 
-1. Which SSE, HTTP-command and WebSocket endpoints belong to the protocol?
-2. Which of those surfaces existed in the pinned `langgraph-api 0.8.1` stack?
-3. Is there an implementation of the command/event protocol in the pinned
-   packages or only bindings?
-4. What role do product-specific stream transformers play?
-5. How should the historical 0.0.12 binding, migrated 0.0.13 CDDL and current
-   protocol be related without conflating versions?
-6. Which protocol concepts changed after the pinned snapshot?
-7. Which current official semantics clarify historical fields without being
-   projected backward?
-8. What final architecture should be carried into MCP and A2A labs?
-9. Can section 1.6 be closed after this comparison?
-10. What should be recorded as protocol contract versus implementation evidence?
+1. Which MCP specification versions does the pinned Agent Server accept?
+2. Which MCP transports and capability families are implemented?
+3. Why are Assistants projected as MCP Tools?
+4. How are Assistant schemas converted into MCP tool schemas?
+5. How does `tools/call` map into Agent Server execution?
+6. Which Runtime resources remain hidden from MCP clients?
+7. What session semantics are supported or deliberately omitted?
+8. How are protocol errors and Runtime failures projected into MCP results?
+9. Which behaviors belong to MCP itself versus the LangGraph adapter?
+10. How does MCP differ architecturally from the A2A projection studied next?
 
 ## Reference environment
 

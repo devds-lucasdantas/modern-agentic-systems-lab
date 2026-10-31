@@ -1185,3 +1185,77 @@ implementation of that contract.
 
 This boundary is the handoff from Runtime/service architecture to the
 protocol-specific remainder of Phase 1.
+
+### Version 0.5 — Agent Streaming Protocol boundary
+
+Phase 1 section 1.6 established the Agent Streaming Protocol as a contract
+distinct from the Agent Server REST API.
+
+The historical protocol model is:
+
+~~~text
+Thread
+    |
+    +-- commands / responses
+    +-- filtered event subscriptions
+    +-- hierarchical namespaces
+    +-- lifecycle and topology
+    +-- HITL
+    +-- state / checkpoints
+    +-- message and tool streaming
+~~~
+
+The pinned environment contains `langchain-protocol 0.0.12`, whose historical
+CDDL was recovered through the Agent Protocol PR #72 migration.
+
+No direct Agent Streaming Protocol implementation wiring was found in the
+pinned `langgraph-api 0.8.1` / `langgraph-sdk 0.3.13` stack.
+
+Its streaming surfaces instead belong to the older Agent Server model:
+
+~~~text
+Agent Server REST
+    |
+    +-- Run SSE
+    |
+    +-- legacy Thread join SSE
+          GET /threads/:id/stream
+          ThreadStreamMode
+          Last-Event-ID
+~~~
+
+The overlapping Thread path was proven to use `join_thread_stream` and is not
+the protocol transport.
+
+The current LangGraph SDK has since added direct protocol integration:
+
+~~~text
+langchain-protocol
+        |
+        v
+ThreadStream
+        |
+        +-- command dispatch
+        +-- typed projections
+        |
+        +---------+---------+
+        |                   |
+        v                   v
+      SSE               WebSocket
+~~~
+
+The inspected current implementation uses an HTTP command sidecar and the
+thread event-stream endpoint for live events.
+
+The architectural boundary carried forward is:
+
+~~~text
+Agent Server REST API
+    -> persistent resource and execution service
+
+Agent Streaming Protocol
+    -> thread-centric interaction / event contract
+
+MCP and A2A
+    -> interoperability projections over Agent Server execution
+~~~
