@@ -8,10 +8,10 @@ Current block:
 
 ~~~text
 1.6 LangChain Agent Streaming Protocol
-    -> 1.6C State, HITL and agent-topology semantics
-    -> namespace-scoped state and checkpoint interaction
-    -> interrupt request / response / injection semantics
-    -> nested agent lifecycle, causation and tree reconstruction
+    -> 1.6D Transport, implementation boundary and protocol evolution
+    -> SSE / HTTP / WebSocket transport mapping
+    -> pinned Agent Server implementation evidence
+    -> historical 0.0.12 / migrated 0.0.13 / current protocol evolution
 ~~~
 
 ## Completed
@@ -619,21 +619,71 @@ through state/checkpoint operations.
 The historical specification does not define exactly-once, at-least-once,
 duplicate suppression, buffer capacity or retention duration.
 
-## Current sub-block — 1.6C State, HITL and agent-topology semantics
+## Completed sub-block — 1.6C State, HITL and agent-topology semantics
+
+The protocol uses Namespace as hierarchical execution identity inside a durable
+Thread.
+
+State, HITL and lifecycle operations are namespace-addressable.
+
+The State module exposes:
+
+~~~text
+state.get
+state.listCheckpoints
+state.fork
+~~~
+
+while cross-thread Store remains outside the streaming protocol.
+
+HITL distinguishes:
+
+~~~text
+run.input
+    -> generic execution input
+
+input.respond
+    -> interrupt-correlated response
+
+input.inject
+    -> unsolicited namespace-targeted input
+~~~
+
+Nested execution can be observed incrementally through lifecycle events and
+queried explicitly with `agent.getTree`.
+
+Lifecycle causation distinguishes:
+
+~~~text
+toolCall
+send
+edge
+~~~
+
+but historical implementation coverage is narrower than the protocol surface:
+`toolCall` had product-specific transformer support while `send` and `edge`
+were declared for future transformer support.
+
+The historical protocol is portable at the wire level while remaining closely
+aligned with LangGraph execution concepts.
+
+## Current sub-block — 1.6D Transport, implementation boundary and protocol evolution
 
 Questions:
 
-1. How does namespace-scoped state relate to Thread state?
-2. What exactly does `state.get` return for root and nested namespaces?
-3. How are checkpoint IDs, namespace references and fork targets related?
-4. What execution semantics does `state.fork` imply?
-5. How does `input.requested` correlate with `input.respond`?
-6. How does `input.inject` differ semantically from interrupt resume?
-7. How is the live agent tree reconstructed from lifecycle events?
-8. What does each lifecycle cause (`toolCall`, `send`, `edge`) represent?
-9. How does `agent.getTree` relate to lifecycle-derived topology?
-10. Which of these semantics belong to the portable protocol rather than
-    LangGraph-specific implementation behavior?
+1. Which SSE, HTTP-command and WebSocket endpoints belong to the protocol?
+2. Which of those surfaces existed in the pinned `langgraph-api 0.8.1` stack?
+3. Is there an implementation of the command/event protocol in the pinned
+   packages or only bindings?
+4. What role do product-specific stream transformers play?
+5. How should the historical 0.0.12 binding, migrated 0.0.13 CDDL and current
+   protocol be related without conflating versions?
+6. Which protocol concepts changed after the pinned snapshot?
+7. Which current official semantics clarify historical fields without being
+   projected backward?
+8. What final architecture should be carried into MCP and A2A labs?
+9. Can section 1.6 be closed after this comparison?
+10. What should be recorded as protocol contract versus implementation evidence?
 
 ## Reference environment
 

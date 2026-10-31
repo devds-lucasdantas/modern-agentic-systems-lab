@@ -1175,3 +1175,630 @@ specification states.
 
 The next block can focus on state, HITL and agent-topology semantics without
 needing further subscription-model investigation.
+
+---
+
+# 1.6C — State, HITL and agent-topology semantics
+
+## Namespace as execution identity
+
+`Namespace` is a hierarchical path identifying a position in the live agent
+tree.
+
+Examples from the historical CDDL are:
+
+~~~text
+[]
+    -> root agent
+
+["agent_1"]
+    -> direct child
+
+["agent_1", "researcher"]
+    -> nested child
+~~~
+
+Namespace is therefore more than a subscription filter.
+
+It is reused as an addressing coordinate for:
+
+~~~text
+lifecycle
+messages
+tools
+state
+HITL
+values
+updates
+checkpoints
+agent topology
+~~~
+
+The resulting conceptual model is:
+
+~~~text
+Thread
+└── Namespace []
+    ├── ["researcher"]
+    │   └── ["researcher", "critic"]
+    └── ["planner"]
+~~~
+
+Thread remains the durable execution identity.
+
+Namespace addresses a position inside that execution hierarchy.
+
+## Namespace-scoped state
+
+`state.get` accepts:
+
+~~~text
+namespace
+keys?
+~~~
+
+and returns:
+
+~~~text
+values
+checkpoint?
+~~~
+
+The protocol therefore addresses graph state relative to an execution
+namespace.
+
+The contract does not require treating each namespace as an independent storage
+system; it defines namespace-scoped state addressing.
+
+## State versus Store
+
+The historical CDDL explicitly excludes cross-thread Store operations from the
+streaming protocol.
+
+Operations such as:
+
+~~~text
+search
+put
+~~~
+
+are delegated to the LangGraph REST API.
+
+The boundary remains:
+
+~~~text
+streaming protocol
+    -> execution state / checkpoints
+
+Agent Server REST API
+    -> cross-thread Store
+~~~
+
+State and Store are distinct concepts.
+
+## Checkpoint representations
+
+The protocol exposes multiple checkpoint structures for different purposes.
+
+### CheckpointRef
+
+~~~text
+id
+ns?
+~~~
+
+A `CheckpointRef` is a lightweight pointer used by structures such as lifecycle
+events.
+
+### CheckpointSummary
+
+`state.listCheckpoints` returns summaries containing:
+
+~~~text
+id
+timestamp
+step
+nodeName?
+metadata?
+~~~
+
+### Checkpoint event envelope
+
+The `checkpoints` channel emits:
+
+~~~text
+id
+parentId?
+step
+source
+~~~
+
+where:
+
+~~~text
+id
+    -> fork target
+
+parentId
+    -> lineage/tree linkage
+
+step
+    -> timeline/superstep coordinate
+
+source
+    -> input | loop | update | fork
+~~~
+
+These structures are related but are not aliases.
+
+## Namespace representation caveat
+
+Protocol namespace paths use:
+
+~~~text
+Namespace = list[str]
+~~~
+
+while `CheckpointRef.ns` is:
+
+~~~text
+text
+~~~
+
+The historical contract does not define a conversion between them.
+
+Clients must not assume that `CheckpointRef.ns` is a direct serialization of the
+protocol `Namespace` path.
+
+This difference reflects a boundary between portable protocol addressing and
+checkpoint-specific identity.
+
+## Values and checkpoint channels
+
+The `values` channel carries full graph state snapshots.
+
+When a values subscription is established, the first replayed values event is
+the current full state and can serve as a baseline for subsequent deltas.
+
+The `checkpoints` channel instead carries lightweight lineage metadata.
+
+Conceptually:
+
+~~~text
+values
+    -> state plane
+
+checkpoints
+    -> history / lineage plane
+~~~
+
+Clients interested in both state and time-travel topology can subscribe to both.
+
+## Checkpoint lineage
+
+Checkpoint events contain enough information to reconstruct a branching
+timeline without streaming every full state snapshot.
+
+~~~text
+checkpoint
+    id
+    parentId?
+    step
+    source
+~~~
+
+The checkpoint ID is explicitly usable as a `state.fork` target.
+
+`parentId` provides lineage linkage.
+
+## `state.fork`
+
+The State module describes checkpoint forking as time-travel debugging.
+
+The command accepts:
+
+~~~text
+checkpointId
+input?
+config?
+~~~
+
+and returns:
+
+~~~text
+runId
+threadId
+~~~
+
+The contract establishes a derived execution from the selected checkpoint.
+
+It does not explicitly require the returned Thread ID to differ from the source
+Thread ID.
+
+Therefore the portable semantic conclusion is:
+
+~~~text
+state.fork
+    -> fork execution from checkpoint
+    -> identify resulting Run
+    -> identify resulting Thread
+~~~
+
+without asserting a mandatory new-Thread policy.
+
+## Three execution-input paths
+
+The historical protocol contains three related but distinct input mechanisms.
+
+### `run.input`
+
+`run.input` is the generic Thread-level execution input.
+
+The Thread execution state determines the behavior:
+
+~~~text
+no active Run
+    -> start Run
+
+interrupted Run
+    -> resume using input as resume value
+
+active Run
+    -> inject input into running execution
+~~~
+
+It targets an Assistant and accepts arbitrary graph input.
+
+### `input.respond`
+
+`input.respond` is a correlated HITL response.
+
+~~~text
+namespace
+interruptId
+response
+~~~
+
+The server emits:
+
+~~~text
+input.requested
+    namespace
+    interruptId
+    payload
+~~~
+
+and `interruptId` correlates the request with `input.respond`.
+
+### `input.inject`
+
+`input.inject` represents unsolicited namespace-targeted input while execution
+is running.
+
+~~~text
+namespace
+
+message
+    role = user | system
+    content
+    name?
+~~~
+
+The three abstractions are therefore:
+
+~~~text
+run.input
+    -> generic execution input
+
+input.respond
+    -> correlated interrupt response
+
+input.inject
+    -> unsolicited namespace-local input
+~~~
+
+The CDDL does not define an internal implementation delegation among those
+commands.
+
+## LangGraph-derived HITL semantics
+
+The historical Input module explicitly describes itself as wrapping:
+
+~~~text
+LangGraph interrupt()
+LangGraph Command({ resume })
+~~~
+
+into protocol messages.
+
+The wire abstraction is portable, but this historical specification is not
+framework-neutral in all of its conceptual vocabulary.
+
+## Agent topology
+
+The protocol models nested execution using two complementary mechanisms.
+
+### Lifecycle stream
+
+The lifecycle channel tracks status for every namespace in the agent tree.
+
+A `started` event can contain an optional `cause` linking the child namespace to
+the event or construct that triggered it on the parent.
+
+This allows clients to incrementally reconstruct nested execution topology from
+the wire stream.
+
+### `agent.getTree`
+
+The command:
+
+~~~text
+agent.getTree
+    runId?
+~~~
+
+returns a recursive:
+
+~~~text
+AgentTreeNode
+    namespace
+    status
+    graphName
+    children?
+    metadata?
+~~~
+
+The lifecycle stream therefore provides incremental topology observation while
+`agent.getTree` provides an explicit recursive topology snapshot.
+
+The protocol does not require a particular internal implementation for
+materializing that snapshot.
+
+## Lifecycle states
+
+Agent topology uses:
+
+~~~text
+started
+running
+completed
+failed
+interrupted
+~~~
+
+These statuses apply to namespace nodes in the execution tree rather than to
+persistent Assistant resources.
+
+## Lifecycle causation
+
+A lifecycle `cause` explains how a parent execution spawned a child namespace.
+
+The historical variants are:
+
+~~~text
+toolCall
+send
+edge
+~~~
+
+### `toolCall`
+
+A parent tool call invokes a compiled subgraph.
+
+The cause contains:
+
+~~~text
+toolCallId
+~~~
+
+which correlates with:
+
+~~~text
+tools channel
+    tool-started.toolCallId
+
+messages channel
+    tool_call.id
+~~~
+
+This creates a cross-channel causal relationship:
+
+~~~text
+AI message tool call
+        |
+        v
+tool execution
+        |
+        v
+child agent/subgraph
+~~~
+
+### `send`
+
+`send` represents LangGraph fan-out via:
+
+~~~text
+Send(node, state)
+~~~
+
+Each Send creates a parallel Pregel task and may spawn a subgraph execution.
+
+The protocol records:
+
+~~~text
+fromNode
+~~~
+
+Multiple Sends from the same node in one superstep share this value, so the
+historical representation does not uniquely identify each individual Send.
+
+The CDDL notes that a future protocol could add a `sendIndex`.
+
+### `edge`
+
+`edge` represents a static or conditional graph edge entering a node that embeds
+a compiled subgraph.
+
+Unlike `Send`, the described edge transition is single-successor and does not
+fan out.
+
+It records:
+
+~~~text
+fromNode
+~~~
+
+## Optional causation
+
+`cause` is optional.
+
+It may be absent for:
+
+~~~text
+root graph
+unmodelled spawning mechanisms
+~~~
+
+A consumer therefore cannot require every child namespace to include a complete
+causal edge.
+
+## Implementation coverage of causation
+
+The historical CDDL separates protocol declaration from producer support.
+
+~~~text
+toolCall
+    -> populated by product-specific transformer
+       e.g. DeepAgents SubagentTransformer
+
+send
+    -> declared
+    -> no transformer in the referenced releases
+
+edge
+    -> declared
+    -> no transformer in the referenced releases
+~~~
+
+The CDDL further states that LangGraph core and `langgraph-api` are
+product-agnostic and do not populate the cause field themselves.
+
+The protocol surface is therefore broader than the implementation coverage in
+the historical stack.
+
+## Forward compatibility
+
+Lifecycle causes are extensible.
+
+Consumers MUST default-case unknown cause variants to an unknown-cause behavior
+rather than fail.
+
+This is a normative forward-compatibility rule.
+
+## Normative-language boundary
+
+The historical CDDL contains very little explicit normative language.
+
+The observed requirements include:
+
+~~~text
+SHOULD NOT
+    place large nested runtime/debug payloads in message metadata
+
+MUST
+    tolerate unknown lifecycle-cause variants
+
+MUST NOT
+    interleave content blocks inside one message
+~~~
+
+Most State, HITL and topology comments therefore describe protocol semantics
+rather than a comprehensive RFC-style conformance regime.
+
+## Portable versus LangGraph-derived semantics
+
+The historical contract combines portable wire abstractions with concepts
+derived directly from LangGraph.
+
+Portable protocol abstractions include:
+
+~~~text
+hierarchical namespaces
+state reads
+checkpoint references
+execution forks
+HITL request/response correlation
+unsolicited input injection
+lifecycle states
+nested execution topology
+causal parent-child relationships
+~~~
+
+LangGraph-derived vocabulary includes:
+
+~~~text
+interrupt()
+Command(resume)
+Send(node, state)
+Pregel tasks and supersteps
+CheckpointMetadata.source
+configurable.checkpoint_id
+LangGraph REST Store boundary
+~~~
+
+Product-specific enrichment includes:
+
+~~~text
+DeepAgents SubagentTransformer
+    -> toolCall lifecycle cause
+
+future transformers
+    -> send
+    -> edge
+~~~
+
+The historical Agent Streaming Protocol should therefore be understood as a
+portable wire contract whose execution semantics remain closely aligned with
+the LangGraph runtime model.
+
+## 1.6C conclusion
+
+The protocol models a Thread as a durable execution identity containing a
+hierarchical namespace tree.
+
+~~~text
+                              Thread
+                                |
+                                v
+                         Namespace tree
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+              v                 v                 v
+            State              HITL            Lifecycle
+              |                 |                 |
+        state.get        input.requested      agent status
+        checkpoints             |                 |
+        state.fork              v                 v
+                         input.respond           cause
+                         input.inject             |
+                                                  v
+                                           parent -> child
+                                                  |
+                                        +---------+--------+
+                                        |         |        |
+                                    toolCall     send     edge
+
+                                +
+                                |
+                                v
+
+                          agent.getTree
+                     explicit tree snapshot
+~~~
+
+This completes the State, HITL and topology contract analysis.
+
+The remaining section 1.6D can focus on transport implementation, mapping to the
+pinned Agent Server stack, and protocol evolution.
+

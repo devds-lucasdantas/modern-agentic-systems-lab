@@ -81,7 +81,7 @@
 - [ ] 1.6 LangChain Agent Streaming Protocol
   - [x] 1.6A Pinned protocol grammar inventory
   - [x] 1.6B Subscription, replay and ordering semantics
-  - [ ] 1.6C State, HITL and agent-topology semantics
+  - [x] 1.6C State, HITL and agent-topology semantics
   - [ ] 1.6D Transport, implementation boundary and protocol evolution
 - [ ] 1.7 MCP
 - [ ] 1.8 A2A
