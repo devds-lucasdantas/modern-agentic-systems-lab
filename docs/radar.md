@@ -29,12 +29,13 @@ Validated foundations
 Validated
     Agent Server API boundary and interoperability mapping
     LangChain Agent Streaming Protocol
-
-In progress
     MCP
 
-Next in Phase 1
+In progress
     A2A
+
+Next in Phase 1
+    Phase 1 review
 
 Later phases
     AG-UI and frontend interaction
@@ -176,7 +177,7 @@ streaming protocols.
 
 ### MCP
 
-Status: **In progress — Phase 1 section 1.7.**
+Status: **Validated — Phase 1 section 1.7 complete.**
 
 Model Context Protocol should be studied as an integration protocol for:
 
@@ -191,7 +192,7 @@ communication problem.
 
 ### A2A
 
-Status: **Planned — Phase 1 section 1.8.**
+Status: **In progress — Phase 1 section 1.8.**
 
 Agent-to-Agent communication belongs on the radar for independent agents that
 need to discover and collaborate with each other. Compare it with MCP rather

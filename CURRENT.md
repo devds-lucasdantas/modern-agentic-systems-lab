@@ -696,20 +696,48 @@ not the Agent Streaming Protocol transport.
 The final architecture keeps Agent Server REST and Agent Streaming Protocol as
 distinct contracts that can be implemented by the same platform.
 
-## Current block — 1.7 MCP
+## Completed block — 1.7 MCP
+
+The pinned Agent Server MCP surface is a stateless, Tools-only interoperability
+projection over Assistants and Runs.
+
+~~~text
+MCP Tool
+    -> Assistant
+    -> runs.wait(thread_id=None)
+    -> temporary Thread
+    -> temporary Run
+    -> normal Agent Server Runtime execution
+~~~
+
+Source inspection and live tests validated:
+
+- handshake-era protocol negotiation through `2025-11-25`;
+- Tools-only capabilities;
+- stateless POST-only useful transport behavior;
+- Assistant-to-Tool schema adaptation;
+- temporary Thread/Run execution beneath stateless MCP calls;
+- lossy success and error result projection;
+- transport, JSON-RPC and Tool-runtime error layers;
+- normalized-name empty and collision edge cases;
+- the boundary between portable MCP semantics and LangGraph adapter policy;
+- the architectural difference between the pinned 2025-era adapter and MCP
+  `2026-07-28`.
+
+## Current block — 1.8 A2A
 
 Questions:
 
-1. Which MCP specification versions does the pinned Agent Server accept?
-2. Which MCP transports and capability families are implemented?
-3. Why are Assistants projected as MCP Tools?
-4. How are Assistant schemas converted into MCP tool schemas?
-5. How does `tools/call` map into Agent Server execution?
-6. Which Runtime resources remain hidden from MCP clients?
-7. What session semantics are supported or deliberately omitted?
-8. How are protocol errors and Runtime failures projected into MCP results?
-9. Which behaviors belong to MCP itself versus the LangGraph adapter?
-10. How does MCP differ architecturally from the A2A projection studied next?
+1. What A2A specification/version does the pinned Agent Server adapter target?
+2. How does an Assistant become an A2A Agent?
+3. How do A2A contextId and task IDs map onto Thread and Run identities?
+4. How do message/send and message/stream create and consume Runs?
+5. How do tasks/get and tasks/cancel project Agent Server lifecycle semantics?
+6. How are Thread interrupts represented as A2A input-required states?
+7. Which message parts and schemas are supported by the pinned adapter?
+8. How is the Agent Card derived from Assistant and Graph schemas?
+9. Which A2A semantics are portable versus LangGraph-specific projection policy?
+10. How does A2A differ architecturally from MCP?
 
 ## Reference environment
 

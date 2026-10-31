@@ -1259,3 +1259,91 @@ Agent Streaming Protocol
 MCP and A2A
     -> interoperability projections over Agent Server execution
 ~~~
+
+### Version 0.6 — MCP interoperability projection
+
+Phase 1 section 1.7 established MCP as a narrow interoperability projection
+over the Agent Server service and execution boundaries.
+
+~~~text
+MCP client
+    |
+    v
+/mcp adapter
+    |
+    +-- tools/list
+    |       |
+    |       v
+    |   Assistants.search
+    |       |
+    |       v
+    |   Assistant schemas
+    |       |
+    |       v
+    |   MCP Tool projection
+    |
+    +-- tools/call
+            |
+            v
+        Assistant resolution
+            |
+            v
+        runs.wait(thread_id=None)
+            |
+            v
+        temporary Thread + Run
+            |
+            v
+        Runtime queue + Graph
+~~~
+
+The pinned `langgraph-api 0.8.1` adapter targets MCP through `2025-11-25`.
+It exposes only Tools and deliberately uses no persistent MCP session.
+
+Stateless MCP calls still execute through stateful Runtime primitives; the
+Runtime creates temporary Threads and Runs and cleans them after both successful
+and failed execution.
+
+The adapter performs lossy semantic projection:
+
+~~~text
+Graph-native input schema
+    -> LLM-friendly MCP Tool schema
+
+Graph final state
+    -> repr(value)
+    -> MCP TextContent
+
+Runtime exception
+    -> shortened MCP Tool error
+~~~
+
+Three failure layers are distinct:
+
+~~~text
+HTTP transport failure
+JSON-RPC / adapter failure
+Tool / Runtime execution failure
+~~~
+
+Assistant Tool-name normalization introduces adapter-specific identity edge
+cases: an Assistant can normalize to an empty Tool name, and multiple Assistant
+names can collide after normalization. Discovery and invocation use different
+collision policies.
+
+The modern MCP `2026-07-28` revision removes the initialize handshake and
+protocol-level sessions, introduces per-request discovery/metadata and
+header-based routing, and further formalizes stateless operation.
+
+Final boundary:
+
+~~~text
+Agent Server REST
+    -> persistent service/resource contract
+
+Agent Streaming Protocol
+    -> rich Thread-centric interaction contract
+
+MCP
+    -> narrow stateless capability projection over Assistants and Runs
+~~~

@@ -83,7 +83,11 @@
   - [x] 1.6B Subscription, replay and ordering semantics
   - [x] 1.6C State, HITL and agent-topology semantics
   - [x] 1.6D Transport, implementation boundary and protocol evolution
-- [ ] 1.7 MCP
+- [x] 1.7 MCP
+  - [x] 1.7A Protocol and capability inventory
+  - [x] 1.7B Assistant-as-Tool projection and transport behavior
+  - [x] 1.7C Runtime execution and persistence semantics
+  - [x] 1.7D Error projection, edge cases and final boundary
 - [ ] 1.8 A2A
 
 ### Phase review
