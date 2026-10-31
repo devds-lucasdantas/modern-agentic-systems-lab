@@ -26,11 +26,13 @@ Validated foundations
     scheduler semantics
     durability
 
-In progress
+Validated
     Agent Server API boundary and interoperability mapping
 
-Next in Phase 1
+In progress
     LangChain Agent Streaming Protocol
+
+Next in Phase 1
     MCP
     A2A
 
@@ -123,7 +125,7 @@ Patterns to keep on the radar:
 
 ### Agent Server API boundary and interoperability
 
-Status: **In progress — Phase 1 section 1.5.**
+Status: **Validated — Phase 1 section 1.5 complete.**
 
 Investigate the boundary between:
 
@@ -140,7 +142,7 @@ and which concepts reappear in portable interoperability contracts?
 
 ### LangChain Agent Streaming Protocol
 
-Status: **Next — Phase 1 section 1.6.**
+Status: **In progress — Phase 1 section 1.6.**
 
 Keep on the radar:
 

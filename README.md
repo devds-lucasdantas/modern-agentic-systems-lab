@@ -109,11 +109,11 @@ Completed:
 
 In progress:
 
-- 🚧 Agent Server API boundary and interoperability mapping
+- ✅ Agent Server API boundary and interoperability mapping
 
 Next:
 
-- ⬜ LangChain Agent Streaming Protocol
+- 🚧 LangChain Agent Streaming Protocol
 - ⬜ MCP
 - ⬜ A2A
 

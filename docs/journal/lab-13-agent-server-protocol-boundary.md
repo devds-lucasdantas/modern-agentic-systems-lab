@@ -1972,3 +1972,298 @@ MCP exposes Assistants as stateless callable Tools.
 
 This confirms that the Agent Server should be understood as a core execution
 service surrounded by protocol-specific semantic adapters.
+
+---
+
+# 1.5D — Final service/API boundary
+
+## Objective
+
+Consolidate sections 1.5A through 1.5C into the final service and
+interoperability boundary.
+
+No additional Runtime experiment is required.
+
+## Final contract layers
+
+The pinned stack contains distinct contracts:
+
+~~~text
+Application
+    |
+    +-----------------------------+
+    |                             |
+    v                             v
+langgraph-sdk              protocol clients
+    |                             |
+    v                       +-----+-----+
+Agent Server REST API       |           |
+    |                       v           v
+    |                      A2A         MCP
+    |                       |           |
+    +-----------+-----------+-----------+
+                |
+                v
+         Runtime execution
+
+
+Separate installed contract:
+
+LangChain Agent Streaming Protocol
+    -> langchain-protocol
+~~~
+
+These surfaces share concepts but are not aliases for one another.
+
+## Agent Server ownership
+
+The Agent Server owns the stateful service and execution model:
+
+~~~text
+Assistant
+Thread
+Run
+ThreadState
+Checkpoint
+Store
+Cron
+
+scheduling
+multitask strategies
+delayed execution
+durability
+cancellation
+rollback
+authentication
+resource administration
+persistence
+~~~
+
+It is the core execution and persistence service.
+
+## LangGraph SDK ownership
+
+`langgraph-sdk` is the typed Python client and schema contract for the
+LangGraph / LangSmith Deployment REST API.
+
+It exposes clients for:
+
+~~~text
+Assistants
+Threads
+Runs
+Store
+Cron
+~~~
+
+and corresponding service-resource schemas.
+
+It is not a generic standalone Agent Protocol.
+
+## Execution substrate
+
+The service resources ultimately drive the same Runtime execution substrate:
+
+~~~text
+Assistant
+    |
+    v
+Graph
+    |
+    v
+Run
+    |
+    +-- scheduler
+    +-- checkpointer
+    +-- streaming
+    +-- cancellation
+    +-- durability
+~~~
+
+Stateful execution exposes a caller-owned Thread.
+
+Stateless execution can still use Runtime-managed Thread machinery internally.
+
+## Protocol-adapter ownership
+
+A protocol adapter translates:
+
+~~~text
+external protocol
+        |
+        v
+identity
+schemas
+messages
+lifecycle
+errors
+capabilities
+        |
+        v
+Agent Server execution primitives
+~~~
+
+It is not a second graph executor.
+
+The Agent Server remains responsible for execution, persistence, scheduling,
+checkpoints and authentication.
+
+## A2A projection
+
+The pinned A2A adapter preserves stateful execution semantics:
+
+~~~text
+Assistant
+    -> A2A Agent / Agent Card
+
+Thread
+    -> contextId
+
+Thread + Run
+    -> A2A Task
+
+SendMessage
+    -> runs.create + runs.join
+
+SendStreamingMessage
+    -> runs.stream
+
+GetTask
+    -> runs.get + threads.get + history
+
+CancelTask
+    -> runs.cancel(action="interrupt")
+~~~
+
+Lifecycle translation is semantic.
+
+For example:
+
+~~~text
+Run.status = success
+Thread.status = interrupted
+        |
+        v
+A2A state = input-required
+~~~
+
+## MCP projection
+
+The pinned MCP adapter exposes a flatter stateless model:
+
+~~~text
+Assistant
+    -> MCP Tool
+
+Assistant input schema
+    -> MCP inputSchema
+
+tools/call
+    -> runs.wait(thread_id=None)
+
+Run result
+    -> MCP Tool result
+~~~
+
+Thread identity is hidden from MCP even though Runtime-managed Thread machinery
+may still exist internally.
+
+## LangChain Agent Streaming Protocol boundary
+
+`langchain-protocol 0.0.12` represents a separate interaction/event contract.
+
+Its generated bindings include concepts such as:
+
+~~~text
+run.input
+
+subscription.subscribe
+subscription.unsubscribe
+subscription.reconnect
+
+agent.getTree
+
+input.respond
+input.inject
+
+state.get
+state.listCheckpoints
+state.fork
+~~~
+
+The pinned source investigation found no direct implementation link proving
+that the Agent Server REST API is itself this command/event protocol.
+
+It therefore remains an independent subject for section 1.6.
+
+## Final ownership model
+
+~~~text
+                    Agent Server
+                        |
+        +---------------+---------------+
+        |                               |
+        v                               v
+ service resources               execution substrate
+        |                               |
+ Assistant                           Graph
+ Thread                              Run
+ Run                              scheduler
+ Store                            checkpointer
+ Cron                             streaming
+        |                               |
+        +---------------+---------------+
+                        |
+                        v
+                protocol adapters
+                        |
+              +---------+---------+
+              |                   |
+              v                   v
+             A2A                 MCP
+              |                   |
+       stateful agent/task     stateless Tool
+          projection            projection
+~~~
+
+## Scope handoff
+
+Section 1.5 establishes where the contracts sit relative to the Runtime.
+
+It deliberately does not fully validate:
+
+~~~text
+LangChain Agent Streaming Protocol behavior
+MCP interoperability and conformance
+A2A interoperability and conformance
+~~~
+
+Those belong to:
+
+~~~text
+1.6 LangChain Agent Streaming Protocol
+1.7 MCP
+1.8 A2A
+~~~
+
+## 1.5 final conclusion
+
+The final model is:
+
+~~~text
+Agent Server
+    = core execution and persistence service
+
+langgraph-sdk
+    = typed service client
+
+A2A / MCP
+    = protocol-specific semantic adapters
+
+langchain-protocol
+    = separate interaction/event contract
+~~~
+
+Section 1.5 is complete.
+
+No additional Runtime experiment is required before section 1.6.

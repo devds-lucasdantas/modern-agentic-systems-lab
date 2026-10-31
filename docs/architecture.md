@@ -1123,3 +1123,65 @@ The architectural question now shifts from Runtime implementation semantics to:
 Which of these Runtime concepts belong to reusable protocol contracts, and which
 are LangGraph-specific implementation details?
 ~~~
+
+### Version 0.4 — Agent Server protocol boundary
+
+Phase 1 section 1.5 established the boundary between the Agent Server service
+contract and interoperability protocols.
+
+~~~text
+                         external clients
+                               |
+              +----------------+----------------+
+              |                                 |
+              v                                 v
+      LangGraph service                   protocol adapters
+              |                                 |
+              v                         +-------+-------+
+        langgraph-sdk                    |               |
+              |                          v               v
+              v                         A2A             MCP
+        Agent Server                     |               |
+              +---------------+----------+---------------+
+                              |
+                              v
+                      Runtime execution
+~~~
+
+The Agent Server owns:
+
+- Assistant, Thread and Run resources;
+- state and checkpoints;
+- Store and Cron resources;
+- scheduling and concurrency policy;
+- durability;
+- cancellation and rollback;
+- persistence and authentication.
+
+`langgraph-sdk` is the typed client for that service API.
+
+A2A and MCP are semantic adapters over the same execution substrate:
+
+~~~text
+A2A
+    Assistant -> Agent / Agent Card
+    Thread -> contextId
+    Thread + Run -> Task
+    Run stream -> translated A2A SSE
+
+MCP
+    Assistant -> Tool
+    Assistant schema -> inputSchema
+    tools/call -> stateless Run wait
+~~~
+
+The adapters own protocol-facing translation of identity, schemas, messages,
+lifecycle and errors.
+
+The installed LangChain Agent Streaming Protocol remains a separate
+command/event contract represented by `langchain-protocol`; the inspected
+pinned source does not establish the Agent Server REST API as a direct
+implementation of that contract.
+
+This boundary is the handoff from Runtime/service architecture to the
+protocol-specific remainder of Phase 1.

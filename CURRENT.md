@@ -7,10 +7,11 @@ Phase 1 — Agent Runtime & Protocols
 Current block:
 
 ~~~text
-1.5 Agent Server API boundary and interoperability mapping
-    -> 1.5D Final service/API boundary
-    -> consolidate REST / streaming / MCP / A2A roles
-    -> define the handoff to protocol-specific labs
+1.6 LangChain Agent Streaming Protocol
+    -> protocol command/event grammar
+    -> subscriptions and reconnect semantics
+    -> state / checkpoint / HITL interaction
+    -> transport and implementation boundary
 ~~~
 
 ## Completed
@@ -505,19 +506,55 @@ resources rather than independent graph executors.
 Protocol adapters own semantic translation while the Agent Server retains
 execution, persistence, scheduling and authentication responsibilities.
 
-## Current sub-block — 1.5D Final service/API boundary
+## Completed block — 1.5 Agent Server API boundary and interoperability mapping
 
-The next objective is to consolidate the complete section 1.5 model.
+Section 1.5 established the final service/protocol boundary:
 
-Questions:
+~~~text
+Agent Server
+    -> core execution, persistence and resource-management service
 
-1. What belongs to the core Agent Server service contract?
-2. What belongs to the LangGraph SDK client contract?
-3. What belongs to protocol-specific adapters?
-4. Which concepts should remain outside section 1.5 for the dedicated
-   LangChain Agent Streaming Protocol, MCP and A2A labs?
-5. What final architecture should be carried into the rest of Phase 1?
-6. Can section 1.5 be closed without additional Runtime experiments?
+langgraph-sdk
+    -> typed client for the Agent Server REST API
+
+A2A
+    -> stateful protocol adapter over Assistant / Thread / Run
+
+MCP
+    -> stateless Assistant-as-Tool adapter over Assistant / Run
+
+langchain-protocol
+    -> separate LangChain Agent Streaming Protocol contract
+~~~
+
+Protocol adapters reuse the Agent Server Runtime while translating identity,
+schemas, lifecycle, messages and errors into protocol-specific semantics.
+
+The Agent Server REST resource model and interoperability contracts must not be
+treated as identical APIs.
+
+## Current block — 1.6 LangChain Agent Streaming Protocol
+
+The next objective is to study the installed LangChain Agent Streaming Protocol
+as an independent contract.
+
+Initial questions:
+
+1. What is the complete command, response and event grammar?
+2. What execution lifecycle does the protocol define?
+3. How are subscriptions represented?
+4. What reconnect and replay semantics are encoded by the contract?
+5. How are state, checkpoints and forks represented?
+6. How are HITL requests and responses represented?
+7. How is nested agent topology represented?
+8. Which parts are transport-neutral and which imply a particular transport?
+9. Is there a reference implementation in the pinned stack or only generated
+   protocol bindings?
+10. How does this contract relate to the already-validated LangGraph Runtime
+    streaming surface without treating them as identical protocols?
+
+The first step is a complete structural inventory of
+`langchain_protocol/protocol.py`.
 
 ## Reference environment
 
