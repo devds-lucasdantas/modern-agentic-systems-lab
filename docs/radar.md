@@ -5,11 +5,55 @@ concerns that may become relevant during the laboratory. Inclusion does not mean
 that every item must be adopted. The goal is to know what exists, where it fits,
 and what questions must be answered before choosing it.
 
+## Current validation status
+
+This radar tracks both investigated and future subjects.
+
+Current status after Phase 1 section 1.4:
+
+~~~text
+Validated foundations
+    LangChain agent primitives
+    LangGraph Runtime fundamentals
+    Deep Agents
+    tools and middleware
+    state / Threads / Runs
+    checkpoints and Store
+    streaming and resumable streaming
+    cancellation / rollback
+    multitask strategies
+    background execution
+    scheduler semantics
+    durability
+
+In progress
+    Agent Protocol
+
+Next in Phase 1
+    Agent Streaming Protocol
+    MCP
+    A2A
+
+Later phases
+    AG-UI and frontend interaction
+    RAG / retrieval
+    sandboxing
+    observability / evaluations
+    authentication / authorization
+    production hardening
+~~~
+
+Items below may therefore be either validated foundations or subjects still on
+the learning radar. Their section-specific questions remain useful even after a
+foundation has been experimentally validated.
+
 ## 1. Agent Runtime and Orchestration
 
 ### LangChain
 
-Role to investigate:
+Status: **Validated foundation; deeper concerns remain on the radar.**
+
+Validated role:
 
 - model abstraction;
 - tools and tool schemas;
@@ -26,7 +70,9 @@ Questions:
 
 ### LangGraph
 
-Role to investigate:
+Status: **Runtime foundation validated through Phase 1 section 1.4.**
+
+Validated role:
 
 - stateful execution;
 - graph orchestration;
@@ -46,7 +92,9 @@ Questions:
 
 ### Deep Agents
 
-Role to investigate:
+Status: **Phase 0 foundation validated.**
+
+Validated role:
 
 - opinionated agent harness;
 - planning and TODOs;
@@ -75,6 +123,8 @@ Patterns to keep on the radar:
 
 ### Agent Protocol
 
+Status: **In progress — Phase 1 section 1.5.**
+
 Investigate standardized concepts such as:
 
 - Agent;
@@ -90,6 +140,8 @@ Important question:
 What belongs to an interoperability contract versus a specific LangGraph SDK?
 
 ### Agent Streaming Protocol
+
+Status: **Next — Phase 1 section 1.6.**
 
 Keep on the radar:
 
@@ -123,6 +175,8 @@ streaming protocols.
 
 ### MCP
 
+Status: **Planned — Phase 1 section 1.7.**
+
 Model Context Protocol should be studied as an integration protocol for:
 
 - tools;
@@ -135,6 +189,8 @@ MCP does not itself solve authorization, sandbox isolation or every agent-to-age
 communication problem.
 
 ### A2A
+
+Status: **Planned — Phase 1 section 1.8.**
 
 Agent-to-Agent communication belongs on the radar for independent agents that
 need to discover and collaborate with each other. Compare it with MCP rather

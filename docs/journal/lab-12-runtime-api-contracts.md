@@ -6471,36 +6471,54 @@ The current model is:
 
 Execution surface and durability are orthogonal concerns.
 
-### Evidence status
+### Evidence status at this point in the investigation
+
+At this stage, the public durability surface and compatibility boundary were
+source-validated, while the exact checkpoint timing semantics still required
+deeper source inspection.
 
 ~~~text
 [OPENAPI VALIDATED]
 
 background / wait / stream / join surfaces
 
-[SOURCE VALIDATED]
-
-Durability =
+durability:
     sync
     async
     exit
 
-legacy compatibility:
-    checkpoint_during=true  <-> async
-    checkpoint_during=false <-> exit
+[SOURCE VALIDATED]
 
-[UNRESOLVED]
+native durability-aware Runtime:
+    explicit durability is preserved
 
-exact checkpoint persistence guarantees:
+legacy input bridge:
+    checkpoint_during=true
+        -> durability=async
+
+    checkpoint_during=false
+        -> no explicit durability value is produced by this branch
+
+legacy-output compatibility path:
+    durability=async
+        -> checkpoint_during=true
+
+    durability=exit
+        -> checkpoint_during=false
+
+    durability=sync
+        -> no equivalent legacy boolean representation
+
+[OPEN AT THIS POINT]
+
+exact checkpoint persistence timing:
     sync
     async
     exit
 ~~~
 
-### Next source question
-
-Trace the LangGraph checkpoint write path to determine exactly when each
-durability mode waits for persistence relative to graph execution.
+The exact timing question is resolved by the subsequent source trace and Runtime
+validation in sections 1.4B and 1.4C.
 
 ## 1.4B — Durability at an interrupted execution boundary
 

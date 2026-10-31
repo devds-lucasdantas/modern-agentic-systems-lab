@@ -76,6 +76,18 @@ learning path remains reproducible without mixing upstream history with our own.
 The repository should grow incrementally. Directories and abstractions are added
 when the laboratory introduces them, rather than being scaffolded prematurely.
 
+## Repository map
+
+- [`CURRENT.md`](CURRENT.md) — exact continuation point and established working model;
+- [`ROADMAP.md`](ROADMAP.md) — incremental learning path and completion status;
+- [`docs/architecture.md`](docs/architecture.md) — consolidated architecture snapshots;
+- [`docs/radar.md`](docs/radar.md) — technology, protocol and production-concern radar;
+- [`docs/adr/`](docs/adr/) — architectural decisions;
+- [`docs/journal/`](docs/journal/) — experiment evidence and learning journals;
+- [`references/README.md`](references/README.md) — pinned external references;
+- [`patches/`](patches/) — local adaptations applied to external references;
+- [`scripts/`](scripts/) — reproducibility and bootstrap helpers.
+
 <!-- current-status:start -->
 
 ## Current status
