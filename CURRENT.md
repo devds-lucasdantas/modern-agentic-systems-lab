@@ -8,10 +8,10 @@ Current block:
 
 ~~~text
 1.6 LangChain Agent Streaming Protocol
-    -> 1.6B Subscription, replay and ordering semantics
-    -> seq / since versus event_id / last_event_id
-    -> namespace filtering and subscription restoration
-    -> CDDL source-of-truth versus generated Python binding
+    -> 1.6C State, HITL and agent-topology semantics
+    -> namespace-scoped state and checkpoint interaction
+    -> interrupt request / response / injection semantics
+    -> nested agent lifecycle, causation and tree reconstruction
 ~~~
 
 ## Completed
@@ -581,23 +581,59 @@ though richer payload structures are separately defined. The next block must
 determine whether this is a generated-binding limitation or part of the
 source protocol grammar.
 
-## Current sub-block — 1.6B Subscription, replay and ordering semantics
+## Completed sub-block — 1.6B Subscription, replay and ordering semantics
+
+The historical CDDL corresponding to the pinned binding was recovered through
+the Agent Protocol PR #72 migration.
+
+The migrated Python binding is byte-identical to the installed
+`langchain-protocol 0.0.12` binding.
+
+The CDDL establishes:
+
+~~~text
+Thread
+    -> durable routing identity
+
+SSE
+    -> connection-scoped subscription
+    -> since / seq replay
+
+WebSocket
+    -> in-band logical subscriptions
+    -> reconnect / lastEventId recovery
+
+eventId
+    -> reconnection identity
+
+seq
+    -> monotonic ordering coordinate
+~~~
+
+The CDDL strongly types event payloads even though the generated Python binding
+collapses event `params` to `dict[str, Any]`.
+
+Replay uses an ephemeral event buffer, while durable recovery is available
+through state/checkpoint operations.
+
+The historical specification does not define exactly-once, at-least-once,
+duplicate suppression, buffer capacity or retention duration.
+
+## Current sub-block — 1.6C State, HITL and agent-topology semantics
 
 Questions:
 
-1. What is the exact source-of-truth CDDL corresponding to the pinned binding?
-2. Are event payload types associated with channels in the CDDL even though the
-   generated Python binding loses that association?
-3. What is the semantic distinction between `seq` and `event_id`?
-4. What exactly does `since` replay?
-5. What exactly does `last_event_id` restore?
-6. What does `applied_through_seq` acknowledge?
-7. How are subscription IDs created, restored and removed?
-8. What are the namespace prefix and depth matching rules?
-9. What ordering and delivery guarantees are defined by the protocol versus an
-   implementation?
-10. Which semantics can be validated from the pinned source and which require
-    upstream protocol source or a reference implementation?
+1. How does namespace-scoped state relate to Thread state?
+2. What exactly does `state.get` return for root and nested namespaces?
+3. How are checkpoint IDs, namespace references and fork targets related?
+4. What execution semantics does `state.fork` imply?
+5. How does `input.requested` correlate with `input.respond`?
+6. How does `input.inject` differ semantically from interrupt resume?
+7. How is the live agent tree reconstructed from lifecycle events?
+8. What does each lifecycle cause (`toolCall`, `send`, `edge`) represent?
+9. How does `agent.getTree` relate to lifecycle-derived topology?
+10. Which of these semantics belong to the portable protocol rather than
+    LangGraph-specific implementation behavior?
 
 ## Reference environment
 

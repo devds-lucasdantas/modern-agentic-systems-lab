@@ -688,3 +688,490 @@ It is structurally distinct from the Agent Server REST resource model.
 The next investigation must resolve subscription, ordering and replay semantics
 and determine whether the event-payload typing gap is a property of the CDDL
 contract or only of the generated Python binding.
+
+---
+
+# 1.6B — Subscription, replay and ordering semantics
+
+## Historical source provenance
+
+The `langchain-protocol 0.0.12` wheel and source distribution do not contain
+the protocol CDDL.
+
+The published 0.0.12 source distribution contains only the generated Python
+binding and packaging files.
+
+The Agent Protocol repository later received the Agent Streaming Protocol in
+PR #72.
+
+The PR explicitly migrated:
+
+~~~text
+protocol.cddl
+generated Python bindings
+generated TypeScript bindings
+streaming documentation
+~~~
+
+into `langchain-ai/agent-protocol`.
+
+The PR head used for the historical comparison was:
+
+~~~text
+4df82a5d0c1e20f5699b6146dc274d4d34240f7b
+~~~
+
+Its artifacts contain:
+
+~~~text
+streaming/protocol.cddl
+    1155 lines
+
+streaming/py/langchain_protocol/protocol.py
+    556 lines
+~~~
+
+The migrated Python binding has SHA-256:
+
+~~~text
+24242db47c62d6487bcc61140b0f81b6920e0462e10965a8fd066365909f9652
+~~~
+
+The installed `langchain-protocol 0.0.12` binding has the same SHA-256.
+
+A byte comparison returns:
+
+~~~text
+IDENTICAL
+~~~
+
+Therefore the Python binding shipped as 0.0.12 is byte-identical to the
+binding migrated in PR #72.
+
+The migrated CDDL already identifies itself as version 0.0.13, so it is not
+described here as a file distributed inside the 0.0.12 package.
+
+Instead, it is treated as the historical source-of-truth corresponding to the
+exact grammar of the pinned 0.0.12 Python binding.
+
+## Generation pipeline
+
+The migrated repository defines:
+
+~~~text
+protocol.cddl
+    |
+    v
+cddl2py 0.2.2
+    |
+    v
+scripts/fixup.py
+    |
+    v
+py/langchain_protocol/protocol.py
+~~~
+
+The same protocol source is also compiled into TypeScript.
+
+The CDDL is validated independently before generation.
+
+## Event payload typing
+
+The CDDL strongly associates each event method with a structured payload.
+
+For example:
+
+~~~text
+LifecycleEvent
+    method = "lifecycle"
+
+    params
+        namespace
+        timestamp
+        data: LifecycleData
+~~~
+
+Likewise:
+
+~~~text
+MessagesEvent
+    -> MessagesData
+
+ToolsEvent
+    -> ToolsData
+
+InputEvent
+    -> InputRequestedData
+
+UpdatesEvent
+    -> UpdatesData
+
+CheckpointsEvent
+    -> Checkpoint
+
+CustomEvent
+    -> CustomData
+~~~
+
+`ValuesEvent` and `TasksEvent` intentionally allow open runtime data.
+
+The generated Python binding instead represents every event payload as:
+
+~~~text
+params: dict[str, Any]
+~~~
+
+The event-payload typing gap observed in section 1.6A is therefore a
+generated-binding limitation rather than an untyped CDDL wire contract.
+
+## Thread-centric routing model
+
+The protocol identifies Thread as the primary durable routing key for:
+
+~~~text
+commands
+events
+subscriptions
+state
+checkpoints
+run history
+~~~
+
+There is no protocol session handshake or durable server-side connection
+session.
+
+Threads may be client-generated or server-assigned.
+
+A Thread can be created lazily on the first `run.input`.
+
+The protocol therefore separates:
+
+~~~text
+Thread
+    -> durable execution identity
+
+connection
+    -> ephemeral transport / observation scope
+~~~
+
+Multiple connections may observe the same Thread concurrently using independent
+filters.
+
+## Transport-specific subscription models
+
+The protocol defines different subscription behavior for SSE/HTTP and
+WebSocket.
+
+### SSE / HTTP
+
+A client opens:
+
+~~~text
+POST /threads/:thread_id/stream
+~~~
+
+with an `EventStreamRequest` containing:
+
+~~~text
+channels
+namespaces?
+depth?
+since?
+~~~
+
+Each SSE connection is itself a subscription.
+
+Closing the connection unsubscribes.
+
+No logical subscription object is persisted beyond the connection lifetime.
+
+Multiple SSE streams can observe the same Thread concurrently with independent
+filters.
+
+### WebSocket
+
+A WebSocket connection uses in-band commands:
+
+~~~text
+subscription.subscribe
+subscription.unsubscribe
+subscription.reconnect
+~~~
+
+WebSocket subscriptions can persist across Run boundaries.
+
+They are removed by:
+
+~~~text
+subscription.unsubscribe
+~~~
+
+or by closing the WebSocket connection.
+
+Therefore the abstract concept of a subscription has transport-specific
+realizations.
+
+## Namespace filtering
+
+Subscriptions select events through:
+
+~~~text
+channels
++
+namespace prefixes
++
+optional depth
+~~~
+
+Namespaces are hierarchical string paths.
+
+A namespace filter performs prefix matching.
+
+`depth` limits how far below the selected prefix matching may extend.
+
+The filter is therefore structural rather than a simple exact namespace match.
+
+## Event coordinates
+
+The event envelope exposes two independent coordinates.
+
+~~~text
+eventId
+    -> unique reconnection identity
+    -> maps to SSE id
+
+seq
+    -> monotonic sequence number
+    -> ordering
+~~~
+
+The specification does not state that:
+
+~~~text
+eventId == str(seq)
+~~~
+
+and clients must not assume that relationship.
+
+## SSE replay
+
+For SSE/HTTP, `EventStreamRequest.since` is a sequence number.
+
+The server:
+
+~~~text
+1. reads the Thread event ring buffer;
+2. selects events after the requested seq;
+3. applies the current event filter;
+4. replays matching events;
+5. transitions to live delivery.
+~~~
+
+Thus:
+
+~~~text
+since = N
+    -> replay matching events after seq N
+~~~
+
+Replay and filtering are applied together.
+
+## WebSocket reconnect
+
+WebSocket recovery uses:
+
+~~~text
+subscription.reconnect
+    runId
+    lastEventId?
+    subscriptions?
+~~~
+
+The result may contain:
+
+~~~text
+restored
+missedEvents?
+currentNamespaces?
+~~~
+
+Therefore the two transport recovery coordinates are deliberately different:
+
+~~~text
+SSE
+    -> seq / since
+
+WebSocket
+    -> eventId / lastEventId
+~~~
+
+## Event buffer lifecycle
+
+The event buffer is an ephemeral Runtime structure.
+
+When execution has completed and all relevant connections close, ephemeral
+state such as:
+
+~~~text
+event buffer
+run session
+~~~
+
+can be dropped.
+
+The Thread and its durable checkpoint/state information remain.
+
+Replay should therefore be understood as short-lived stream recovery rather
+than durable event-log storage.
+
+## Replay beyond the retained buffer
+
+The historical streaming documentation states that servers may keep a recent
+event ring buffer.
+
+If a requested recovery point is no longer buffered, the server should indicate
+that events were missed.
+
+The client can then recover through durable state operations such as:
+
+~~~text
+state.get
+state.listCheckpoints
+~~~
+
+This establishes two recovery layers:
+
+~~~text
+event buffer
+    -> incremental stream recovery
+
+state/checkpoints
+    -> durable resynchronization
+~~~
+
+## Ordering guarantees
+
+The CDDL explicitly defines `seq` as a monotonic sequence number used for
+ordering.
+
+Additional local ordering constraints exist.
+
+### Message-local ordering
+
+Content blocks within one message must not interleave.
+
+Conceptually:
+
+~~~text
+block 0 start
+block 0 delta*
+block 0 finish
+
+block 1 start
+block 1 delta*
+block 1 finish
+~~~
+
+A later content block cannot begin before the prior block finishes.
+
+### Checkpoint / value correlation
+
+A checkpoint event is emitted on the same superstep as its corresponding
+values event.
+
+Consumers can correlate them through:
+
+~~~text
+(namespace, step)
+~~~
+
+or through adjacent event sequence numbers.
+
+## Delivery guarantees deliberately not established
+
+The historical specification does not define:
+
+~~~text
+exactly-once delivery
+at-least-once delivery
+at-most-once delivery
+duplicate suppression
+ring-buffer capacity
+ring-buffer TTL
+global durable event retention
+~~~
+
+Therefore section 1.6B does not assign those semantics to the protocol.
+
+This differs from the Agent Server SSE behavior empirically validated earlier
+in Phase 1.
+
+The two contracts must not be conflated.
+
+## `appliedThroughSeq`
+
+The historical CDDL defines:
+
+~~~text
+ResponseMeta
+    appliedThroughSeq?
+~~~
+
+but does not attach a semantic comment to the field.
+
+The historical README also shows it in an example response without defining its
+precise acknowledgment semantics.
+
+Its exact historical meaning is therefore recorded as:
+
+~~~text
+field existence
+    -> validated
+
+precise acknowledgment semantics
+    -> not explicitly established
+~~~
+
+Current upstream documentation later describes the value as the latest event
+sequence number applied before the corresponding command response.
+
+That later clarification is useful protocol evolution context but is not
+silently projected backward onto the pinned historical snapshot.
+
+## 1.6B conclusion
+
+The pinned protocol's subscription and replay model is:
+
+~~~text
+                         Thread
+                      durable key
+                           |
+              +------------+------------+
+              |                         |
+              v                         v
+          SSE / HTTP                WebSocket
+              |                         |
+ connection = subscription      in-band subscriptions
+              |                         |
+           since=seq               reconnect
+              |                    lastEventId
+              +------------+------------+
+                           |
+                           v
+                    filtered event source
+                           |
+                           v
+                    monotonic sequence
+                           |
+                           v
+                      ring buffer
+                           |
+                 replay -> live delivery
+~~~
+
+Replay is explicitly part of the contract, but retention and delivery
+guarantees are intentionally not inferred beyond what the historical
+specification states.
+
+The next block can focus on state, HITL and agent-topology semantics without
+needing further subscription-model investigation.
