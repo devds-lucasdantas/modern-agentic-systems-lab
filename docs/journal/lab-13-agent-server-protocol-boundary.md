@@ -1321,3 +1321,654 @@ The next investigation should identify where the Agent Server deliberately
 exposes independent protocol integrations and how those integrations obtain
 graph schemas and execution context without collapsing their contracts into the
 REST resource model.
+
+---
+
+# 1.5C — Agent Server protocol-integration boundary
+
+## Objective
+
+Determine how the pinned Agent Server exposes independent interoperability
+protocols without replacing its internal Assistant / Thread / Run execution
+model.
+
+The source investigation focuses on A2A and MCP only as integration boundaries.
+
+Detailed protocol behavior remains reserved for the dedicated later labs.
+
+## Shared adapter architecture
+
+Both protocol integrations are first-class protected Agent Server routes.
+
+Both use a local LangGraph SDK client:
+
+~~~python
+get_client(url=None)
+~~~
+
+to access existing Agent Server resources.
+
+The resulting architecture is:
+
+~~~text
+External protocol
+        |
+        v
+protocol adapter
+        |
+        v
+LangGraphClient
+        |
+        +-- Assistants
+        +-- Threads
+        +-- Runs
+        |
+        v
+Agent Server Runtime
+        |
+        v
+LangGraph
+~~~
+
+The interoperability protocols therefore do not replace the Agent Server
+Runtime.
+
+They project different external semantics over the same execution substrate.
+
+## Route composition and feature gates
+
+The Agent Server route collection includes:
+
+~~~text
+assistants_routes
+runs_routes
+threads_routes
+store_routes
+ui_routes
+mcp_routes
+a2a_routes
+~~~
+
+MCP and A2A can be disabled independently through HTTP configuration.
+
+Their OpenAPI paths are likewise removed when the corresponding integration is
+disabled.
+
+This establishes MCP and A2A as optional protocol adapters around the Runtime
+rather than mandatory parts of the core resource API.
+
+# A2A adapter
+
+## Transport
+
+The pinned A2A implementation supports:
+
+~~~text
+A2A protocol
+JSON-RPC 2.0
+HTTP
+SSE for streaming
+~~~
+
+Push notifications are not implemented.
+
+## Identity mapping
+
+A2A uses:
+
+~~~text
+contextId
+~~~
+
+as the LangGraph:
+
+~~~text
+thread_id
+~~~
+
+A2A Task identity is synthesized as:
+
+~~~text
+"{contextId}:{run_id}"
+~~~
+
+The task ID can therefore be decomposed back into:
+
+~~~text
+Thread identity
++
+Run identity
+~~~
+
+An A2A Task is not merely an alias for a LangGraph Run resource.
+
+## `SendMessage`
+
+The source path is:
+
+~~~text
+A2A SendMessage
+        |
+        v
+message / command translation
+        |
+        v
+runs.create(
+    thread_id=contextId,
+    assistant_id=assistantId,
+    ...
+)
+        |
+        v
+runs.join(...)
+        |
+        v
+A2A Task
+~~~
+
+If no `contextId` is provided, the adapter generates one and passes it as the
+Thread ID with `if_not_exists="create"`.
+
+A2A execution is therefore stateful at the protocol boundary.
+
+## Human-in-the-loop continuation
+
+The adapter inspects whether an existing Thread is interrupted and can promote
+incoming A2A message parts into a LangGraph `Command`.
+
+This permits A2A interaction to resume an interrupted graph through the same
+Run execution substrate.
+
+The protocol adapter translates rather than bypasses LangGraph HITL semantics.
+
+## `GetTask`
+
+A2A task inspection reads:
+
+~~~text
+runs.get(...)
+threads.get(...)
+threads.get_history(...)
+~~~
+
+The adapter combines Run and Thread information to construct the A2A Task.
+
+This is necessary because the two lifecycle models are not isomorphic.
+
+For example:
+
+~~~text
+LangGraph Run
+    status = success
+
+LangGraph Thread
+    status = interrupted
+
+A2A Task
+    state = input-required
+~~~
+
+This reproduces an earlier Runtime finding:
+
+~~~text
+Run success
+    !=
+graph END
+~~~
+
+The protocol adapter therefore requires semantic lifecycle translation.
+
+## Lifecycle mapping
+
+The basic Run-to-A2A state map is:
+
+~~~text
+pending
+    -> submitted
+
+running
+    -> working
+
+success
+    -> completed
+
+interrupted
+    -> input-required
+
+error
+timeout
+    -> failed
+~~~
+
+Contextual Thread state can refine that basic mapping.
+
+## `CancelTask`
+
+A2A cancellation maps to:
+
+~~~text
+runs.cancel(
+    wait=True,
+    action="interrupt"
+)
+~~~
+
+The adapter does not use rollback for A2A task cancellation.
+
+It also implements the protocol's expected cancellation idempotency: an already
+terminal LangGraph Run may still be represented as an acknowledged canceled
+A2A Task.
+
+## History
+
+A2A Task history is reconstructed from LangGraph Thread checkpoint history.
+
+The adapter queries history filtered by Run metadata and extracts the relevant
+message state.
+
+A2A history is therefore a protocol projection over persisted LangGraph
+checkpoint state.
+
+## Streaming
+
+A2A `SendStreamingMessage` uses:
+
+~~~text
+client.runs.stream(...)
+~~~
+
+The resulting LangGraph stream items are converted into A2A messages and
+status-update events before being emitted through SSE.
+
+Therefore:
+
+~~~text
+LangGraph semantic stream
+        !=
+A2A event stream
+~~~
+
+even though the latter is powered by the former.
+
+## Agent Card
+
+The A2A Agent Card is generated from:
+
+~~~text
+Assistant
++
+Assistant graph schemas
+~~~
+
+The adapter calls:
+
+~~~text
+assistants.get(...)
+assistants.get_schemas(...)
+~~~
+
+and transforms the results into an A2A representation including:
+
+~~~text
+name
+description
+URL
+protocol binding
+protocol version
+capabilities
+skills
+input modes
+output modes
+~~~
+
+An Agent Card is therefore an interoperability projection of an Assistant, not
+a serialization of the Assistant resource.
+
+# MCP adapter
+
+## Implementation structure
+
+The MCP implementation is organized as:
+
+~~~text
+langgraph_api/api/mcp/
+    __init__.py
+    _constants.py
+    _handlers.py
+    _models.py
+    _routes.py
+    _sanitizers.py
+~~~
+
+The module describes itself as an MCP server using Streamable HTTP.
+
+The pinned implementation supports protocol versions:
+
+~~~text
+2024-11-05
+2025-03-26
+2025-06-18
+2025-11-25
+~~~
+
+## MCP projection model
+
+The module explicitly states:
+
+~~~text
+each LangGraph Assistant
+    ->
+one MCP Tool
+~~~
+
+This is substantially different from the A2A projection.
+
+MCP does not expose the Assistant as an agent-management resource.
+
+It exposes its callable behavior as a Tool.
+
+## Stateless boundary
+
+The MCP implementation is explicitly stateless.
+
+It maintains no persistent MCP session.
+
+Its HTTP route accepts:
+
+~~~text
+POST
+GET
+DELETE
+~~~
+
+but in the pinned implementation:
+
+~~~text
+POST
+    -> JSON-RPC requests
+
+GET
+    -> 405
+       streaming/session resumption not implemented
+
+DELETE
+    -> 404
+       no persistent session to terminate
+~~~
+
+MCP streaming is therefore not implemented in this pinned server version.
+
+## Supported MCP methods
+
+The JSON-RPC dispatcher supports:
+
+~~~text
+initialize
+ping
+tools/list
+tools/call
+~~~
+
+No first-class handlers were observed for:
+
+~~~text
+resources/list
+resources/read
+prompts/list
+prompts/get
+~~~
+
+The pinned implementation is therefore primarily an MCP Tool server.
+
+## Protocol negotiation
+
+`initialize` negotiates the requested protocol version against the supported
+versions and returns:
+
+~~~text
+protocolVersion
+capabilities.tools
+serverInfo
+~~~
+
+The server advertises Tool capability with:
+
+~~~text
+listChanged = false
+~~~
+
+## `tools/list`
+
+The implementation calls:
+
+~~~text
+assistants.search(...)
+~~~
+
+and represents available Assistants as MCP Tools.
+
+For each Assistant it calls:
+
+~~~text
+assistants.get_schemas(...)
+~~~
+
+and converts the Assistant input schema into MCP `inputSchema`.
+
+Tool names are normalized to MCP naming constraints.
+
+Duplicate normalized names are suppressed.
+
+Assistants whose schemas cannot be converted are omitted from the Tool list.
+
+## Schema adaptation
+
+LangGraph / LangChain message-heavy schemas are simplified before being exposed
+to MCP clients.
+
+Properties that reference LangChain message types can be reduced to a portable
+string input such as:
+
+~~~text
+"The user message to send to the agent."
+~~~
+
+This establishes explicit schema adaptation rather than schema passthrough.
+
+## `tools/call`
+
+The MCP Tool name is resolved back to the matching Assistant.
+
+Execution then uses:
+
+~~~text
+client.runs.wait(
+    thread_id=None,
+    assistant_id=<resolved assistant>,
+    input=<tool arguments>,
+    context=<MCP context>,
+    raise_error=False
+)
+~~~
+
+Therefore the protocol-level operation:
+
+~~~text
+MCP tools/call
+~~~
+
+maps to:
+
+~~~text
+stateless LangGraph Run
+        |
+        v
+Runtime-managed Thread
+        |
+        v
+wait consumption mode
+~~~
+
+`thread_id=None` hides Thread identity from the MCP contract but does not remove
+the Runtime's internal Thread machinery.
+
+## MCP error boundary
+
+Protocol/request problems such as:
+
+~~~text
+unknown tool
+ambiguous normalized tool name
+invalid parameters
+unknown method
+~~~
+
+are represented as JSON-RPC errors.
+
+A graph execution failure returned as:
+
+~~~text
+{"__error__": ...}
+~~~
+
+is instead converted to an MCP Tool result:
+
+~~~text
+isError = true
+content = [...]
+~~~
+
+Transport/protocol failure and Tool execution failure are therefore distinct
+error classes at the adapter boundary.
+
+# A2A versus MCP
+
+The same Runtime is projected differently by each integration.
+
+| Concern | A2A | MCP |
+| --- | --- | --- |
+| External abstraction | Agent / Task | Tool |
+| Assistant | Agent identity / card | Tool definition |
+| Thread | `contextId` | hidden |
+| Run | Task execution component | Tool invocation |
+| Protocol state model | stateful | stateless |
+| History | Thread/checkpoint history | not exposed |
+| HITL | mapped through interruption/resume | not first-class |
+| Cancellation | mapped to Run interrupt | not first-class |
+| Streaming | Run stream translated to A2A SSE | not implemented |
+| Schema use | Agent Card / capabilities | Tool `inputSchema` |
+| Execution primitive | Run create/join/stream | Run wait |
+| Error mapping | A2A JSON-RPC lifecycle/errors | JSON-RPC + Tool `isError` |
+
+## Architectural consequence
+
+Protocol adapters decide how much of the internal Runtime model is visible.
+
+A2A preserves a large portion of stateful execution semantics:
+
+~~~text
+Assistant
+Thread
+Run
+history
+interrupts
+streaming
+~~~
+
+MCP deliberately flattens the model:
+
+~~~text
+Assistant
+    -> Tool
+
+Assistant schema
+    -> Tool inputSchema
+
+Tool invocation
+    -> stateless Run
+
+Run result
+    -> Tool content
+~~~
+
+The protocol boundary is therefore a semantic projection layer.
+
+It is not a one-to-one exposure of Agent Server resources.
+
+## Ownership boundary
+
+The Agent Server remains responsible for:
+
+~~~text
+Assistant persistence
+Thread creation / persistence
+Run scheduling and execution
+checkpoints
+history
+cancellation
+authentication
+execution errors
+~~~
+
+The adapters are responsible for:
+
+~~~text
+protocol transport
+protocol identity mapping
+schema adaptation
+message conversion
+lifecycle translation
+protocol-specific error representation
+capability advertisement
+~~~
+
+## Evidence classification
+
+~~~text
+[SOURCE VALIDATED]
+
+A2A:
+    first-class Agent Server adapter
+    local LangGraphClient
+    Assistant / Thread / Run reuse
+    contextId -> Thread
+    Task -> Thread + Run
+    SendMessage -> Run create/join
+    GetTask -> Run + Thread + history
+    CancelTask -> Run interrupt
+    streaming -> Run stream + A2A SSE translation
+    Agent Card -> Assistant + schemas
+
+MCP:
+    first-class Agent Server adapter
+    Streamable HTTP / JSON-RPC
+    stateless
+    each Assistant exposed as a Tool
+    tools/list -> Assistant search + schemas
+    tools/call -> stateless Run wait
+    no persistent MCP session
+    no pinned MCP streaming
+    schema sanitization
+    protocol errors distinct from Tool execution errors
+
+[INFERENCE FROM VALIDATED RUNTIME MODEL]
+
+Because both adapters invoke the existing Runs surface, execution continues to
+use the Agent Server's existing scheduler, graph execution and persistence
+substrate.
+
+The adapters change the external contract, not the underlying execution
+engine.
+~~~
+
+## 1.5C conclusion
+
+A2A and MCP demonstrate two different interoperability projections over the
+same Agent Server Runtime.
+
+A2A preserves stateful agent/task semantics.
+
+MCP exposes Assistants as stateless callable Tools.
+
+This confirms that the Agent Server should be understood as a core execution
+service surrounded by protocol-specific semantic adapters.

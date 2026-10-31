@@ -8,9 +8,9 @@ Current block:
 
 ~~~text
 1.5 Agent Server API boundary and interoperability mapping
-    -> 1.5C Agent Server protocol-integration boundary
-    -> MCP / A2A integration surfaces
-    -> graph schema and execution-context boundary
+    -> 1.5D Final service/API boundary
+    -> consolidate REST / streaming / MCP / A2A roles
+    -> define the handoff to protocol-specific labs
 ~~~
 
 ## Completed
@@ -465,20 +465,59 @@ event contract.
 A bridge between them would therefore require semantic translation rather than
 simple schema renaming.
 
-## Current sub-block — 1.5C Agent Server protocol-integration boundary
+## Completed sub-block — 1.5C Agent Server protocol-integration boundary
 
-The next objective is to determine how the Agent Server exposes independent
-protocol integrations.
+The source investigation established that MCP and A2A are first-class optional
+protocol adapters over the same Agent Server Runtime.
+
+A2A preserves stateful execution semantics:
+
+~~~text
+Assistant
+    -> A2A Agent
+
+Thread
+    -> contextId
+
+Thread + Run
+    -> A2A Task
+
+Run stream
+    -> translated A2A SSE
+~~~
+
+MCP deliberately exposes a flatter stateless contract:
+
+~~~text
+Assistant
+    -> MCP Tool
+
+Assistant schema
+    -> Tool inputSchema
+
+tools/call
+    -> stateless Run wait
+~~~
+
+Both adapters use the local LangGraph SDK client and existing Agent Server
+resources rather than independent graph executors.
+
+Protocol adapters own semantic translation while the Agent Server retains
+execution, persistence, scheduling and authentication responsibilities.
+
+## Current sub-block — 1.5D Final service/API boundary
+
+The next objective is to consolidate the complete section 1.5 model.
 
 Questions:
 
-1. Where are MCP and A2A routes implemented in the pinned Agent Server?
-2. How do those integrations obtain graph schemas?
-3. How do they trigger graph execution?
-4. Do they translate into the existing Run primitive or bypass it?
-5. Which Runtime concepts remain internal behind each protocol boundary?
-6. What responsibilities belong to protocol adapters versus the core Agent
-   Server?
+1. What belongs to the core Agent Server service contract?
+2. What belongs to the LangGraph SDK client contract?
+3. What belongs to protocol-specific adapters?
+4. Which concepts should remain outside section 1.5 for the dedicated
+   LangChain Agent Streaming Protocol, MCP and A2A labs?
+5. What final architecture should be carried into the rest of Phase 1?
+6. Can section 1.5 be closed without additional Runtime experiments?
 
 ## Reference environment
 
