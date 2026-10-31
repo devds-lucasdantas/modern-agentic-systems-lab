@@ -8,10 +8,10 @@ Current block:
 
 ~~~text
 1.6 LangChain Agent Streaming Protocol
-    -> protocol command/event grammar
-    -> subscriptions and reconnect semantics
-    -> state / checkpoint / HITL interaction
-    -> transport and implementation boundary
+    -> 1.6B Subscription, replay and ordering semantics
+    -> seq / since versus event_id / last_event_id
+    -> namespace filtering and subscription restoration
+    -> CDDL source-of-truth versus generated Python binding
 ~~~
 
 ## Completed
@@ -533,28 +533,71 @@ schemas, lifecycle, messages and errors into protocol-specific semantics.
 The Agent Server REST resource model and interoperability contracts must not be
 treated as identical APIs.
 
-## Current block — 1.6 LangChain Agent Streaming Protocol
+## Completed sub-block — 1.6A Pinned protocol grammar inventory
 
-The next objective is to study the installed LangChain Agent Streaming Protocol
-as an independent contract.
+The pinned `langchain-protocol 0.0.12` binding defines a distinct command /
+response / event grammar.
 
-Initial questions:
+~~~text
+Command
+    -> 10 command variants
 
-1. What is the complete command, response and event grammar?
-2. What execution lifecycle does the protocol define?
-3. How are subscriptions represented?
-4. What reconnect and replay semantics are encoded by the contract?
-5. How are state, checkpoints and forks represented?
-6. How are HITL requests and responses represented?
-7. How is nested agent topology represented?
-8. Which parts are transport-neutral and which imply a particular transport?
-9. Is there a reference implementation in the pinned stack or only generated
-   protocol bindings?
-10. How does this contract relate to the already-validated LangGraph Runtime
-    streaming surface without treating them as identical protocols?
+Message
+    -> CommandResponse
+     | ErrorResponse
+     | Event
 
-The first step is a complete structural inventory of
-`langchain_protocol/protocol.py`.
+Event
+    -> lifecycle
+     | messages
+     | tools
+     | input.requested
+     | values
+     | updates
+     | checkpoints
+     | custom
+     | tasks
+~~~
+
+The grammar includes subscription filters, namespace paths, nested agent
+topology, HITL commands, state/checkpoint interaction, fine-grained message
+content and tool-execution events.
+
+Two cursor coordinate families are visible:
+
+~~~text
+sequence:
+    seq
+    since
+    applied_through_seq
+
+reconnection:
+    event_id
+    last_event_id
+~~~
+
+The generated Python event envelopes use `dict[str, Any]` for `params` even
+though richer payload structures are separately defined. The next block must
+determine whether this is a generated-binding limitation or part of the
+source protocol grammar.
+
+## Current sub-block — 1.6B Subscription, replay and ordering semantics
+
+Questions:
+
+1. What is the exact source-of-truth CDDL corresponding to the pinned binding?
+2. Are event payload types associated with channels in the CDDL even though the
+   generated Python binding loses that association?
+3. What is the semantic distinction between `seq` and `event_id`?
+4. What exactly does `since` replay?
+5. What exactly does `last_event_id` restore?
+6. What does `applied_through_seq` acknowledge?
+7. How are subscription IDs created, restored and removed?
+8. What are the namespace prefix and depth matching rules?
+9. What ordering and delivery guarantees are defined by the protocol versus an
+   implementation?
+10. Which semantics can be validated from the pinned source and which require
+    upstream protocol source or a reference implementation?
 
 ## Reference environment
 
