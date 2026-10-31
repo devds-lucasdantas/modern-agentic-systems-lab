@@ -8,9 +8,9 @@ Current block:
 
 ~~~text
 1.5 Agent Server API boundary and interoperability mapping
-    -> 1.5B Runtime concepts vs interoperability concepts
-    -> protocol integration boundary
-    -> service-specific vs portable contracts
+    -> 1.5C Agent Server protocol-integration boundary
+    -> MCP / A2A integration surfaces
+    -> graph schema and execution-context boundary
 ~~~
 
 ## Completed
@@ -422,16 +422,63 @@ The 1.5A source inventory established:
    `langchain-protocol` was identified in the inspected Python source;
 5. MCP and A2A are separate protocol integrations exposed by the Agent Server.
 
-The next questions for 1.5B are:
+## Completed sub-block — 1.5B Runtime concepts vs interoperability concepts
 
-1. Which validated Runtime concepts have direct equivalents in portable protocol
-   contracts?
-2. Which concepts are specific to the LangGraph Agent Server resource model?
-3. Which lifecycle semantics require adaptation rather than direct type mapping?
-4. Which concepts belong to service management rather than agent
-   interoperability?
-5. Which boundaries should be carried forward into the later LangChain Agent
-   Streaming Protocol, MCP and A2A experiments?
+The source comparison established four mapping classes:
+
+~~~text
+DIRECT ANALOG
+    state inspection
+    checkpoints
+    state fork / branching
+    HITL request / response
+
+SEMANTIC ADAPTATION
+    Assistant execution identity
+    Run execution identity
+    execution lifecycle
+    replay / reconnect
+
+AGENT-SERVER-SPECIFIC
+    persisted service resources
+    Thread lifecycle
+    Store
+    Cron
+    scheduling
+    concurrency policy
+    durability
+    operational management
+
+PROTOCOL-SPECIFIC
+    subscription commands
+    protocol channels
+    live agent/subagent tree
+    lifecycle causation
+~~~
+
+The Agent Server REST API is primarily a stateful service/resource-management
+contract.
+
+The LangChain Agent Streaming Protocol is primarily an agent-interaction and
+event contract.
+
+A bridge between them would therefore require semantic translation rather than
+simple schema renaming.
+
+## Current sub-block — 1.5C Agent Server protocol-integration boundary
+
+The next objective is to determine how the Agent Server exposes independent
+protocol integrations.
+
+Questions:
+
+1. Where are MCP and A2A routes implemented in the pinned Agent Server?
+2. How do those integrations obtain graph schemas?
+3. How do they trigger graph execution?
+4. Do they translate into the existing Run primitive or bypass it?
+5. Which Runtime concepts remain internal behind each protocol boundary?
+6. What responsibilities belong to protocol adapters versus the core Agent
+   Server?
 
 ## Reference environment
 

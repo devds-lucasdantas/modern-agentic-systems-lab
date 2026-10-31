@@ -75,7 +75,7 @@
 
 - [ ] 1.5 Agent Server API boundary and interoperability mapping
   - [x] 1.5A Source and package inventory
-  - [ ] 1.5B Runtime concepts vs interoperability concepts
+  - [x] 1.5B Runtime concepts vs interoperability concepts
   - [ ] 1.5C Agent Server protocol-integration boundary
   - [ ] 1.5D Final service/API boundary
 - [ ] 1.6 LangChain Agent Streaming Protocol

@@ -506,3 +506,818 @@ streaming protocol
 The next block will map which already-validated Runtime concepts are
 LangGraph-specific and which have equivalents in interoperable protocol
 surfaces.
+
+---
+
+# 1.5B — Runtime concepts versus interoperability concepts
+
+## Objective
+
+Compare the already-validated LangGraph Agent Server resource model with the
+installed LangChain Agent Streaming Protocol contract.
+
+The goal is not to match names lexically.
+
+The goal is to determine whether each concept is:
+
+~~~text
+A — DIRECT ANALOG
+
+    The same essential concept exists on both sides.
+    Wire shapes and scoping can differ.
+
+
+B — SEMANTIC ADAPTATION
+
+    Related concepts exist on both sides, but the models are not
+    isomorphic and require semantic translation.
+
+
+C — AGENT-SERVER-SPECIFIC
+
+    A first-class Agent Server service/resource concept has no first-class
+    equivalent in the inspected protocol contract.
+
+
+D — PROTOCOL-SPECIFIC
+
+    A first-class interaction-protocol abstraction has no equivalent
+    resource abstraction in the Agent Server REST model.
+~~~
+
+These classifications describe the pinned contracts under study.
+
+They are not claims about every possible agent protocol or deployment system.
+
+## Methodological note — lexical presence is insufficient
+
+A preliminary lexical comparison was useful for discovery but produced both
+false positives and false negatives.
+
+For example:
+
+~~~text
+protocol "store" = lexical YES
+~~~
+
+was a false positive caused by words such as:
+
+~~~text
+restored
+~~~
+
+No Store resource or Store command exists in the inspected
+`langchain-protocol` contract.
+
+Likewise:
+
+~~~text
+SDK "state read" = lexical NO
+SDK "state fork" = lexical NO
+~~~
+
+were false negatives because the LangGraph SDK represents these concepts using
+different names and resource-oriented operations such as:
+
+~~~text
+ThreadsClient.get_state()
+ThreadsClient.get_history()
+ThreadsClient.update_state()
+checkpoint-based Run creation
+~~~
+
+The final mapping therefore uses source structure and semantics rather than
+substring presence.
+
+## Identity does not imply a resource contract
+
+Both contracts contain identifiers such as:
+
+~~~text
+assistant_id
+run_id
+thread_id
+checkpoint_id
+interrupt_id
+~~~
+
+but identifier presence does not imply that the corresponding concept is a
+first-class resource.
+
+This distinction is especially important for Assistant, Thread and Run.
+
+## Assistant
+
+### LangGraph Agent Server
+
+Assistant is a persisted, configurable and versionable resource.
+
+Its SDK model includes fields such as:
+
+~~~text
+assistant_id
+graph_id
+config
+context
+metadata
+version
+name
+description
+created_at
+updated_at
+~~~
+
+Service operations include:
+
+~~~text
+get
+create
+update
+delete
+search
+count
+get_versions
+set_latest
+get_graph
+get_schemas
+get_subgraphs
+~~~
+
+### LangChain Agent Streaming Protocol
+
+The protocol contains:
+
+~~~text
+assistant_id
+~~~
+
+inside:
+
+~~~text
+run.input
+~~~
+
+where it identifies the deployed graph/agent to execute.
+
+No Assistant CRUD, versioning or management resource is defined.
+
+### Classification
+
+~~~text
+Assistant identity
+    -> B — SEMANTIC ADAPTATION
+
+Assistant management resource
+    -> C — AGENT-SERVER-SPECIFIC
+~~~
+
+The protocol uses Assistant identity as an execution target but does not model
+the Agent Server's Assistant management lifecycle.
+
+## Thread
+
+### LangGraph Agent Server
+
+Thread is a persisted execution-lineage resource.
+
+Its SDK model includes:
+
+~~~text
+thread_id
+created_at
+updated_at
+metadata
+status
+values
+interrupts
+~~~
+
+Thread operations include:
+
+~~~text
+get
+create
+update
+delete
+search
+count
+copy
+prune
+get_state
+update_state
+get_history
+join_stream
+~~~
+
+### LangChain Agent Streaming Protocol
+
+The protocol does not expose a first-class Thread command or Thread resource.
+
+`thread_id` occurs only in limited contexts such as:
+
+~~~text
+message metadata
+state.fork result
+~~~
+
+This is insufficient to establish a Thread lifecycle contract.
+
+### Classification
+
+~~~text
+Thread resource
+    -> C — AGENT-SERVER-SPECIFIC
+
+thread_id
+    -> incidental protocol identity / result data
+~~~
+
+Thread identity must not be mistaken for a portable Thread resource model.
+
+## Run
+
+### LangGraph Agent Server
+
+Run is a persisted execution-attempt resource.
+
+Its SDK shape includes:
+
+~~~text
+run_id
+thread_id
+assistant_id
+created_at
+updated_at
+status
+metadata
+multitask_strategy
+~~~
+
+Runs can also be:
+
+~~~text
+created
+listed
+retrieved
+waited on
+streamed
+joined
+cancelled
+deleted
+batched
+~~~
+
+### LangChain Agent Streaming Protocol
+
+The protocol models execution through:
+
+~~~text
+run.input
+~~~
+
+with:
+
+~~~text
+assistant_id
+input
+config?
+metadata?
+~~~
+
+and returns:
+
+~~~text
+RunResult:
+    run_id?
+~~~
+
+`run_id` is subsequently used for operations such as reconnect.
+
+The protocol does not expose the full persisted Agent Server Run resource.
+
+### Classification
+
+~~~text
+Run execution identity
+    -> B — SEMANTIC ADAPTATION
+
+persisted Run management resource
+    -> C — AGENT-SERVER-SPECIFIC
+~~~
+
+A protocol Run is primarily an execution/interactivity handle.
+
+An Agent Server Run is additionally a persisted service resource.
+
+## Lifecycle
+
+The protocol defines Agent lifecycle states:
+
+~~~text
+started
+running
+completed
+failed
+interrupted
+~~~
+
+The LangGraph Agent Server defines Run statuses:
+
+~~~text
+pending
+running
+error
+success
+timeout
+interrupted
+~~~
+
+and separate Thread statuses:
+
+~~~text
+idle
+busy
+interrupted
+error
+~~~
+
+These vocabularies are not isomorphic.
+
+Examples include:
+
+~~~text
+Agent protocol:
+    completed
+
+Agent Server:
+    success
+~~~
+
+and:
+
+~~~text
+Agent Server:
+    pending
+    timeout
+
+Agent protocol:
+    no directly identical status
+~~~
+
+The Agent Server additionally maintains Thread lifecycle separately from Run
+lifecycle.
+
+### Classification
+
+~~~text
+execution lifecycle
+    -> B — SEMANTIC ADAPTATION
+
+ThreadStatus
+    -> C — AGENT-SERVER-SPECIFIC
+~~~
+
+A protocol adapter must define lifecycle mapping explicitly rather than reusing
+status values as identical enums.
+
+## State
+
+The protocol exposes:
+
+~~~text
+state.get
+~~~
+
+with namespace-scoped state selection.
+
+The Agent Server exposes Thread state through operations such as:
+
+~~~text
+get_state
+get_history
+update_state
+~~~
+
+and returns a richer execution snapshot containing:
+
+~~~text
+values
+next
+checkpoint
+parent_checkpoint
+tasks
+interrupts
+metadata
+~~~
+
+### Classification
+
+~~~text
+state inspection
+    -> A — DIRECT ANALOG
+~~~
+
+The essential capability exists on both sides, although scope and representation
+differ.
+
+A protocol namespace must not automatically be interpreted as a LangGraph Store
+namespace.
+
+## Checkpoints
+
+Both contracts represent checkpoint identity and lineage.
+
+The protocol checkpoint model includes:
+
+~~~text
+id
+parent_id
+step
+source
+~~~
+
+and checkpoint references/summaries.
+
+The LangGraph API uses checkpoint configuration including:
+
+~~~text
+thread_id
+checkpoint_ns
+checkpoint_id
+checkpoint_map
+~~~
+
+and its ThreadState exposes checkpoint and parent-checkpoint references.
+
+### Classification
+
+~~~text
+checkpoint identity / lineage
+    -> A — DIRECT ANALOG
+~~~
+
+The wire schemas differ, but the essential durable execution-position concept is
+shared.
+
+## State fork and time travel
+
+The protocol explicitly exposes:
+
+~~~text
+state.fork
+~~~
+
+using a checkpoint ID and optional new input/config.
+
+The Agent Server already demonstrated historical checkpoint execution and
+branching in the earlier Runtime experiments.
+
+### Classification
+
+~~~text
+state fork / execution branching
+    -> A — DIRECT ANALOG
+~~~
+
+The two systems expose the same essential operation: continue execution from a
+historical durable state without destructively replacing the original lineage.
+
+## Human-in-the-loop
+
+The protocol exposes:
+
+~~~text
+input.requested
+        |
+        v
+input.respond
+~~~
+
+using:
+
+~~~text
+interrupt_id
+namespace
+response
+~~~
+
+It separately exposes:
+
+~~~text
+input.inject
+~~~
+
+The Runtime experiments previously established graph-level interrupts and
+resume commands.
+
+### Classification
+
+~~~text
+human input request / response
+    -> A — DIRECT ANALOG
+~~~
+
+The exact command representation differs, but the durable pause/respond/resume
+interaction is shared.
+
+`input.inject` is a distinct protocol operation and must not be conflated with
+responding to an existing interrupt.
+
+## Reconnect and replay
+
+The protocol exposes:
+
+~~~text
+subscription.reconnect
+    run_id
+    last_event_id?
+    subscriptions?
+~~~
+
+and event metadata can include:
+
+~~~text
+event_id
+seq
+~~~
+
+The LangGraph Runtime uses SSE and `Last-Event-ID`.
+
+Earlier experiments established that its resumable SSE cursor IDs behave as
+cursor groups: multiple semantic events may share one cursor.
+
+### Classification
+
+~~~text
+reconnect / replay capability
+    -> B — SEMANTIC ADAPTATION
+~~~
+
+The underlying goal is shared, but replay and subscription semantics are not
+identical.
+
+A protocol adapter must preserve each side's replay guarantees rather than
+assuming an event-for-event cursor mapping.
+
+## Agent and subagent topology
+
+The protocol defines:
+
+~~~text
+agent.getTree
+~~~
+
+and:
+
+~~~text
+AgentTreeNode:
+    namespace
+    status
+    graph_name
+    children?
+    metadata?
+~~~
+
+Lifecycle causes can represent:
+
+~~~text
+toolCall
+send
+edge
+~~~
+
+The Agent Server REST API exposes graph and subgraph introspection, but the
+inspected resource model does not expose an equivalent live AgentTree resource
+with the same command and lifecycle semantics.
+
+### Classification
+
+~~~text
+live Agent/subagent interaction tree
+    -> D — PROTOCOL-SPECIFIC
+~~~
+
+This is a protocol-level abstraction over active agent topology rather than an
+Agent Server management resource.
+
+## Subscription and channel model
+
+The LangChain Agent Streaming Protocol defines explicit:
+
+~~~text
+subscription.subscribe
+subscription.unsubscribe
+subscription.reconnect
+~~~
+
+with channels including:
+
+~~~text
+values
+updates
+messages
+tools
+lifecycle
+input
+checkpoints
+tasks
+custom
+~~~
+
+The LangGraph Runtime has streaming modes and SSE attachment surfaces, but it
+does not expose this subscription command model in the inspected Agent Server
+source.
+
+### Classification
+
+~~~text
+subscription command model
+    -> D — PROTOCOL-SPECIFIC
+~~~
+
+Conceptual streaming overlap does not make the transport contracts identical.
+
+## Store
+
+The LangGraph Agent Server exposes a first-class Store API with operations such
+as:
+
+~~~text
+put_item
+get_item
+delete_item
+search_items
+list_namespaces
+~~~
+
+The inspected LangChain Agent Streaming Protocol contains no first-class Store
+resource or Store commands.
+
+### Classification
+
+~~~text
+Store
+    -> C — AGENT-SERVER-SPECIFIC
+~~~
+
+Protocol state namespaces must not be treated as Store namespaces.
+
+## Service-management concepts without first-class protocol equivalents
+
+The following concepts are exposed by the Agent Server SDK but have no
+first-class equivalent in the inspected protocol contract:
+
+| Agent Server concept | Classification |
+| --- | --- |
+| Assistant CRUD | C — Agent-Server-specific |
+| Assistant versioning | C — Agent-Server-specific |
+| Thread CRUD | C — Agent-Server-specific |
+| Thread status | C — Agent-Server-specific |
+| Thread copy / prune | C — Agent-Server-specific |
+| Run list / get / delete / batch | C — Agent-Server-specific |
+| Store CRUD / namespace listing | C — Agent-Server-specific |
+| Cron | C — Agent-Server-specific |
+| `durability=sync/async/exit` | C — Agent-Server-specific |
+| multitask strategy | C — Agent-Server-specific |
+| `reject` / `enqueue` | C — Agent-Server-specific |
+| lifecycle `interrupt` / `rollback` cancellation | C — Agent-Server-specific |
+| delayed execution / `after_seconds` | C — Agent-Server-specific |
+| webhook | C — Agent-Server-specific |
+| stateless `on_completion` policy | C — Agent-Server-specific |
+| resource search / count | C — Agent-Server-specific |
+| `interrupt_before` / `interrupt_after` breakpoints | C — Agent-Server-specific |
+
+These concepts primarily belong to service operation, persistence policy,
+scheduling, resource administration or LangGraph execution control.
+
+Their absence from the protocol does not mean that an application cannot
+communicate related information through generic metadata/config/custom fields.
+
+It means that they are not first-class contract concepts in the inspected
+protocol version.
+
+## Consolidated mapping
+
+~~~text
+DIRECT ANALOG
+    state inspection
+    checkpoints
+    state fork / branching
+    HITL request / response
+
+SEMANTIC ADAPTATION
+    Assistant execution identity
+    Run execution identity
+    execution lifecycle
+    replay / reconnect
+
+AGENT-SERVER-SPECIFIC
+    Assistant resource management
+    Thread resource
+    Thread status
+    persisted Run resource management
+    Store
+    Cron
+    durability
+    multitask strategies
+    cancellation rollback policy
+    delayed scheduling
+    webhooks
+    on-completion policy
+    resource search / count / prune
+    execution breakpoints
+
+PROTOCOL-SPECIFIC
+    subscription command model
+    protocol channel model
+    live agent/subagent tree
+    lifecycle causation model
+~~~
+
+## Architectural interpretation
+
+The two contracts optimize for different responsibilities.
+
+~~~text
+LangGraph Agent Server REST API
+    |
+    +-- persistence
+    +-- resource management
+    +-- scheduling
+    +-- concurrency policy
+    +-- deployment/runtime operation
+    +-- execution inspection
+
+
+LangChain Agent Streaming Protocol
+    |
+    +-- execution interaction
+    +-- lifecycle observation
+    +-- streamed messages/tools/state
+    +-- reconnect
+    +-- human input
+    +-- checkpoint interaction
+    +-- agent/subagent topology
+~~~
+
+There is meaningful conceptual overlap, but neither contract is a subset-shaped
+copy of the other.
+
+An adapter between them would be a semantic translation layer.
+
+It could not be implemented correctly as simple schema renaming.
+
+## Evidence classification
+
+~~~text
+[SOURCE VALIDATED]
+
+Agent Server SDK:
+    persisted Assistant / Thread / Run resources
+    service-management clients
+    Store
+    Cron
+    concurrency and durability controls
+
+LangChain Agent Streaming Protocol:
+    run input / run ID
+    subscriptions
+    lifecycle
+    state
+    checkpoints
+    fork
+    HITL input
+    agent tree
+    reconnect
+
+[SOURCE + PRIOR RUNTIME VALIDATED]
+
+state/checkpoint branching
+HITL
+SSE reconnect/replay
+Runtime lifecycle
+Thread lifecycle
+multitask strategies
+durability
+
+[INFERENCE]
+
+A correct bridge between the Agent Server and the LangChain Agent Streaming
+Protocol requires explicit semantic adaptation for lifecycle, identity and
+replay behavior.
+~~~
+
+## 1.5B conclusion
+
+The Agent Server REST API is primarily a stateful service/resource-management
+contract.
+
+The LangChain Agent Streaming Protocol is primarily an agent-interaction and
+event contract.
+
+Their overlap is real but selective.
+
+The next investigation should identify where the Agent Server deliberately
+exposes independent protocol integrations and how those integrations obtain
+graph schemas and execution context without collapsing their contracts into the
+REST resource model.
