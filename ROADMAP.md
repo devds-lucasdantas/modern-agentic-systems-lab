@@ -89,6 +89,10 @@
   - [x] 1.7C Runtime execution and persistence semantics
   - [x] 1.7D Error projection, edge cases and final boundary
 - [ ] 1.8 A2A
+  - [x] 1.8A Protocol, adapter and projection inventory
+  - [x] 1.8B Agent Card, versioning and compatibility behavior
+  - [x] 1.8C Task lifecycle, HITL and persistence semantics
+  - [ ] 1.8D Streaming and final A2A boundary
 
 ### Phase review
 

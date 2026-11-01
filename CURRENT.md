@@ -724,20 +724,124 @@ Source inspection and live tests validated:
 - the architectural difference between the pinned 2025-era adapter and MCP
   `2026-07-28`.
 
-## Current block — 1.8 A2A
+## Completed sub-block — 1.8A A2A protocol and adapter inventory
+
+The pinned Agent Server adapter targets A2A protocol 1.0 and also provides an
+explicit v0.x compatibility bridge.
+
+~~~text
+Assistant -> A2A Agent
+Thread    -> A2A Context
+Run       -> A2A Task
+~~~
+
+The adapter directly reuses Agent Server Assistants, Threads, Runs, checkpoint
+history and streaming primitives.
+
+Source inspection also found partial legacy wire-format behavior despite the
+advertised 1.0 interface, including legacy `kind` discriminators and a
+TaskStatusUpdateEvent `final` field.
+
+## Completed sub-blocks — 1.8A–1.8B A2A
+
+The pinned adapter targets A2A 1.0 while retaining an explicit v0.x
+compatibility layer.
+
+Live testing confirmed:
+
+~~~text
+Assistant -> Agent Card
+Thread    -> contextId
+Run       -> Task
+~~~
+
+Agent Card discovery paths and GetExtendedAgentCard return equivalent Cards.
+
+The Card advertises protocol 1.0, but A2A-Version is not enforced: supported,
+unsupported and absent version headers behave equivalently.
+
+Canonical SendMessage accepts v1 member-based Parts and returns the v1
+SendMessageResponse task wrapper with prefixed v1 enums.
+
+Legacy message/send remains supported and returns a direct Task with legacy
+lowercase enums.
+
+Canonical output still contains legacy `kind` fields in nested Task, Message
+and Part objects.
+
+Both paths create persistent Threads and Runs and block through runs.join.
+
+## Completed sub-blocks — 1.8A–1.8C A2A
+
+The pinned adapter targets A2A 1.0 while retaining an explicit v0.x
+compatibility layer.
+
+Live testing established the core projection:
+
+~~~text
+Assistant -> Agent
+Thread    -> Context
+Run       -> Task
+~~~
+
+but also demonstrated that a Runtime Run is not sufficient to represent a
+durable logical A2A Task.
+
+Key lifecycle findings include:
+
+~~~text
+A2A-Version
+    advertised but not enforced
+
+returnImmediately
+    accepted but ignored
+
+GetTask(historyLength=0)
+    returns the complete history
+
+ListTasks artifacts
+    incomplete projection
+
+terminal CancelTask
+    synthetic CANCELED acknowledgement
+    persistent Run remains success
+
+dynamic LangGraph interrupt
+    Run success + Thread interrupted
+    -> INPUT_REQUIRED + Interrupt Artifact
+
+A2A resume
+    same logical Task and Context
+    second physical Runtime Run
+
+post-resume retrieval
+    exposes a phantom continuation Task
+
+active CancelTask
+    CancelTask  -> CANCELED
+    SendMessage -> FAILED(UserInterrupt)
+    GetTask     -> INPUT_REQUIRED
+    Runtime     -> interrupted
+~~~
+
+The active-cancel experiment also showed that lifecycle interruption and
+resumable graph interruption are different semantics despite sharing the
+Runtime `interrupted` status.
+
+## Current sub-block — 1.8D Streaming and final A2A boundary
 
 Questions:
 
-1. What A2A specification/version does the pinned Agent Server adapter target?
-2. How does an Assistant become an A2A Agent?
-3. How do A2A contextId and task IDs map onto Thread and Run identities?
-4. How do message/send and message/stream create and consume Runs?
-5. How do tasks/get and tasks/cancel project Agent Server lifecycle semantics?
-6. How are Thread interrupts represented as A2A input-required states?
-7. Which message parts and schemas are supported by the pinned adapter?
-8. How is the Agent Card derived from Assistant and Graph schemas?
-9. Which A2A semantics are portable versus LangGraph-specific projection policy?
-10. How does A2A differ architecturally from MCP?
+1. What exact SSE sequence does canonical SendStreamingMessage emit?
+2. Which LangGraph stream events become A2A Task, status and artifact events?
+3. Does the stream begin with the required initial Task?
+4. What states are emitted during a successful execution?
+5. How are dynamic interrupts represented in the stream?
+6. Does streaming resume preserve logical Task identity?
+7. How do canonical SendStreamingMessage and legacy message/stream differ?
+8. Which legacy `kind` and `final` fields remain in streaming output?
+9. How does stream cancellation interact with Runtime lifecycle state?
+10. What is the final boundary between Agent Server semantics and portable A2A?
 
 ## Reference environment
 
