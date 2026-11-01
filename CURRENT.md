@@ -877,31 +877,79 @@ Detailed evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current sub-block — 2.1B Runtime domain model
+## Completed sub-block — 2.1B Runtime domain model
 
-The next step is to define the browser-side representation of the Runtime
-without collapsing distinct service concepts into generic chat state.
-
-Initial domain concepts:
+A transport-independent frontend Runtime domain now exists under:
 
 ~~~text
-Assistant
-Thread
-Run
-ThreadState
-Checkpoint
-Interrupt
-Message
+apps/web/src/domain/
 ~~~
 
-Questions:
+The model preserves the principal Phase 1 boundaries:
 
-1. Which fields belong to stable frontend domain types?
-2. Which fields are transport-only representations?
-3. How should Run lifecycle and graph execution position remain separate?
-4. How should Thread identity differ from Run identity in client state?
-5. How should graph/HITL interrupts differ from lifecycle cancellation?
-6. Which protocol-specific fields must remain outside the core domain model?
+~~~text
+AssistantId != ThreadId != RunId
+
+RunStatus
+    !=
+GraphPosition
+
+GraphInterrupt
+    !=
+LifecycleCancellation
+
+CheckpointId
+    !=
+logical step number
+~~~
+
+Branded identifiers were compile-time validated.
+
+The domain passed:
+
+~~~text
+pnpm lint
+pnpm build
+~~~
+
+and contains no LangGraph SDK, AG-UI, A2A, MCP or wire-transport dependency.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current sub-block — 2.1C Agent Server REST client baseline
+
+The next step introduces the transport boundary without allowing Agent Server
+wire schemas to become the frontend domain model.
+
+Target layering:
+
+~~~text
+Agent Server REST
+      |
+      v
+transport DTOs
+      |
+      v
+normalization / mappers
+      |
+      v
+frontend domain
+~~~
+
+Initial questions:
+
+1. What exact pinned Agent Server JSON shapes must the browser support?
+2. Which REST fields are wire-only and should not enter the domain?
+3. How should snake_case transport fields map into frontend naming?
+4. How should unknown or future fields be handled?
+5. What error model should the REST client expose?
+6. Can the first client work without the modern LangGraph JavaScript SDK?
+7. How should the Agent Server base URL be configured for development without
+   hard-coding environment-specific values?
 
 Phase 2 will build the client-facing layer over the Runtime contracts established
 during Phase 1.
