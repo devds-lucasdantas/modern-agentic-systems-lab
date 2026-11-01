@@ -868,6 +868,6 @@ That section will introduce:
 wire DTOs
 normalization
 Agent Server client
-```
+~~~
 
 without changing the domain model to mirror transport schemas.
