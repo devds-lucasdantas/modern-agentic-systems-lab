@@ -1124,7 +1124,7 @@ Which of these Runtime concepts belong to reusable protocol contracts, and which
 are LangGraph-specific implementation details?
 ~~~
 
-### Version 0.4 — Agent Server protocol boundary
+## Version 0.5 — Agent Server protocol boundary
 
 Phase 1 section 1.5 established the boundary between the Agent Server service
 contract and interoperability protocols.
@@ -1186,7 +1186,7 @@ implementation of that contract.
 This boundary is the handoff from Runtime/service architecture to the
 protocol-specific remainder of Phase 1.
 
-### Version 0.5 — Agent Streaming Protocol boundary
+## Version 0.6 — Agent Streaming Protocol boundary
 
 Phase 1 section 1.6 established the Agent Streaming Protocol as a contract
 distinct from the Agent Server REST API.
@@ -1260,7 +1260,7 @@ MCP and A2A
     -> interoperability projections over Agent Server execution
 ~~~
 
-### Version 0.6 — MCP interoperability projection
+## Version 0.7 — MCP interoperability projection
 
 Phase 1 section 1.7 established MCP as a narrow interoperability projection
 over the Agent Server service and execution boundaries.
@@ -1346,4 +1346,363 @@ Agent Streaming Protocol
 
 MCP
     -> narrow stateless capability projection over Assistants and Runs
+~~~
+
+## Version 0.8 — A2A interoperability projection
+
+Phase 1 section 1.8 established A2A as a stateful interoperability projection
+over Agent Server execution rather than an independent Task engine.
+
+The simple projection is:
+
+~~~text
+Assistant
+    -> A2A Agent / Agent Card
+
+Thread
+    -> A2A Context
+
+Run
+    -> initial approximation of A2A Task
+~~~
+
+A2A execution reuses persistent Agent Server resources:
+
+~~~text
+SendMessage
+    -> Thread
+    -> persistent Run
+    -> runs.join
+
+SendStreamingMessage
+    -> Thread
+    -> persistent Run
+    -> runs.stream
+~~~
+
+Unlike MCP, A2A exposes the persistent execution identity rather than hiding a
+temporary Runtime-managed Thread.
+
+### A2A HITL
+
+A resumable LangGraph graph interrupt maps naturally to:
+
+~~~text
+Run.status     = success
+Thread.status  = interrupted
+Thread.interrupts = populated
+        |
+        v
+A2A Task
+    = INPUT_REQUIRED
+    + Interrupt Artifact
+~~~
+
+This is distinct from Runtime lifecycle cancellation:
+
+~~~text
+runs.cancel(action="interrupt")
+        |
+        v
+Run.status     = interrupted
+Thread.status  = interrupted
+Thread.error   = UserInterrupt
+Thread.interrupts = {}
+~~~
+
+The two cases must not be projected to the same semantic state merely because
+the Runtime uses the word `interrupted` for both.
+
+### A2A logical Task identity
+
+The central A2A identity finding is:
+
+~~~text
+A2A Task != Runtime Run
+~~~
+
+A logical Task can span multiple Runs:
+
+~~~text
+Task A
+    |
+    +-- Run A
+    |      |
+    |      +-- INPUT_REQUIRED
+    |
+    +-- Run B
+           |
+           +-- resume
+           |
+           +-- COMPLETED
+~~~
+
+During blocking and streaming resume, the adapter preserves Task A correctly.
+
+Persistent retrieval does not retain the Run-A-to-Run-B continuation relation:
+
+~~~text
+GetTask / ListTasks
+
+Run A
+    -> Task A
+
+Run B
+    -> synthesized phantom continuation Task B
+~~~
+
+A lossless A2A implementation therefore requires durable protocol-level Task
+state capable of associating multiple physical Runs with one logical Task.
+
+### A2A compatibility boundary
+
+The pinned adapter advertises A2A 1.0 but retains substantial v0.x compatibility
+behavior.
+
+Observed gaps include:
+
+~~~text
+A2A-Version
+    -> advertised but not enforced
+
+returnImmediately
+    -> accepted but ignored
+
+canonical streaming
+    -> v1 wrapper/enums
+    -> legacy kind/final events
+
+historyLength=0
+    -> inconsistent
+
+ListTasks artifacts
+    -> incomplete
+
+terminal CancelTask
+    -> synthetic CANCELED response
+
+active CancelTask
+    -> CANCELED / FAILED / INPUT_REQUIRED split
+~~~
+
+These are pinned-adapter observations and must not be generalized into the A2A
+protocol itself.
+
+## Version 0.9 — Phase 1 consolidated Runtime and protocol architecture
+
+Phase 1 establishes four distinct architectural contracts over one execution
+substrate.
+
+~~~text
+                         external consumers
+                                |
+        +-----------------------+-----------------------+
+        |                       |                       |
+        v                       v                       v
+ LangGraph clients       protocol clients       protocol clients
+        |                       |                       |
+        v                       v                       v
+  langgraph-sdk          Agent Streaming              MCP / A2A
+        |                   Protocol                    |
+        v                       |                       |
+ Agent Server REST             |                 protocol adapters
+        |                       |                       |
+        +-----------------------+-----------------------+
+                                |
+                                v
+                         Runtime execution
+                                |
+             +------------------+------------------+
+             |                  |                  |
+             v                  v                  v
+           Graph             scheduler         persistence
+             |                                     |
+             v                              +------+------+
+            Run                             |             |
+             |                              v             v
+             v                        Checkpointer       Store
+           Thread
+~~~
+
+### Agent Server REST
+
+Agent Server is the persistent service and resource contract.
+
+It owns:
+
+~~~text
+Assistant
+Thread
+Run
+ThreadState
+Checkpoint
+Store
+Cron
+
+scheduling
+multitask policy
+delayed execution
+durability
+cancellation
+rollback
+authentication
+persistence
+~~~
+
+Execution submission and result-consumption surfaces are different views over
+the same Run primitive, not separate workflow engines.
+
+### Agent Streaming Protocol
+
+The Agent Streaming Protocol is a separate Thread-centric command/event
+interaction contract.
+
+Its concepts include:
+
+~~~text
+run.input
+subscriptions
+reconnect
+event sequence coordinates
+state
+checkpoints
+state.fork
+HITL input
+agent topology
+message streaming
+tool streaming
+~~~
+
+The pinned Agent Server REST/SSE implementation is not itself the pinned
+`langchain-protocol 0.0.12` transport.
+
+### MCP
+
+MCP is a narrow stateless capability projection.
+
+~~~text
+Assistant
+    -> Tool
+
+tools/call
+    -> temporary Runtime-managed Thread
+    -> temporary Run
+    -> Graph execution
+    -> lossy Tool result
+~~~
+
+MCP does not introduce a second execution engine or persistent protocol Task
+model.
+
+### A2A
+
+A2A is a persistent Agent/Context/Task interoperability projection.
+
+~~~text
+Assistant -> Agent
+Thread    -> Context
+Runs      -> physical execution beneath logical Tasks
+~~~
+
+For simple calls one Run can approximate one Task.
+
+For resumable workflows:
+
+~~~text
+one logical Task
+    -> multiple Runs
+~~~
+
+Therefore protocol identity and Runtime execution identity are different
+dimensions.
+
+### Cross-layer invariants
+
+The architecture carries the following invariants forward:
+
+~~~text
+Graph != Assistant
+
+Thread != Run
+
+Run success != graph END
+
+Thread.status != authoritative execution lock
+
+Checkpointer != Store
+
+StateBackend != FilesystemBackend != StoreBackend
+
+stateless API != execution without a Thread
+
+Runtime lifecycle interrupt != graph/HITL interrupt
+
+Agent Server REST != Agent Streaming Protocol
+
+MCP != Agent Server Runtime
+
+A2A Task != Runtime Run
+
+protocol adapter != execution engine
+~~~
+
+### Persistence ownership
+
+Registered Agent Server graphs do not own production persistence infrastructure.
+
+~~~text
+registered graph
+    |
+    +-- embedded production Checkpointer = none
+    |
+    +-- embedded production Store = none
+    |
+    v
+Agent Server Runtime
+    |
+    +-- owns execution checkpoint persistence
+    |
+    +-- supplies Runtime Store
+~~~
+
+Standalone tests may explicitly inject in-memory persistence when they execute
+outside the registered Agent Server ownership boundary.
+
+### Architectural decisions
+
+The consolidated model is supported by the repository ADRs:
+
+- [ADR 0001 — Dedicated learning repository](adr/0001-learning-repository.md);
+- [ADR 0002 — Runtime-owned persistence for registered graphs](adr/0002-runtime-owned-persistence.md);
+- [ADR 0003 — Keep Runtime APIs and interoperability protocols distinct](adr/0003-runtime-and-protocol-boundaries.md).
+
+The detailed Phase 1 reconciliation is recorded in
+[Lab 17 — Phase 1 Review](journal/lab-17-phase-1-review.md).
+
+### Phase 2 handoff
+
+Phase 2 can now treat Runtime and protocol behavior as established substrate.
+
+The next problem is no longer:
+
+~~~text
+How does agent execution work?
+~~~
+
+It becomes:
+
+~~~text
+How should a frontend consume, represent and control that execution model?
+~~~
+
+That includes:
+
+~~~text
+frontend application
+event streaming
+shared state
+interrupt UX
+frontend tools
+AG-UI
+generative UI patterns
 ~~~

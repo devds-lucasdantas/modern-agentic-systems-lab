@@ -724,24 +724,6 @@ Source inspection and live tests validated:
 - the architectural difference between the pinned 2025-era adapter and MCP
   `2026-07-28`.
 
-## Completed sub-block — 1.8A A2A protocol and adapter inventory
-
-The pinned Agent Server adapter targets A2A protocol 1.0 and also provides an
-explicit v0.x compatibility bridge.
-
-~~~text
-Assistant -> A2A Agent
-Thread    -> A2A Context
-Run       -> A2A Task
-~~~
-
-The adapter directly reuses Agent Server Assistants, Threads, Runs, checkpoint
-history and streaming primitives.
-
-Source inspection also found partial legacy wire-format behavior despite the
-advertised 1.0 interface, including legacy `kind` discriminators and a
-TaskStatusUpdateEvent `final` field.
-
 ## Completed block — 1.8 A2A
 
 The A2A adapter was analyzed from source and live behavior across:
@@ -812,20 +794,87 @@ legacy streaming
 A lossless adapter would require durable protocol-level Task state relating
 multiple Runtime Runs to one A2A Task.
 
-## Current sub-block — Phase 1 review
+## Completed phase — Phase 1 — Agent Runtime & Protocols
 
-Questions:
+Phase 1 is complete.
 
-1. Are all Phase 1 roadmap items complete and internally consistent?
-2. Do the Agent Server, streaming protocol, MCP and A2A conclusions agree?
-3. Are any experiments missing reproducibility evidence?
-4. Are terminology and architectural diagrams consistent across journals?
-5. Are temporary fixtures and generated artifacts fully cleaned up?
-6. Does the root repository pass documentation and structural checks?
-7. What is the final Phase 1 architecture model?
-8. What decisions should be promoted into ADRs or the architecture reference?
-9. What technical debt should be carried into the next phase?
-10. Is Phase 1 ready for a final versioned checkpoint?
+The final review is recorded in:
+
+~~~text
+docs/journal/lab-17-phase-1-review.md
+~~~
+
+The consolidated architecture is recorded in:
+
+~~~text
+docs/architecture.md
+    Version 0.9 — Phase 1 consolidated Runtime and protocol architecture
+~~~
+
+Phase 1 promoted two additional architectural decisions:
+
+~~~text
+ADR 0002
+    Runtime-owned persistence for registered graphs
+
+ADR 0003
+    Keep Runtime APIs and interoperability protocols distinct
+~~~
+
+Core invariants carried into the next phase include:
+
+~~~text
+Graph != Assistant
+Thread != Run
+Run success != graph END
+Checkpointer != Store
+Thread.status != authoritative execution lock
+
+stateless API
+    != execution without a Thread
+
+Runtime lifecycle interrupt
+    != graph/HITL interrupt
+
+Agent Server REST
+    != Agent Streaming Protocol
+
+MCP / A2A adapter
+    != execution engine
+
+A2A Task
+    != Runtime Run
+~~~
+
+## Current phase — Phase 2 — Agent ↔ UI
+
+The next roadmap item is:
+
+~~~text
+Frontend application
+~~~
+
+Phase 2 will build the client-facing layer over the Runtime contracts established
+during Phase 1.
+
+The initial architectural question is:
+
+~~~text
+How should a frontend observe, represent and control Agent Server execution
+without collapsing Run, Thread, graph state and protocol semantics into one
+client-side concept?
+~~~
+
+The Phase 2 roadmap then continues through:
+
+~~~text
+Event streaming
+Shared state
+Interrupts
+Frontend tools
+AG-UI
+Generative UI patterns
+~~~
 
 ## Reference environment
 

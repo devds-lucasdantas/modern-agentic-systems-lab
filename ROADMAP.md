@@ -96,7 +96,7 @@
 
 ### Phase review
 
-- [ ] 1.9 Runtime and protocols review
+- [x] 1.9 Runtime and protocols review
 
 ## Phase 2 — Agent ↔ UI
 

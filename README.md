@@ -92,78 +92,75 @@ when the laboratory introduces them, rather than being scaffolded prematurely.
 
 ## Current status
 
-The project is currently in **Phase 1 — Agent Runtime & Protocols**.
+The project has completed **Phase 1 — Agent Runtime & Protocols** and is entering
+**Phase 2 — Agent ↔ UI**.
 
-### Runtime foundations
+### Phase 1 completed
 
-Completed:
+Validated and consolidated:
 
-- ✅ Agent, Thread and Run
-- ✅ State and checkpoints
-- ✅ Store and persistence
-- ✅ Streaming
-- ✅ Run cancellation and rollback semantics
-- ✅ Multitask strategies and supersession
-- ✅ Per-Thread scheduling and serialization
-- ✅ Background Runs and durability
+- ✅ Runtime API contracts;
+- ✅ Agent, Thread and Run resource model;
+- ✅ State, checkpoints and Store persistence;
+- ✅ Run lifecycle and execution-control semantics;
+- ✅ SSE streaming, replay and disconnect behavior;
+- ✅ multitask strategies and per-Thread scheduling;
+- ✅ background execution and durability;
+- ✅ Agent Server API boundary;
+- ✅ LangChain Agent Streaming Protocol boundary;
+- ✅ MCP interoperability;
+- ✅ A2A interoperability;
+- ✅ Phase 1 architectural review.
 
-In progress:
+The consolidated architecture distinguishes:
 
-- ✅ Agent Server API boundary and interoperability mapping
+~~~text
+Agent Server REST
+    -> persistent resource and execution service
 
-Next:
+Agent Streaming Protocol
+    -> Thread-centric command/event interaction contract
 
-- ✅ LangChain Agent Streaming Protocol
-- ✅ MCP
-- 🚧 A2A
+MCP
+    -> stateless capability projection over Runtime execution
 
-### Runtime model validated so far
+A2A
+    -> persistent Agent/Context/Task interoperability projection
+~~~
 
-```text
-registered Graph
-      |
-      v
-  Assistant
-      |
-      v
-     Run
-      |
-      +----------------------+
-      |                      |
-      v                      v
-   Thread                stream / wait
-      |
-      v
-State / Checkpoints
+Key invariants carried forward include:
 
-Store
-  |
-  +-- independent cross-thread persistence
-```
+- stateless Runs still execute through Runtime-managed Threads;
+- Run lifecycle status is distinct from persisted graph execution position;
+- `Run.status=success` does not necessarily mean graph `END`;
+- `Checkpointer != Store`;
+- `Thread.status` is not an authoritative concurrency lock;
+- Runtime lifecycle interruption is distinct from graph/HITL interruption;
+- Agent Server REST is not the Agent Streaming Protocol;
+- MCP and A2A are protocol projections, not alternate graph executors;
+- `A2A Task != Runtime Run`.
 
-Key findings include:
+### Current phase — Agent ↔ UI
 
-- stateful and stateless Runs share the same underlying Run execution model;
-- stateless Runs still use Runtime-managed Threads;
-- Run lifecycle and persisted graph execution position are separate dimensions;
-- `Run.status=success` does not necessarily mean the graph reached `END`;
-- checkpoint history supports resume, time travel and branching;
-- Store persistence is independent from checkpoint persistence;
-- resumable SSE streams use cursor groups rather than unique event IDs;
-- `interrupt` preserves partial state while `rollback` restores prior state;
-- `enqueue` is scheduled per-Thread serialized execution, ordered by eligible
-  `created_at`, not strict HTTP submission FIFO;
-- `Thread.status` is a denormalized lifecycle projection and must not be treated
-  as an authoritative in-flight Run index.
+The next roadmap block is:
 
-The current experiment block is:
+~~~text
+Phase 2 — Agent ↔ UI
+    -> Frontend application
+    -> Event streaming
+    -> Shared state
+    -> Interrupts
+    -> Frontend tools
+    -> AG-UI
+    -> Generative UI patterns
+~~~
 
-```text
-Agent Server API boundary
-    -> Runtime-specific vs portable concepts
-    -> interoperability mapping
-    -> protocol integration boundary
-```
+The central next question is:
+
+~~~text
+How should a frontend observe, represent and control the Runtime model
+validated during Phase 1?
+~~~
 
 See [`CURRENT.md`](CURRENT.md) for the exact continuation point and
 [`ROADMAP.md`](ROADMAP.md) for the full learning path.
