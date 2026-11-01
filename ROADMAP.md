@@ -100,13 +100,20 @@
 
 ## Phase 2 — Agent ↔ UI
 
-- [ ] Frontend application
-- [ ] Event streaming
-- [ ] Shared state
-- [ ] Interrupts
-- [ ] Frontend tools
-- [ ] AG-UI
-- [ ] Generative UI patterns
+- [ ] 2.1 Frontend application
+  - [x] 2.1A Frontend stack and scaffold
+  - [ ] 2.1B Runtime domain model
+  - [ ] 2.1C Agent Server REST client baseline
+  - [ ] 2.1D Application shell
+  - [ ] 2.1E First execution surface
+  - [ ] 2.1F Frontend baseline review
+
+- [ ] 2.2 Event streaming
+- [ ] 2.3 Shared state
+- [ ] 2.4 Interrupts
+- [ ] 2.5 Frontend tools
+- [ ] 2.6 AG-UI
+- [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE
 

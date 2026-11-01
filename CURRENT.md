@@ -848,11 +848,60 @@ A2A Task
 
 ## Current phase — Phase 2 — Agent ↔ UI
 
-The next roadmap item is:
+## Completed sub-block — 2.1A Frontend stack and scaffold
+
+The greenfield frontend baseline is established under:
 
 ~~~text
-Frontend application
+apps/web/
 ~~~
+
+Validated stack:
+
+~~~text
+React       19.3.1
+TypeScript  7.0.2
+Vite        8.3.5
+Node        24.15.0
+pnpm        10.6.2
+~~~
+
+Both lint and production build pass.
+
+The frontend currently contains no LangGraph SDK, AG-UI integration,
+state-management abstraction or Agent Server client.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current sub-block — 2.1B Runtime domain model
+
+The next step is to define the browser-side representation of the Runtime
+without collapsing distinct service concepts into generic chat state.
+
+Initial domain concepts:
+
+~~~text
+Assistant
+Thread
+Run
+ThreadState
+Checkpoint
+Interrupt
+Message
+~~~
+
+Questions:
+
+1. Which fields belong to stable frontend domain types?
+2. Which fields are transport-only representations?
+3. How should Run lifecycle and graph execution position remain separate?
+4. How should Thread identity differ from Run identity in client state?
+5. How should graph/HITL interrupts differ from lifecycle cancellation?
+6. Which protocol-specific fields must remain outside the core domain model?
 
 Phase 2 will build the client-facing layer over the Runtime contracts established
 during Phase 1.
