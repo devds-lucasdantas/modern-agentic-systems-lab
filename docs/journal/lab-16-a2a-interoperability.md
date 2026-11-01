@@ -1006,19 +1006,552 @@ Runtime Run
 A correct adapter requires a durable logical Task layer capable of relating
 multiple Runtime Runs and preserving protocol-specific lifecycle state.
 
-## Current conclusion
+## 1.8D — Streaming and final A2A boundary
 
-A2A is a stateful projection over Assistant, Thread, Run and checkpoint
-semantics.
+### Canonical SendStreamingMessage happy path
+
+A deterministic graph was streamed through canonical `SendStreamingMessage`.
+
+The HTTP response used:
 
 ~~~text
-Assistant -> Agent
-Thread    -> Context
-Run       -> Task
+200 OK
+Content-Type: text/event-stream
+Transfer-Encoding: chunked
 ~~~
 
-Sections 1.8A through 1.8C are complete.
+and the persistent Runtime Run used:
 
-The final sub-block studies SendStreamingMessage, SSE event ordering,
-interrupt streaming, legacy compatibility and the final A2A interoperability
-boundary.
+~~~text
+stream_mode = ["messages", "values"]
+temporary   = false
+status      = success
+~~~
+
+The observed SSE sequence contained three JSON-RPC responses:
+
+~~~text
+0. initial Task
+   TASK_STATE_SUBMITTED
+
+1. status update
+   TASK_STATE_WORKING
+   message = A2A_STREAM_OK
+   final = false
+
+2. status update
+   TASK_STATE_COMPLETED
+   final = true
+
+stream closed
+~~~
+
+The first event correctly establishes the Task before update events.
+
+### Hybrid v1/v0.3 streaming wire shape
+
+The canonical stream is not consistently A2A 1.0-shaped.
+
+Its initial response uses the newer StreamResponse-style wrapper:
+
+~~~json
+{
+  "result": {
+    "task": { "...": "..." }
+  }
+}
+~~~
+
+However subsequent events use the legacy direct-event shape:
+
+~~~json
+{
+  "result": {
+    "kind": "status-update",
+    "taskId": "...",
+    "contextId": "...",
+    "status": { "...": "..." },
+    "final": false
+  }
+}
+~~~
+
+A2A 1.0 removed the streaming `kind` discriminator and `final` boolean in
+favor of member-based event discrimination and stream closure.
+
+The canonical adapter therefore combines:
+
+~~~text
+v1 operation name
+v1 TaskState enums
+v1 initial StreamResponse wrapper
+
+with
+
+legacy status-update kind discriminator
+legacy final boolean
+legacy nested kind fields
+~~~
+
+### Output delivery
+
+The assistant output `A2A_STREAM_OK` appeared as the message attached to the
+WORKING status update.
+
+The terminal COMPLETED update did not repeat that message and no Artifact event
+was emitted.
+
+This reflects the adapter translating LangGraph `messages` stream events into
+A2A status messages rather than materializing ordinary graph output as an A2A
+Artifact update.
+
+### Canonical versus legacy streaming
+
+The same deterministic graph was then executed through the legacy
+`message/stream` alias.
+
+Both canonical and legacy paths emitted three SSE events and used the same
+underlying Runtime streaming execution.
+
+The wire representations differed as follows:
+
+~~~text
+canonical event 0
+    wrapped Task
+    TASK_STATE_SUBMITTED
+    ROLE_USER
+    member-based input Part
+
+legacy event 0
+    direct Task
+    submitted
+    user
+    kind=text Part
+
+canonical event 1
+    direct status-update
+    TASK_STATE_WORKING
+    ROLE_AGENT
+    final=false
+
+legacy event 1
+    direct status-update
+    working
+    agent
+    final=false
+
+canonical event 2
+    direct status-update
+    TASK_STATE_COMPLETED
+    final=true
+
+legacy event 2
+    direct status-update
+    completed
+    final=true
+~~~
+
+The canonical path is therefore hybrid:
+
+~~~text
+v1 operation name
+v1 prefixed enum values
+v1-style wrapper for the initial Task
+
+plus
+
+legacy direct status-update events
+legacy kind discriminator
+legacy final boolean
+~~~
+
+The legacy alias applies `_to_spec_format()` to every SSE payload. That
+transformation unwraps the initial Task and converts roles/states to lowercase,
+while retaining the legacy `kind` and `final` representation.
+
+The legacy path is therefore more internally consistent with the v0.x wire
+model than the canonical path is with A2A 1.0.
+
+A2A 1.0 StreamResponse instead discriminates events through exactly one of:
+
+~~~text
+task
+message
+statusUpdate
+artifactUpdate
+~~~
+
+rather than direct `kind=status-update` / `kind=artifact-update` objects.
+
+### Streaming dynamic interrupt
+
+A deterministic graph using LangGraph `interrupt()` was executed through
+canonical `SendStreamingMessage`.
+
+The SSE connection completed normally in approximately 0.82 seconds rather
+than remaining open waiting for the resume message.
+
+The observed sequence was:
+
+~~~text
+0. initial Task
+   TASK_STATE_SUBMITTED
+
+1. artifact-update
+   Artifact name = Interrupt
+   Data Part contains interrupt id and value
+
+2. status-update
+   TASK_STATE_INPUT_REQUIRED
+   final = true
+
+stream closed
+~~~
+
+No WORKING event was emitted for this short interrupted execution.
+
+The interrupt Artifact was delivered before the INPUT_REQUIRED status update,
+matching the ordering implemented by the pinned adapter.
+
+The underlying Runtime state was:
+
+~~~text
+Run.status     = success
+Thread.status  = interrupted
+Thread.error   = None
+Thread.interrupts = populated with the resumable LangGraph interrupt
+~~~
+
+This contrasts with lifecycle cancellation, where Runtime interruption carries
+`UserInterrupt`, no resumable interrupt data and should not represent
+INPUT_REQUIRED.
+
+### Stream closure at INPUT_REQUIRED
+
+The adapter closes the SSE connection after emitting INPUT_REQUIRED and marks
+the legacy streaming event with:
+
+~~~text
+final = true
+~~~
+
+A2A 1.0 removed the `final` field from TaskStatusUpdateEvent.
+
+The current v1.0.1 specification also contains a wording tension: the
+SendStreamingMessage operation description states that a task lifecycle stream
+closes at a terminal state, while the REST streaming binding describes closure
+at a terminal or interrupted state.
+
+The pinned behavior matches the REST-binding interpretation for
+INPUT_REQUIRED.
+
+### Streaming resume and Task identity
+
+The interrupted streaming Task was resumed through canonical
+`SendStreamingMessage` using the same:
+
+~~~text
+taskId
+contextId
+~~~
+
+and a Data Part containing:
+
+~~~json
+{
+  "resume": "A2A_STREAM_RESUME_OK"
+}
+~~~
+
+The resume stream emitted:
+
+~~~text
+0. initial Task
+   TASK_STATE_SUBMITTED
+
+1. status-update
+   TASK_STATE_WORKING
+   message = A2A_STREAM_RESUMED:A2A_STREAM_RESUME_OK
+   final = false
+
+2. status-update
+   TASK_STATE_COMPLETED
+   final = true
+~~~
+
+Every SSE event preserved the original logical Task ID.
+
+### Logical identity versus physical resume Run
+
+Despite preserving the original Task identity on the wire, the Runtime created
+a second persistent Run:
+
+~~~text
+Run A
+    initial input
+    command = null
+    status = success
+
+Run B
+    input = {}
+    command.resume = A2A_STREAM_RESUME_OK
+    status = success
+~~~
+
+After Run B completed, the Thread returned to:
+
+~~~text
+status     = idle
+interrupts = {}
+error      = None
+~~~
+
+and contained the final resumed assistant message.
+
+Streaming execution therefore correctly models one logical A2A Task across
+multiple Runtime Runs while the request is in progress.
+
+### Streaming phantom continuation Task
+
+Persistent retrieval lost that logical relationship exactly as in the blocking
+resume experiment.
+
+GetTask for the original Task returned:
+
+~~~text
+TASK_STATE_COMPLETED
+history = initial user message only
+~~~
+
+GetTask for the identity synthesized from Run B returned:
+
+~~~text
+TASK_STATE_COMPLETED
+history =
+    initial user message
+    resumed assistant message
+~~~
+
+ListTasks returned both identities as independent Tasks.
+
+Therefore the phantom continuation Task is not specific to blocking
+SendMessage. It is caused by the persistent Run-to-Task projection shared by
+both execution modes.
+
+~~~text
+execution-time streaming projection
+
+Task A
+    -> Run A
+    -> INPUT_REQUIRED
+    -> Run B resume
+    -> COMPLETED as Task A
+
+
+persistent retrieval projection
+
+Run A -> Task A
+Run B -> phantom Task B
+~~~
+
+### 1.8D conclusion
+
+The streaming experiments established:
+
+~~~text
+canonical happy path
+    Task SUBMITTED
+    -> WORKING
+    -> COMPLETED
+
+canonical wire
+    hybrid A2A 1.0 envelope/enums
+    plus legacy kind/final streaming events
+
+legacy message/stream
+    comparatively coherent v0.x representation
+
+dynamic HITL
+    Task SUBMITTED
+    -> Interrupt Artifact
+    -> INPUT_REQUIRED
+    -> stream closes
+
+streaming resume
+    preserves original logical Task identity
+    while creating a second Runtime Run
+
+post-resume retrieval
+    again exposes a phantom continuation Task
+~~~
+
+Streaming therefore does not create a separate architectural model.
+
+Both blocking and streaming A2A operations ultimately project the same
+persistent Agent Server Runtime objects, and both inherit the same loss of
+logical Task identity during later retrieval.
+
+## Final conclusion
+
+The pinned LangGraph API 0.8.1 A2A adapter is best understood as a projection
+layer over Agent Server rather than an independent A2A task engine.
+
+Its core mapping is:
+
+~~~text
+LangGraph Assistant -> A2A Agent
+LangGraph Thread    -> A2A Context
+LangGraph Run       -> initial approximation of A2A Task
+~~~
+
+That approximation is sufficient for simple one-Run executions but becomes
+lossy whenever A2A semantics do not map one-to-one onto Runtime Runs.
+
+The experiments demonstrated four distinct boundaries.
+
+### Discovery and compatibility
+
+The adapter advertises A2A protocol 1.0 and supports canonical v1 operation
+names while maintaining explicit aliases for v0.x clients.
+
+However:
+
+~~~text
+A2A-Version
+    is not enforced
+
+canonical output
+    still contains legacy fields
+
+canonical streaming
+    mixes v1 wrappers/enums with v0.x event shapes
+
+legacy aliases
+    often produce a more internally coherent v0.x representation
+~~~
+
+### Execution and persistence
+
+SendMessage and SendStreamingMessage both create persistent Agent Server
+Threads and Runs.
+
+The A2A adapter does not maintain a separate durable Task store.
+
+Consequently:
+
+~~~text
+A2A Task
+    is reconstructed from Runtime state
+
+rather than
+
+A2A Task
+    being an independently persisted protocol resource
+~~~
+
+### Lifecycle semantic gaps
+
+Several A2A lifecycle concepts are richer than the underlying Runtime status
+mapping.
+
+Observed examples include:
+
+~~~text
+returnImmediately
+    accepted but ignored
+
+terminal CancelTask
+    synthetic CANCELED acknowledgement
+    while Runtime remains success
+
+active CancelTask
+    CancelTask  -> CANCELED
+    SendMessage -> FAILED(UserInterrupt)
+    GetTask     -> INPUT_REQUIRED
+
+graph interrupt()
+    correctly becomes INPUT_REQUIRED
+    with a resumable Interrupt Artifact
+~~~
+
+Runtime lifecycle interruption and graph/HITL interruption therefore cannot be
+treated as the same protocol state merely because both use the Runtime
+`interrupted` status.
+
+### Task identity gap
+
+The most important architectural mismatch appears during resume.
+
+A logical A2A lifecycle is:
+
+~~~text
+Task A
+    -> INPUT_REQUIRED
+    -> resume Task A
+    -> COMPLETED
+~~~
+
+The Runtime needs multiple physical Runs:
+
+~~~text
+Thread
+    -> Run A
+    -> Run B(resume)
+~~~
+
+During both blocking and streaming execution, the adapter correctly preserves
+Task A.
+
+Persistent retrieval does not preserve that relationship:
+
+~~~text
+GetTask/ListTasks
+
+Run A -> Task A
+Run B -> phantom continuation Task B
+~~~
+
+The original Task then has incomplete history while the synthesized Task B
+contains the resumed result.
+
+### Final architectural boundary
+
+The practical boundary is:
+
+~~~text
+Agent Server
+    owns
+        execution
+        Runs
+        Threads
+        checkpoints
+        Runtime lifecycle
+        persistence
+
+A2A adapter
+    projects
+        Agent discovery
+        Context identity
+        Task lifecycle
+        HITL
+        streaming
+        protocol compatibility
+
+but does not own
+        durable logical Task identity
+        protocol-specific lifecycle state
+~~~
+
+A lossless A2A implementation over Agent Server therefore requires an
+additional durable protocol-level Task layer capable of relating multiple Runs
+to one logical Task and retaining A2A-specific lifecycle intent.
+
+Without that layer:
+
+~~~text
+Run != Task
+Thread != complete A2A Context semantics
+Runtime interrupted != one unique A2A state
+~~~
+
+This completes section 1.8 A2A.
