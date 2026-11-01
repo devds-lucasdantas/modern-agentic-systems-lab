@@ -1,6 +1,7 @@
 export type {
   IsoTimestamp,
   Metadata,
+  StateRecord,
   StateValues,
 } from './common'
 

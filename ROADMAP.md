@@ -103,7 +103,7 @@
 - [ ] 2.1 Frontend application
   - [x] 2.1A Frontend stack and scaffold
   - [x] 2.1B Runtime domain model
-  - [ ] 2.1C Agent Server REST client baseline
+  - [x] 2.1C Agent Server REST client baseline
   - [ ] 2.1D Application shell
   - [ ] 2.1E First execution surface
   - [ ] 2.1F Frontend baseline review

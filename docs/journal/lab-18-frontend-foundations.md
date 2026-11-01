@@ -871,3 +871,581 @@ Agent Server client
 ~~~
 
 without changing the domain model to mirror transport schemas.
+
+---
+
+# 2.1C — Agent Server REST client baseline
+
+## Objective
+
+Introduce the first browser-to-Runtime transport boundary while preserving the
+transport-independent frontend domain established in section 2.1B.
+
+The target architecture is:
+
+~~~text
+Agent Server REST
+      |
+      v
+unknown JSON
+      |
+      v
+tolerant decoder
+      |
+      v
+wire DTO
+      |
+      v
+mapper
+      |
+      v
+frontend domain
+~~~
+
+The pinned Runtime remains the source of truth.
+
+The modern LangGraph JavaScript SDK is intentionally not used in this baseline.
+
+---
+
+## OpenAPI inspection
+
+The pinned Agent Server exposed:
+
+~~~text
+OpenAPI 3.1.0
+47 paths
+49 component schemas
+~~~
+
+The repository now contains:
+
+~~~text
+scripts/inspect-agent-server-openapi.py
+~~~
+
+which inspects the relevant Assistant, Thread, Run and state REST operations and
+walks their transitively referenced OpenAPI schemas.
+
+The inspector found 42 relevant non-stream operations before the frontend
+surface was intentionally reduced to a smaller baseline.
+
+---
+
+## Minimal REST surface
+
+Section 2.1C does not attempt to wrap the entire Agent Server API.
+
+The initial client supports:
+
+~~~text
+Assistant
+    searchAssistants
+    getAssistant
+
+Thread
+    createThread
+    searchThreads
+    getThread
+    deleteThread
+
+Run
+    createRun
+    listRuns
+    getRun
+
+State
+    getThreadState
+~~~
+
+Streaming, join, wait, history, state mutation, cancellation, rollback, cron and
+protocol-specific functionality remain outside this baseline.
+
+They belong to later Phase 2 experiments.
+
+---
+
+## Live contract inspection
+
+The OpenAPI contract was compared with payloads returned by the running pinned
+Agent Server.
+
+The live probe used no model execution.
+
+It:
+
+~~~text
+searched Assistants
+searched Threads
+inspected an existing Run
+created an empty temporary Thread
+retrieved the Thread
+retrieved its ThreadState
+deleted the temporary Thread
+tested a missing-Thread 404
+~~~
+
+The temporary Thread was deleted successfully.
+
+---
+
+## OpenAPI drift
+
+The live Runtime exposed meaningful differences from its OpenAPI schema.
+
+### ThreadState nullability
+
+OpenAPI describes several ThreadState properties as required:
+
+~~~text
+checkpoint
+metadata
+created_at
+~~~
+
+and gives them non-null object/string representations.
+
+A valid empty Thread returned:
+
+~~~text
+checkpoint = null
+metadata = null
+created_at = null
+~~~
+
+The transport layer therefore models these observed values as nullable.
+
+---
+
+## Undocumented ThreadState fields
+
+The live empty ThreadState also returned:
+
+~~~text
+checkpoint_id
+parent_checkpoint_id
+~~~
+
+These fields are not represented in the pinned ThreadState OpenAPI schema.
+
+The wire DTO tolerates and records them explicitly as observed Runtime fields.
+
+They are not promoted directly into the frontend domain unless they can form a
+valid CheckpointRef.
+
+---
+
+## Thread drift
+
+A live Thread search result included:
+
+~~~text
+error = null
+~~~
+
+although `error` is absent from the pinned OpenAPI Thread schema.
+
+The transport DTO therefore tolerates:
+
+~~~text
+ThreadDto.error?: unknown
+~~~
+
+without promoting the field into the stable Thread domain model.
+
+---
+
+## Run error semantics
+
+The pinned Run OpenAPI schema and observed Run payload contain no top-level:
+
+~~~text
+error
+~~~
+
+field.
+
+The frontend domain can still represent:
+
+~~~text
+Run.error
+~~~
+
+as a semantic capability, but the pinned transport cannot currently populate
+it.
+
+The mapper therefore sets:
+
+~~~text
+Run.error = null
+~~~
+
+rather than pretending that the value came from the server.
+
+---
+
+## ThreadState identity
+
+The wire ThreadState contains no required Thread ID.
+
+The request itself provides that identity:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+The mapper therefore combines:
+
+~~~text
+request ThreadId
+    +
+ThreadStateDto
+    ↓
+ThreadState
+~~~
+
+to produce:
+
+~~~text
+ThreadState.threadId
+~~~
+
+This is an explicit example of why wire DTO and frontend domain are not the
+same abstraction.
+
+---
+
+## State values
+
+The pinned OpenAPI allows ThreadState values to be either:
+
+~~~text
+object
+
+or
+
+array of objects
+~~~
+
+The frontend domain was refined accordingly:
+
+~~~text
+StateRecord
+
+StateValues =
+    StateRecord
+    |
+    readonly StateRecord[]
+~~~
+
+This change reflects the actual server contract rather than a UI-specific
+assumption.
+
+---
+
+## Checkpoint normalization
+
+CheckpointConfig has no required fields in the wire schema.
+
+A frontend CheckpointRef, however, represents an identifiable checkpoint.
+
+The mapper therefore creates a domain CheckpointRef only when:
+
+~~~text
+checkpoint_id
+~~~
+
+is present.
+
+If no checkpoint ID exists:
+
+~~~text
+CheckpointRef = null
+~~~
+
+The request ThreadId is used as a fallback when a valid checkpoint lacks an
+explicit wire `thread_id`.
+
+---
+
+## Tolerant decoding
+
+The client does not cast raw JSON directly to TypeScript interfaces.
+
+Responses enter the system as:
+
+~~~text
+unknown
+~~~
+
+and are decoded explicitly.
+
+The decoders validate the fields required by the frontend while tolerating
+known Runtime/OpenAPI drift.
+
+This is deliberately different from blind generated-schema validation.
+
+For the pinned stack:
+
+~~~text
+strict OpenAPI-derived validation
+    could reject valid Runtime payloads
+
+tolerant observed-contract decoding
+    accepts validated Runtime behavior
+~~~
+
+No runtime-validation dependency such as Zod was required for this baseline.
+
+---
+
+## Error model
+
+Non-success HTTP responses are converted into:
+
+~~~text
+AgentServerHttpError
+~~~
+
+which preserves:
+
+~~~text
+HTTP status
+method
+request path
+human-readable detail
+raw response body
+~~~
+
+A live missing Thread request returned HTTP 404 and was successfully converted
+to AgentServerHttpError with the Runtime-provided detail message.
+
+Malformed successful payloads use a separate:
+
+~~~text
+AgentServerDecodeError
+~~~
+
+so transport failures and contract failures remain distinct.
+
+---
+
+## Pagination
+
+Search responses use the payload body for items and the Agent Server header:
+
+~~~text
+x-pagination-total
+~~~
+
+for total-count information.
+
+The frontend represents this as:
+
+~~~text
+SearchPage<T>
+    items
+    total
+~~~
+
+The absence or invalidity of the header produces:
+
+~~~text
+total = null
+~~~
+
+rather than inventing a total from page length.
+
+---
+
+## CORS
+
+The pinned Agent Server accepted development-browser origins for both:
+
+~~~text
+http://localhost:5173
+
+http://127.0.0.1:5173
+~~~
+
+The preflight response allowed the required methods and content-type header.
+
+The actual response also exposed pagination and content-location headers.
+
+Therefore the 2.1C baseline does not require a Vite reverse proxy.
+
+The Agent Server base URL remains configuration supplied to the client rather
+than being embedded in the domain layer.
+
+---
+
+## Dependency direction
+
+The source tree now follows:
+
+~~~text
+transport
+    |
+    v
+domain
+~~~
+
+The domain contains no dependency on:
+
+~~~text
+fetch
+Request
+Response
+Agent Server
+LangGraph SDK
+AG-UI
+A2A
+MCP
+~~~
+
+The transport layer is allowed to depend on the domain because its purpose is
+to normalize wire representations into frontend concepts.
+
+The reverse dependency is forbidden.
+
+---
+
+## TypeScript 7 harness observation
+
+An initial temporary CommonJS validation harness used:
+
+~~~text
+moduleResolution = Node
+~~~
+
+TypeScript 7 resolves this to the removed legacy Node10 mode and reported
+TS5108.
+
+Because the temporary compiler invocation still emitted JavaScript, the
+subsequent live execution succeeded despite the compiler error.
+
+That result was not accepted as the final gate.
+
+The harness was replaced by a temporary Vite SSR build using the same frontend
+toolchain as the application.
+
+The corrected harness enforces:
+
+~~~text
+build failure
+    -> no execution
+~~~
+
+and removes its temporary source after validation.
+
+---
+
+## Live client validation
+
+The corrected client validation exercises the actual transport implementation
+against the pinned Runtime.
+
+Validated behavior includes:
+
+~~~text
+searchAssistants
+getAssistant
+
+searchThreads
+
+listRuns
+getRun
+
+createThread
+getThread
+deleteThread
+
+getThreadState
+
+404 -> AgentServerHttpError
+~~~
+
+For an empty Thread, the mapped domain state correctly produced:
+
+~~~text
+position.next = []
+
+checkpoint = null
+
+parentCheckpoint = null
+
+interrupts = []
+
+tasks = []
+
+createdAt = null
+~~~
+
+and its domain ThreadId was supplied from request context.
+
+---
+
+## Schema-drift gate
+
+An explicit structural gate verifies that:
+
+~~~text
+ThreadState checkpoint is nullable
+ThreadState metadata is nullable
+ThreadState created_at is nullable
+
+checkpoint_id is tolerated
+parent_checkpoint_id is tolerated
+
+Thread error is tolerated
+
+Run error is not invented in RunDto
+
+ThreadState ThreadId comes from request context
+
+nullable metadata is normalized
+
+null created_at is accepted
+~~~
+
+This prevents future cleanup work from accidentally making the client stricter
+than the observed pinned Runtime.
+
+---
+
+## 2.1C conclusion
+
+The frontend now has its first validated Runtime transport boundary.
+
+The complete flow is:
+
+~~~text
+Agent Server REST
+        |
+        v
+unknown JSON
+        |
+        v
+explicit tolerant decoder
+        |
+        v
+wire DTO
+        |
+        v
+mapper
+        |
+        v
+transport-independent domain
+~~~
+
+The baseline has been validated against the running pinned Agent Server without
+requiring the modern LangGraph JavaScript SDK.
+
+The next section is:
+
+~~~text
+2.1D — Application shell
+~~~
+
+where these domain and transport primitives can finally be composed into a
+React-facing application architecture.

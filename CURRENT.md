@@ -920,36 +920,82 @@ Detailed evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current sub-block — 2.1C Agent Server REST client baseline
+## Completed sub-block — 2.1C Agent Server REST client baseline
 
-The next step introduces the transport boundary without allowing Agent Server
-wire schemas to become the frontend domain model.
+The frontend now has a validated direct REST boundary to the pinned Agent
+Server.
 
-Target layering:
+Implemented under:
 
 ~~~text
-Agent Server REST
-      |
-      v
-transport DTOs
-      |
-      v
-normalization / mappers
-      |
-      v
-frontend domain
+apps/web/src/transport/agent-server/
 ~~~
+
+The transport pipeline is:
+
+~~~text
+unknown JSON
+    -> tolerant decoder
+    -> DTO
+    -> mapper
+    -> frontend domain
+~~~
+
+The implementation was validated against the live pinned Runtime for:
+
+~~~text
+Assistant search/get
+Thread search/create/get/delete
+Run list/get
+ThreadState get
+HTTP 404 handling
+~~~
+
+Observed Runtime/OpenAPI drift is handled explicitly, including nullable empty
+ThreadState fields and fields returned by the Runtime but omitted from its
+OpenAPI schema.
+
+CORS permits direct development-browser access from both localhost:5173 and
+127.0.0.1:5173, so no Vite proxy is required by this baseline.
+
+The reusable OpenAPI inspection utility is:
+
+~~~text
+scripts/inspect-agent-server-openapi.py
+~~~
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current sub-block — 2.1D Application shell
+
+The next step is to compose the domain and transport layers into a React-facing
+application architecture.
+
+The shell must establish:
+
+~~~text
+application configuration
+AgentServerClient ownership
+top-level loading/error boundaries
+navigation/layout structure
+Runtime-aware application state boundary
+~~~
+
+without yet implementing the full execution/chat surface.
 
 Initial questions:
 
-1. What exact pinned Agent Server JSON shapes must the browser support?
-2. Which REST fields are wire-only and should not enter the domain?
-3. How should snake_case transport fields map into frontend naming?
-4. How should unknown or future fields be handled?
-5. What error model should the REST client expose?
-6. Can the first client work without the modern LangGraph JavaScript SDK?
-7. How should the Agent Server base URL be configured for development without
-   hard-coding environment-specific values?
+1. Where should the AgentServerClient instance be created and owned?
+2. How should VITE_AGENT_SERVER_URL enter the application?
+3. Which state belongs to application shell versus Runtime resources?
+4. How should loading and transport errors be represented?
+5. What is the minimum useful navigation structure before chat execution exists?
+6. Can the shell expose Runtime concepts without introducing a global state
+   library prematurely?
 
 Phase 2 will build the client-facing layer over the Runtime contracts established
 during Phase 1.
