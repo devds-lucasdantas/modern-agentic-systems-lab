@@ -1449,3 +1449,609 @@ The next section is:
 
 where these domain and transport primitives can finally be composed into a
 React-facing application architecture.
+
+---
+
+# 2.1D — Application shell
+
+## Objective
+
+Compose the transport-independent domain and validated Agent Server REST client
+into the first React-facing application boundary.
+
+The purpose of this section is not yet to build a chat interface.
+
+It establishes:
+
+~~~text
+application configuration
+AgentServerClient ownership
+Runtime context
+remote-resource projection
+loading and error states
+navigation shell
+live Runtime overview
+~~~
+
+The resulting application must expose Runtime concepts directly rather than
+collapsing execution into generic chat state.
+
+---
+
+## Composition root
+
+The frontend composition root now follows:
+
+~~~text
+VITE_AGENT_SERVER_URL
+        |
+        v
+    AppConfig
+        |
+        v
+ RuntimeProvider
+        |
+        v
+ AgentServerClient
+        |
+        v
+ React application
+~~~
+
+The application layer owns transport construction.
+
+The domain layer remains independent from:
+
+~~~text
+import.meta.env
+fetch
+Request
+Response
+AgentServerClient
+React context
+~~~
+
+---
+
+## Application configuration
+
+The Agent Server location is supplied through:
+
+~~~text
+VITE_AGENT_SERVER_URL
+~~~
+
+The repository provides:
+
+~~~text
+apps/web/.env.example
+~~~
+
+with the development baseline:
+
+~~~text
+VITE_AGENT_SERVER_URL=http://127.0.0.1:2024
+~~~
+
+Local configuration uses:
+
+~~~text
+.env.local
+~~~
+
+which remains ignored by Git.
+
+The configuration parser validates:
+
+~~~text
+URL exists
+URL is syntactically valid
+protocol is http or https
+trailing slash normalization
+~~~
+
+Missing or unsupported configuration produces a distinct AppConfigError before
+the Runtime client is created.
+
+---
+
+## Runtime client ownership
+
+RuntimeProvider owns one AgentServerClient instance for the current Agent Server
+URL.
+
+The client is recreated only when:
+
+~~~text
+config.agentServerUrl
+~~~
+
+changes.
+
+The dependency direction is:
+
+~~~text
+React application
+        |
+        v
+AgentServerClient
+        |
+        v
+transport
+        |
+        v
+domain
+~~~
+
+The domain does not import the application or transport layers.
+
+---
+
+## Runtime context split
+
+The Runtime React boundary is separated into:
+
+~~~text
+runtime-context.ts
+runtime-provider.tsx
+use-runtime.ts
+~~~
+
+This split keeps:
+
+~~~text
+Context declaration
+Provider component
+consumer hook
+~~~
+
+as separate responsibilities.
+
+It also satisfies the React Fast Refresh constraint that component modules
+should not unnecessarily mix component and non-component exports.
+
+---
+
+## Runtime overview projection
+
+The shell introduces:
+
+~~~text
+useRuntimeOverview
+~~~
+
+which reads the Runtime through AgentServerClient and projects:
+
+~~~text
+Assistants
+Threads
+Assistant total
+Thread total
+loading status
+transport errors
+refresh action
+~~~
+
+The Agent Server remains the source of truth.
+
+The hook does not create a separate persistent client-side database for Runtime
+resources.
+
+---
+
+## I/O and state transitions
+
+The initial hook implementation caused the React lint rule:
+
+~~~text
+react(set-state-in-effect)
+~~~
+
+because the effect invoked a function that synchronously initiated a React state
+transition.
+
+The implementation was refined to separate:
+
+~~~text
+fetchOverview
+    -> external I/O only
+
+commitReady
+    -> React state transition
+
+commitError
+    -> React state transition
+
+refresh
+    -> explicit user-triggered reload
+~~~
+
+The final application passes the React lint rules with zero warnings.
+
+---
+
+## Browser fetch receiver bug
+
+The first real-browser execution exposed a bug that did not appear in the Node
+or Vite SSR validation harness.
+
+The AgentServerClient stored the native fetch function and invoked it as a class
+member.
+
+Conceptually:
+
+~~~text
+this.#fetch = global fetch
+
+this.#fetch(...)
+~~~
+
+In Chrome this changed the receiver of the native Window fetch function and
+produced:
+
+~~~text
+Failed to execute 'fetch' on 'Window':
+Illegal invocation
+~~~
+
+The default fetch implementation was therefore changed to:
+
+~~~text
+globalThis.fetch.bind(globalThis)
+~~~
+
+while preserving injected fetch implementations for tests.
+
+This is an important browser-specific validation result.
+
+---
+
+## Runtime availability diagnosis
+
+After the fetch receiver fix, the browser reported:
+
+~~~text
+Failed to fetch
+~~~
+
+This initially suggested a possible browser-to-WSL networking boundary.
+
+A direct Runtime probe showed instead:
+
+~~~text
+curl 127.0.0.1:2024
+    -> connection failed
+
+listener :2024
+    -> absent
+~~~
+
+The Agent Server was simply no longer running.
+
+After restarting the pinned Runtime:
+
+~~~text
+langgraph-api          0.8.1
+langgraph-runtime-inmem 0.28.0
+
+http://127.0.0.1:2024
+~~~
+
+the browser connected successfully.
+
+Therefore:
+
+~~~text
+Windows browser
+        |
+        v
+127.0.0.1:2024
+        |
+        v
+Agent Server in WSL
+~~~
+
+works in the current development environment.
+
+No Vite reverse proxy is required by the 2.1D baseline.
+
+---
+
+## Live browser validation
+
+The real browser successfully displayed:
+
+~~~text
+Connection
+    Connected
+
+Assistants
+    1
+
+Threads
+    21
+
+Loaded
+    20
+
+Transport
+    REST
+~~~
+
+The current Assistant was displayed as:
+
+~~~text
+deep_agent
+~~~
+
+and the Thread list showed real Runtime thread identities and lifecycle states.
+
+The Agent Server logs simultaneously recorded successful requests such as:
+
+~~~text
+POST /assistants/search -> 200
+POST /threads/search    -> 200
+~~~
+
+This validates the full browser path:
+
+~~~text
+React
+  |
+  v
+RuntimeProvider
+  |
+  v
+AgentServerClient
+  |
+  v
+browser fetch
+  |
+  v
+CORS
+  |
+  v
+Agent Server
+  |
+  v
+Runtime resources
+~~~
+
+---
+
+## Pagination semantics in the UI
+
+The live browser exposed an important distinction:
+
+~~~text
+Threads = 21
+Loaded  = 20
+~~~
+
+The first value originates from the Agent Server pagination total.
+
+The second represents the current page loaded by the shell.
+
+The UI therefore does not confuse:
+
+~~~text
+total Runtime resource count
+        !=
+current client projection size
+~~~
+
+This validates the SearchPage<T> boundary introduced in section 2.1C.
+
+---
+
+## Failure states
+
+The shell distinguishes two failure classes.
+
+### Configuration failure
+
+Occurs before Runtime client creation, for example:
+
+~~~text
+missing VITE_AGENT_SERVER_URL
+invalid URL
+unsupported protocol
+~~~
+
+This is surfaced as an application configuration screen.
+
+### Runtime transport failure
+
+Occurs after valid application configuration when the Runtime cannot be reached.
+
+This is surfaced inside the shell as:
+
+~~~text
+Unavailable
+Runtime request failed
+~~~
+
+The shell therefore preserves:
+
+~~~text
+application configuration failure
+        !=
+Runtime transport failure
+~~~
+
+---
+
+## Development StrictMode observation
+
+React StrictMode is enabled for the development application.
+
+Development logs showed repeated Assistant and Thread search requests during
+some mount and refresh cycles.
+
+This is consistent with development-time StrictMode behavior designed to expose
+unsafe side effects.
+
+The search operations used by the shell are idempotent projections.
+
+No production architecture change is made solely to suppress development
+StrictMode diagnostics.
+
+Future execution operations must not assume that the same tolerance is safe for
+non-idempotent side effects.
+
+---
+
+## Application shell structure
+
+The shell currently exposes:
+
+~~~text
+Overview
+Assistants
+Threads
+Runs       -> reserved for 2.1E
+Streaming  -> reserved for 2.2
+~~~
+
+The current screen is a Runtime overview rather than a chat interface.
+
+This is deliberate.
+
+The user can already see that the application is connected to a resource-based
+execution Runtime composed of:
+
+~~~text
+Assistants
+Threads
+Runs
+State
+~~~
+
+before message execution is introduced.
+
+---
+
+## Styling baseline
+
+The original Vite demonstration assets were removed.
+
+The shell now provides:
+
+~~~text
+responsive sidebar
+Runtime connection indicator
+resource summary cards
+Assistant projection
+Thread projection
+loading state
+transport error state
+configuration error state
+responsive layout
+~~~
+
+No external component library or styling dependency was introduced.
+
+---
+
+## Validation
+
+The final application shell passed:
+
+~~~text
+pnpm lint
+    -> 0 warnings
+    -> 0 errors
+
+pnpm build
+    -> TypeScript PASS
+    -> Vite production build PASS
+~~~
+
+The application configuration harness also validated:
+
+~~~text
+valid Runtime URL
+missing configuration
+unsupported protocol
+~~~
+
+The real browser completed the live Runtime connection successfully.
+
+---
+
+## Architectural model
+
+The frontend architecture now becomes:
+
+~~~text
+                        Browser
+                           |
+                           v
+                    React AppShell
+                           |
+                 +---------+---------+
+                 |                   |
+                 v                   v
+             AppConfig       Runtime overview
+                 |                   |
+                 v                   |
+          RuntimeProvider            |
+                 |                   |
+                 +---------+---------+
+                           |
+                           v
+                  AgentServerClient
+                           |
+                           v
+                tolerant transport
+                           |
+                           v
+                     frontend domain
+                           |
+                           v
+                    Runtime concepts
+~~~
+
+The shell owns application composition.
+
+The Agent Server remains the resource source of truth.
+
+---
+
+## 2.1D conclusion
+
+The frontend is now a functioning Runtime-aware React application.
+
+It can:
+
+~~~text
+load validated configuration
+construct the Runtime client
+connect directly to the pinned Agent Server
+search Assistants
+search Threads
+represent pagination totals
+surface loading state
+surface Runtime transport failures
+refresh remote projections
+render real Runtime resources
+~~~
+
+without introducing:
+
+~~~text
+global state library
+chat abstraction
+streaming abstraction
+AG-UI
+LangGraph JavaScript SDK
+~~~
+
+The next section is:
+
+~~~text
+2.1E — First execution surface
+~~~
+
+That section can now introduce Run creation and execution while preserving the
+resource model established by the previous frontend foundations.

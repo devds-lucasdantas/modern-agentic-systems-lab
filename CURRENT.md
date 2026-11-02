@@ -970,32 +970,107 @@ Detailed evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current sub-block — 2.1D Application shell
+## Completed sub-block — 2.1D Application shell
 
-The next step is to compose the domain and transport layers into a React-facing
-application architecture.
+The frontend is now a live Runtime-aware React application.
 
-The shell must establish:
+Composition:
 
 ~~~text
-application configuration
-AgentServerClient ownership
-top-level loading/error boundaries
-navigation/layout structure
-Runtime-aware application state boundary
+AppConfig
+    -> RuntimeProvider
+    -> AgentServerClient
+    -> Runtime overview projection
+    -> AppShell
 ~~~
 
-without yet implementing the full execution/chat surface.
+The shell has been validated in a real browser against the pinned Agent Server.
+
+Observed live state included:
+
+~~~text
+Connected
+Assistants = 1
+Threads total = 21
+Threads loaded = 20
+Transport = REST
+~~~
+
+The Runtime logs confirmed successful browser requests to:
+
+~~~text
+POST /assistants/search
+POST /threads/search
+~~~
+
+The default browser fetch is explicitly bound to globalThis after Chrome exposed
+an Illegal invocation error that was not reproduced by the Node/Vite SSR
+harness.
+
+Direct Windows-browser-to-WSL localhost access works in the current development
+environment, so no Vite reverse proxy is required.
+
+The shell passes:
+
+~~~text
+pnpm lint
+    -> 0 warnings
+    -> 0 errors
+
+pnpm build
+    -> PASS
+~~~
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current sub-block — 2.1E First execution surface
+
+The next step introduces the first user-controlled execution flow.
+
+The implementation must preserve:
+
+~~~text
+Thread
+    !=
+Run
+
+Run lifecycle
+    !=
+graph execution position
+
+message projection
+    !=
+Runtime execution identity
+~~~
+
+Initial target:
+
+~~~text
+select or create Thread
+select Assistant
+submit one user input
+create stateful Run
+observe Run lifecycle
+refresh persisted ThreadState
+render message projection from Runtime state
+~~~
+
+Streaming remains outside this sub-block and belongs to Phase 2.2.
 
 Initial questions:
 
-1. Where should the AgentServerClient instance be created and owned?
-2. How should VITE_AGENT_SERVER_URL enter the application?
-3. Which state belongs to application shell versus Runtime resources?
-4. How should loading and transport errors be represented?
-5. What is the minimum useful navigation structure before chat execution exists?
-6. Can the shell expose Runtime concepts without introducing a global state
-   library prematurely?
+1. How should the shell select and retain an active Thread?
+2. Should new conversations create a Thread before any Run exists?
+3. What is the smallest safe Run creation payload?
+4. How should pending/running/success/error/interrupted status be represented?
+5. How should messages be projected from ThreadState.values without making
+   Message[] the source of truth?
+6. How should execution remain usable before SSE streaming is introduced?
+7. How do we prevent Run success from being interpreted as graph END?
 
 Phase 2 will build the client-facing layer over the Runtime contracts established
 during Phase 1.

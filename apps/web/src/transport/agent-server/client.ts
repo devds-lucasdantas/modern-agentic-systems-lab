@@ -163,7 +163,8 @@ export class AgentServerClient {
     )
 
     this.#fetch =
-      options.fetchImpl ?? fetch
+      options.fetchImpl ??
+      globalThis.fetch.bind(globalThis)
 
     this.#credentials =
       options.credentials ?? 'include'
