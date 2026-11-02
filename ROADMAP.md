@@ -111,7 +111,7 @@
 - [ ] 2.2 Event streaming
   - [x] 2.2A Pinned streaming contract discovery
   - [x] 2.2B SSE transport client
-  - [ ] 2.2C Live Run streaming integration
+  - [x] 2.2C Live Run streaming integration
   - [ ] 2.2D Message and state projection
   - [ ] 2.2E Disconnect, reconnect and replay
   - [ ] 2.2F Persisted-state reconciliation

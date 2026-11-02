@@ -32,7 +32,8 @@ const busyPhases =
   new Set([
     'creating-thread',
     'creating-run',
-    'polling',
+    'streaming',
+    'reconciling-run',
     'refreshing-state',
   ])
 
@@ -71,24 +72,30 @@ export function ExecutionSurface({
     setText,
   ] = useState('')
 
-  const {
-    phase,
-    run,
-    state,
-    messages,
-    error,
-    execute,
-    loadThreadState,
-    reset,
-  } = useExecution()
+    const {
+      phase,
+      runId,
+      run,
+      state,
+      messages,
+      error,
+      execute,
+      loadThreadState,
+      reset,
+    } = useExecution()
 
   const effectiveAssistant =
     selectedAssistant ||
     assistants[0]?.id ||
     ''
 
-  const busy =
-    busyPhases.has(phase)
+    const busy =
+      busyPhases.has(phase)
+
+    const displayedRunId =
+      runId ??
+      run?.id ??
+      null
 
   const handleAssistantChange = (
     event:
@@ -180,12 +187,13 @@ export function ExecutionSurface({
           </span>
 
           <h2>
-            First execution surface
+              Streaming execution surface
           </h2>
 
           <p>
-            Runs execute through REST polling.
-            Streaming remains reserved for 2.2.
+              Runs execute through SSE streaming,
+              then reconcile lifecycle and persisted
+              Thread state through REST.
           </p>
         </div>
 
@@ -324,9 +332,11 @@ export function ExecutionSurface({
               </span>
 
               <strong>
-                {run === null
-                  ? '—'
-                  : shortId(run.id)}
+                  {displayedRunId === null
+                    ? '—'
+                    : shortId(
+                        displayedRunId,
+                      )}
               </strong>
             </article>
 

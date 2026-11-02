@@ -1489,3 +1489,385 @@ The next sub-block is:
 
 That step will replace REST polling as the primary live Run observation
 mechanism while retaining explicit final Run and ThreadState reconciliation.
+
+---
+
+# 2.2C — Live Run streaming integration
+
+## Objective
+
+Replace REST lifecycle polling with the SSE transport implemented in 2.2B while
+preserving explicit persisted-resource reconciliation.
+
+The target control flow is:
+
+~~~text
+streamRun
+    -> observe live Agent Server events
+    -> obtain run_id from metadata
+    -> stream closes
+    -> getRun
+    -> getThreadState
+~~~
+
+The stream is the live observation mechanism.
+
+It is not the final lifecycle or persisted-state authority.
+
+## Execution lifecycle
+
+The frontend execution phases now distinguish:
+
+~~~text
+creating-run
+streaming
+reconciling-run
+refreshing-state
+completed
+failed
+~~~
+
+The previous:
+
+~~~text
+polling
+~~~
+
+phase was removed.
+
+The execution hook no longer contains a timer, polling limit or repeated
+getRun loop.
+
+## Run identity versus Run resource
+
+The execution snapshot now keeps:
+
+~~~text
+runId: RunId | null
+run: Run | null
+~~~
+
+separately.
+
+This distinction is intentional.
+
+During SSE execution:
+
+~~~text
+metadata event
+    -> run_id
+    -> runId becomes known
+~~~
+
+but the final Run resource has not yet been reconciled.
+
+Therefore the UI may know:
+
+~~~text
+Run ID
+~~~
+
+while still not knowing the authoritative final:
+
+~~~text
+Run status
+~~~
+
+No synthetic Run object is fabricated from stream metadata.
+
+## Metadata identity
+
+The integration extracts Runtime Run identity only from a known:
+
+~~~text
+event = metadata
+~~~
+
+whose decoded data contains:
+
+~~~text
+run_id: string
+~~~
+
+A stream that completes without a metadata run_id is treated as an execution
+failure.
+
+If one execution were to emit conflicting run IDs, the client also fails rather
+than silently switching identity.
+
+## Stream modes
+
+The first UI streaming integration requests:
+
+~~~text
+updates
+values
+messages
+checkpoints
+~~~
+
+with:
+
+~~~text
+stream_resumable = true
+on_disconnect = continue
+~~~
+
+The stream is consumed, but its message and state payloads are deliberately not
+projected into React UI state yet.
+
+That semantic projection is reserved for 2.2D.
+
+## Stream completion is not Run success
+
+SSE closure is not treated as lifecycle success.
+
+After the stream closes, the UI performs exactly one:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}
+~~~
+
+The returned Run is the lifecycle authority.
+
+If its status is still non-terminal:
+
+~~~text
+pending
+running
+~~~
+
+the execution fails rather than silently falling back to polling or creating a
+second Run.
+
+This preserves:
+
+~~~text
+stream closure != Run success
+~~~
+
+## Persisted-state reconciliation
+
+After lifecycle reconciliation, the UI performs:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+The resulting ThreadState remains authoritative for:
+
+~~~text
+graph position
+checkpoint
+persisted values
+persisted messages
+interrupt state
+~~~
+
+Messages shown by the UI therefore still come from:
+
+~~~text
+projectMessagesFromState(final ThreadState)
+~~~
+
+not from messages/partial.
+
+## Browser validation
+
+The first browser Run used the input:
+
+~~~text
+Responda exatamente: STREAMING_UI_OK
+~~~
+
+The final UI showed:
+
+~~~text
+phase = completed
+Run = populated
+Run status = success
+Graph next = END
+Checkpoint = populated
+
+assistant:
+STREAMING_UI_OK
+~~~
+
+A second execution used:
+
+~~~text
+Responda exatamente: SSE_NETWORK_OK
+~~~
+
+and produced the expected persisted message sequence in the same Thread.
+
+## Network validation
+
+Browser DevTools and Runtime logs confirmed the new control flow.
+
+For one execution:
+
+~~~text
+POST /threads/{thread}/runs/stream
+GET  /threads/{thread}/runs/{run}
+GET  /threads/{thread}/state
+~~~
+
+There was no repeated getRun polling loop.
+
+A longer output experiment generated a stream response of approximately:
+
+~~~text
+132622 bytes
+~~~
+
+over approximately:
+
+~~~text
+3597 ms
+~~~
+
+and still produced exactly:
+
+~~~text
+one streaming POST
+one final Run GET
+one final ThreadState GET
+~~~
+
+## Runtime refresh after execution
+
+After final reconciliation, the existing application-level callback still
+refreshes overview resources.
+
+Therefore additional requests such as:
+
+~~~text
+POST /assistants/search
+POST /threads/search
+~~~
+
+may occur after execution completion.
+
+These are application overview refreshes.
+
+They are not Run polling.
+
+## Fast phase transitions
+
+Even a 1-to-100 generation completed quickly enough that the visible
+`streaming` badge was difficult to capture manually.
+
+This does not weaken the streaming proof.
+
+The Runtime network trace directly establishes that the POST stream remained
+open throughout model execution and only afterward performed the two REST
+reconciliation requests.
+
+No artificial delay was introduced merely to make a transient UI phase easier
+to photograph.
+
+## Static validation
+
+After migration:
+
+~~~text
+polling
+sleep(...)
+maxPolls
+client.createRun(...)
+~~~
+
+are absent from the execution control path.
+
+Quality gates pass:
+
+~~~text
+oxlint
+    0 warnings
+    0 errors
+
+TypeScript
+    PASS
+
+Vite production build
+    PASS
+
+git diff --check
+    PASS
+~~~
+
+## Visual shell update
+
+The application shell was advanced from the historical:
+
+~~~text
+2.1E
+First execution surface
+~~~
+
+to:
+
+~~~text
+2.2D
+Message and state projection
+~~~
+
+after closing 2.2C.
+
+The transport summary was also updated from:
+
+~~~text
+REST
+direct Agent Server boundary
+~~~
+
+to:
+
+~~~text
+REST + SSE
+REST resources + SSE execution
+~~~
+
+## 2.2C conclusion
+
+Live execution observation now uses SSE rather than polling.
+
+The resulting authority model is:
+
+~~~text
+SSE stream
+    -> live execution observation
+
+metadata.run_id
+    -> live execution identity
+
+GET Run
+    -> final lifecycle authority
+
+GET ThreadState
+    -> final persisted graph/state authority
+~~~
+
+Important invariants remain:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph position
+
+stream closure != Run success
+
+stream observation != persisted truth
+
+stream message event != persisted Message projection
+~~~
+
+The next sub-block is:
+
+~~~text
+2.2D — Message and state projection
+~~~
+
+It will project selected live stream events into frontend state without
+discarding final persisted-state reconciliation.

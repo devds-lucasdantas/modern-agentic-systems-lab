@@ -1355,69 +1355,86 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2C Live Run streaming integration
+## Completed sub-block — 2.2C Live Run streaming integration
 
-The next experiment connects the validated streaming transport to execution
-orchestration.
+The React execution path now uses the validated SSE transport.
 
-Current control implementation:
-
-~~~text
-createRun
-    -> poll getRun every ~500 ms
-    -> terminal Run lifecycle
-    -> getThreadState
-~~~
-
-Target experimental path:
+Live execution control:
 
 ~~~text
 streamRun
-    -> live Agent Server events
-    -> stream closes
+    -> metadata run_id
+    -> streaming observation
+    -> stream close
     -> getRun
     -> getThreadState
 ~~~
 
-The final REST calls remain important because they reconcile two independent
-authorities:
+The previous polling loop has been removed.
+
+Run identity and final Run resource remain separate:
 
 ~~~text
-getRun
-    -> final Run lifecycle
+runId
+    -> observed from stream metadata
 
-getThreadState
-    -> persisted graph position and state
+run
+    -> reconciled final Runtime resource
 ~~~
 
-Initial questions:
-
-1. How should useExecution represent streaming lifecycle?
-2. How should the Run ID be acquired from the metadata event?
-3. Which stream modes are required for the first integration?
-4. Should message events affect UI state yet, or remain observational until
-   2.2D?
-5. What does stream completion mean relative to Run lifecycle completion?
-6. Should final getRun always execute after the stream closes?
-7. Should final getThreadState always execute after the stream closes?
-8. How should AbortController lifetime be owned by execution orchestration?
-9. How should a stream transport failure surface without accidentally creating
-   a second Run?
-10. How should the old polling path be removed while retaining a clear
-    reconciliation boundary?
-
-The integration must preserve:
+Browser and Runtime validation confirmed:
 
 ~~~text
-Thread != Run
+one POST /runs/stream
+one final GET /runs/{run_id}
+one final GET /state
+zero Run polling loop
+~~~
 
-Run lifecycle != graph position
+The final ThreadState remains authoritative for persisted message projection.
 
-stream closure != Run success
+Detailed evidence is recorded in:
 
-stream observation != persisted truth
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2D Message and state projection
+
+The next experiment projects selected live SSE payloads into frontend state.
+
+The key known behavior from 2.2A is:
+
+~~~text
+messages/partial
+    = cumulative/progressive snapshots
+    != token deltas
+~~~
+
+Therefore message streaming must not append each chunk's content.
+
+The integration must determine:
+
+1. How to identify a logical streamed message.
+2. How to replace/merge cumulative message snapshots.
+3. How messages/metadata relates to messages/partial.
+4. Whether values should project whole state during execution.
+5. Whether updates should remain diagnostic or affect UI state.
+6. How live state differs from persisted ThreadState.
+7. How to reconcile live projections with final persisted messages.
+8. How to avoid duplicate final message rendering.
+9. How malformed or unknown stream events affect live projection.
+10. Which projection logic belongs in execution versus a dedicated stream
+    projector.
+
+The implementation must preserve:
+
+~~~text
+stream projection = provisional UI observation
 
 ThreadState = persisted reconciliation authority
+
+messages/partial = snapshot, not delta
 ~~~
 
 ## Reference environment

@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.1E
+            2.2D
           </strong>
 
           <span>
-            First execution surface
+            Message and state projection
           </span>
         </div>
       </aside>
@@ -339,11 +339,11 @@ export function AppShell() {
             </span>
 
             <strong className="transport-name">
-              REST
+              REST + SSE
             </strong>
 
             <small>
-              direct Agent Server boundary
+              REST resources + SSE execution
             </small>
           </article>
         </section>

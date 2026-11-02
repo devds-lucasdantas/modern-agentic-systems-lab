@@ -5,9 +5,11 @@ import {
 
 import {
   assistantId,
+  runId,
   type AssistantId,
   type Message,
   type Run,
+  type RunId,
   type ThreadId,
   type ThreadState,
 } from '../domain'
@@ -15,6 +17,10 @@ import {
 import {
   useRuntime,
 } from '../app/use-runtime'
+
+import type {
+  AgentServerStreamEvent,
+} from '../transport/agent-server'
 
 import {
   projectMessagesFromState,
@@ -25,13 +31,22 @@ export type ExecutionPhase =
   | 'loading-state'
   | 'creating-thread'
   | 'creating-run'
-  | 'polling'
+  | 'streaming'
+  | 'reconciling-run'
   | 'refreshing-state'
   | 'completed'
   | 'failed'
 
 export interface ExecutionSnapshot {
   readonly phase: ExecutionPhase
+
+  /**
+   * Runtime Run identity observed from SSE metadata.
+   *
+   * It can exist before the final Run resource is reconciled.
+   */
+  readonly runId:
+    RunId | null
 
   readonly run:
     Run | null
@@ -58,8 +73,9 @@ export interface ExecuteInput {
 }
 
 const initialSnapshot:
-ExecutionSnapshot = {
+  ExecutionSnapshot = {
   phase: 'idle',
+  runId: null,
   run: null,
   state: null,
   messages: [],
@@ -74,22 +90,36 @@ const terminalStatuses =
     'interrupted',
   ])
 
-const sleep = (
-  milliseconds: number,
-): Promise<void> =>
-  new Promise((resolve) => {
-    window.setTimeout(
-      resolve,
-      milliseconds,
-    )
-  })
-
 const asError = (
   value: unknown,
 ): Error =>
   value instanceof Error
     ? value
     : new Error(String(value))
+
+const isObject = (
+  value: unknown,
+): value is Record<string, unknown> =>
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value)
+
+const runIdFromStreamEvent = (
+  event: AgentServerStreamEvent,
+): RunId | null => {
+  if (
+    event.kind !== 'known' ||
+    event.event !== 'metadata' ||
+    !isObject(event.data) ||
+    typeof event.data.run_id !== 'string'
+  ) {
+    return null
+  }
+
+  return runId(
+    event.data.run_id,
+  )
+}
 
 export function useExecution() {
   const { client } =
@@ -110,6 +140,7 @@ export function useExecution() {
         setSnapshot((current) => ({
           ...current,
           phase: 'loading-state',
+          runId: null,
           run: null,
           error: null,
         }))
@@ -122,6 +153,7 @@ export function useExecution() {
 
           setSnapshot({
             phase: 'idle',
+            runId: null,
             run: null,
             state,
             messages:
@@ -182,6 +214,7 @@ export function useExecution() {
             setSnapshot({
               phase:
                 'creating-thread',
+              runId: null,
               run: null,
               state: null,
               messages: [],
@@ -198,11 +231,20 @@ export function useExecution() {
           setSnapshot((current) => ({
             ...current,
             phase: 'creating-run',
+            runId: null,
+            run: null,
             error: null,
           }))
 
-          const createdRun =
-            await client.createRun(
+          let observedRunId:
+            RunId | null = null
+
+          let streamStarted =
+            false
+
+          for await (
+            const event
+            of client.streamRun(
               activeThread,
               {
                 assistantId:
@@ -221,61 +263,117 @@ export function useExecution() {
                   ],
                 },
 
-                // The first UI surface allows one
-                // active execution per selected Thread.
+                // Preserve the single-active-execution
+                // policy from the REST baseline.
                 multitaskStrategy:
                   'reject',
+
+                // 2.2C observes the stream but deliberately
+                // does not project partial messages yet.
+                streamMode: [
+                  'updates',
+                  'values',
+                  'messages',
+                  'checkpoints',
+                ],
+
+                streamResumable:
+                  true,
+
+                // Transport loss must not implicitly
+                // cancel Runtime execution.
+                onDisconnect:
+                  'continue',
               },
             )
-
-          setSnapshot((current) => ({
-            ...current,
-            phase: 'polling',
-            run: createdRun,
-          }))
-
-          let currentRun =
-            createdRun
-
-          const maxPolls = 240
-
-          for (
-            let attempt = 0;
-            attempt < maxPolls;
-            attempt += 1
           ) {
-            if (
-              terminalStatuses.has(
-                currentRun.status,
+            const metadataRunId =
+              runIdFromStreamEvent(
+                event,
               )
+
+            if (
+              metadataRunId !== null
             ) {
-              break
+              if (
+                observedRunId !== null &&
+                observedRunId !==
+                  metadataRunId
+              ) {
+                throw new Error(
+                  'Run stream changed run_id during one execution',
+                )
+              }
+
+              observedRunId =
+                metadataRunId
             }
 
-            await sleep(500)
-
-            currentRun =
-              await client.getRun(
-                activeThread,
-                currentRun.id,
+            if (
+              !streamStarted ||
+              metadataRunId !== null
+            ) {
+              setSnapshot(
+                (current) => ({
+                  ...current,
+                  phase:
+                    'streaming',
+                  runId:
+                    observedRunId,
+                }),
               )
+            }
 
-            setSnapshot(
-              (current) => ({
-                ...current,
-                phase: 'polling',
-                run: currentRun,
-              }),
-            )
+            streamStarted = true
           }
 
           if (
+            observedRunId === null
+          ) {
+            throw new Error(
+              'Run stream completed without metadata run_id',
+            )
+          }
+
+          const finalRunId =
+            observedRunId
+
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase:
+                'reconciling-run',
+              runId:
+                finalRunId,
+            }),
+          )
+
+          const reconciledRun =
+            await client.getRun(
+              activeThread,
+              finalRunId,
+            )
+
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase:
+                'reconciling-run',
+              runId:
+                finalRunId,
+              run:
+                reconciledRun,
+            }),
+          )
+
+          if (
             !terminalStatuses.has(
-              currentRun.status,
+              reconciledRun.status,
             )
           ) {
             throw new Error(
-              'Run polling exceeded 120 seconds',
+              'Run stream closed before terminal lifecycle status: ' +
+              reconciledRun.status,
             )
           }
 
@@ -284,7 +382,10 @@ export function useExecution() {
               ...current,
               phase:
                 'refreshing-state',
-              run: currentRun,
+              runId:
+                finalRunId,
+              run:
+                reconciledRun,
             }),
           )
 
@@ -295,7 +396,10 @@ export function useExecution() {
 
           setSnapshot({
             phase: 'completed',
-            run: currentRun,
+            runId:
+              finalRunId,
+            run:
+              reconciledRun,
             state,
             messages:
               projectMessagesFromState(
