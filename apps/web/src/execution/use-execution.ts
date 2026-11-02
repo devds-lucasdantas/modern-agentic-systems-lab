@@ -10,6 +10,7 @@ import {
   type Message,
   type Run,
   type RunId,
+  type StateValues,
   type ThreadId,
   type ThreadState,
 } from '../domain'
@@ -25,6 +26,11 @@ import type {
 import {
   projectMessagesFromState,
 } from './message-projector'
+
+import {
+  emptyLiveStreamProjection,
+  projectStreamEvent,
+} from './stream-projector'
 
 export type ExecutionPhase =
   | 'idle'
@@ -54,6 +60,15 @@ export interface ExecutionSnapshot {
   readonly state:
     ThreadState | null
 
+  /**
+   * Latest provisional complete values snapshot
+   * observed from the live SSE stream.
+   *
+   * Final persisted authority remains ThreadState.
+   */
+  readonly liveValues:
+    StateValues | null
+
   readonly messages:
     readonly Message[]
 
@@ -78,6 +93,7 @@ const initialSnapshot:
   runId: null,
   run: null,
   state: null,
+  liveValues: null,
   messages: [],
   error: null,
 }
@@ -142,6 +158,7 @@ export function useExecution() {
           phase: 'loading-state',
           runId: null,
           run: null,
+            liveValues: null,
           error: null,
         }))
 
@@ -156,6 +173,7 @@ export function useExecution() {
             runId: null,
             run: null,
             state,
+            liveValues: null,
             messages:
               projectMessagesFromState(
                 state,
@@ -217,6 +235,7 @@ export function useExecution() {
               runId: null,
               run: null,
               state: null,
+              liveValues: null,
               messages: [],
               error: null,
             })
@@ -233,8 +252,21 @@ export function useExecution() {
             phase: 'creating-run',
             runId: null,
             run: null,
+            liveValues: null,
             error: null,
           }))
+
+          let liveProjection = {
+            ...emptyLiveStreamProjection,
+
+            // Preserve already reconciled history
+            // for an existing Thread until the first
+            // complete values snapshot arrives.
+            messages:
+              selectedThreadId === null
+                ? []
+                : snapshot.messages,
+          }
 
           let observedRunId:
             RunId | null = null
@@ -268,8 +300,9 @@ export function useExecution() {
                 multitaskStrategy:
                   'reject',
 
-                // 2.2C observes the stream but deliberately
-                // does not project partial messages yet.
+                // Observe complementary live execution views.
+                // 2.2D projects messages/partial and complete
+                // values snapshots into provisional UI state.
                 streamMode: [
                   'updates',
                   'values',
@@ -309,9 +342,23 @@ export function useExecution() {
                 metadataRunId
             }
 
+            const nextProjection =
+              projectStreamEvent(
+                liveProjection,
+                event,
+              )
+
+            const projectionChanged =
+              nextProjection !==
+              liveProjection
+
+            liveProjection =
+              nextProjection
+
             if (
               !streamStarted ||
-              metadataRunId !== null
+              metadataRunId !== null ||
+              projectionChanged
             ) {
               setSnapshot(
                 (current) => ({
@@ -320,6 +367,16 @@ export function useExecution() {
                     'streaming',
                   runId:
                     observedRunId,
+
+                  messages:
+                    projectionChanged
+                      ? liveProjection.messages
+                      : current.messages,
+
+                  liveValues:
+                    projectionChanged
+                      ? liveProjection.values
+                      : current.liveValues,
                 }),
               )
             }
@@ -401,6 +458,7 @@ export function useExecution() {
             run:
               reconciledRun,
             state,
+            liveValues: null,
             messages:
               projectMessagesFromState(
                 state,
@@ -422,7 +480,7 @@ export function useExecution() {
           throw normalized
         }
       },
-      [client],
+      [client, snapshot.messages],
     )
 
   return {

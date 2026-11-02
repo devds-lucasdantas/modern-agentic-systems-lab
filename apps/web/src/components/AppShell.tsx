@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.2D
+            2.2E
           </strong>
 
           <span>
-            Message and state projection
+            Disconnect, reconnect and replay
           </span>
         </div>
       </aside>

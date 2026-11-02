@@ -1871,3 +1871,457 @@ The next sub-block is:
 
 It will project selected live stream events into frontend state without
 discarding final persisted-state reconciliation.
+
+---
+
+# 2.2D — Message and state projection
+
+## Objective
+
+Project selected Agent Server SSE payloads into provisional frontend state
+while preserving persisted ThreadState as the final reconciliation authority.
+
+The live pipeline is now:
+
+~~~text
+Agent Server SSE
+      |
+      +-- messages/partial
+      |       |
+      |       -> progressive Message projection
+      |
+      +-- values
+              |
+              -> complete provisional state snapshot
+~~~
+
+followed by:
+
+~~~text
+GET Run
+GET ThreadState
+      |
+      -> final persisted projection
+~~~
+
+## Empirical payload discovery
+
+A dedicated temporary harness inspected the pinned Runtime before projection
+logic was implemented.
+
+Observed event counts for one execution:
+
+~~~text
+messages/metadata   1
+messages/partial   16
+values              3
+updates             5
+~~~
+
+### messages/partial
+
+Each observed partial was:
+
+~~~text
+array length = 1
+message type = ai
+same message id across snapshots
+~~~
+
+The first snapshot had empty content.
+
+Later snapshots progressively contained the accumulated model output.
+
+The final streamed message kept the same message identity that was later
+persisted in ThreadState.
+
+Therefore:
+
+~~~text
+messages/partial = cumulative snapshot
+messages/partial != token delta
+~~~
+
+Appending partial content would be incorrect.
+
+### values
+
+`values` behaved as a complete live graph-state snapshot.
+
+The first observed values payload contained only the human message.
+
+The final values payload contained:
+
+~~~text
+human message
+AI message
+~~~
+
+The final persisted ThreadState contained the same two messages plus additional
+state keys such as memory and skill metadata.
+
+### updates
+
+`updates` was deliberately not interpreted as a generic state contract.
+
+Observed keys included:
+
+~~~text
+SkillsMiddleware.before_agent
+PatchToolCallsMiddleware.before_agent
+MemoryMiddleware.before_agent
+model
+TodoListMiddleware.after_model
+~~~
+
+Their shapes were heterogeneous.
+
+Only some update payloads contained messages, and even those message fields
+did not share one universal shape.
+
+Therefore updates remain diagnostic/event-level information rather than a
+generic frontend-state projection source.
+
+## Pure stream projector
+
+A framework-independent projector was added:
+
+~~~text
+src/execution/stream-projector.ts
+~~~
+
+Its state is:
+
+~~~text
+LiveStreamProjection
+    messages
+    values
+~~~
+
+The reducer API is conceptually:
+
+~~~text
+LiveStreamProjection
+        +
+AgentServerStreamEvent
+        |
+        v
+projectStreamEvent(...)
+        |
+        v
+LiveStreamProjection
+~~~
+
+It has no React, fetch, AgentServerClient or stream framing dependency.
+
+## Message merge semantics
+
+`messages/partial` is projected through the existing transport-independent
+Message model.
+
+Identified incoming messages are merged by:
+
+~~~text
+message.id
+~~~
+
+If the ID already exists, the new cumulative snapshot replaces the previous
+message.
+
+If it does not exist, the message is appended.
+
+This means:
+
+~~~text
+partial 1: "PRO"
+partial 2: "PROJECTION"
+partial 3: "PROJECTION_STREAM"
+~~~
+
+produces:
+
+~~~text
+"PROJECTION_STREAM"
+~~~
+
+rather than:
+
+~~~text
+"PROPROJECTIONPROJECTION_STREAM"
+~~~
+
+Unidentified partial messages are ignored because safe cumulative replacement
+cannot be established without identity.
+
+The complete values snapshot and final ThreadState provide recovery paths.
+
+## values semantics
+
+A known `values` event replaces the provisional complete values snapshot.
+
+Its messages are projected as a complete message list.
+
+Therefore:
+
+~~~text
+messages/partial
+    -> progressive message-level replacement
+
+values
+    -> complete live-state replacement
+~~~
+
+Both remain provisional.
+
+## Ignored semantic events
+
+The following event families do not currently alter LiveStreamProjection:
+
+~~~text
+updates
+messages/metadata
+metadata
+checkpoints
+~~~
+
+They retain their separate responsibilities:
+
+~~~text
+metadata
+    -> Runtime execution identity
+
+messages/metadata
+    -> model execution metadata
+
+updates
+    -> heterogeneous graph/node/middleware updates
+
+checkpoints
+    -> checkpoint observation
+~~~
+
+## Integration with useExecution
+
+ExecutionSnapshot now contains:
+
+~~~text
+state
+    -> persisted ThreadState
+
+liveValues
+    -> provisional SSE values snapshot
+
+messages
+    -> currently rendered message projection
+~~~
+
+During streaming, every known SSE event passes through the pure projector.
+
+When the projection changes, React receives:
+
+~~~text
+messages = liveProjection.messages
+liveValues = liveProjection.values
+~~~
+
+The existing Runtime lifecycle identity continues to come from the SSE metadata
+run_id.
+
+## Existing Thread history
+
+For an existing Thread, live projection starts from the already reconciled:
+
+~~~text
+snapshot.messages
+~~~
+
+This preserves conversation history until the first complete live values
+snapshot arrives.
+
+For a newly created Thread, the seed is empty.
+
+This avoids leaking messages from a previously selected Thread into a new
+execution.
+
+## Persisted reconciliation
+
+After SSE closure:
+
+~~~text
+GET /threads/{thread}/runs/{run}
+GET /threads/{thread}/state
+~~~
+
+still execute exactly once.
+
+The final ThreadState replaces provisional state:
+
+~~~text
+liveValues = null
+messages = projectMessagesFromState(state)
+~~~
+
+Thus:
+
+~~~text
+live projection != persisted authority
+~~~
+
+## Deterministic projector validation
+
+A temporary standalone harness verified:
+
+1. an initial values snapshot projects the human message;
+2. the first AI partial adds one assistant message;
+3. later cumulative partials replace that same message by ID;
+4. message count remains stable;
+5. unknown events do not mutate semantic projection;
+6. malformed JSON events do not mutate semantic projection;
+7. updates do not mutate complete state projection;
+8. a later values snapshot replaces the complete live message snapshot.
+
+The harness passed and was removed afterward.
+
+## Browser validation — new Thread
+
+A new Thread was executed with a long 40-line response.
+
+During execution the UI showed the user message and eventually the final single
+assistant card.
+
+The Run completed with:
+
+~~~text
+Run status = success
+Graph next = END
+Checkpoint = populated
+~~~
+
+No duplicated Assistant message cards were observed.
+
+## Browser validation — existing Thread
+
+A second Run was executed in the same Thread.
+
+The previous user/assistant pair remained visible while the next execution was
+processed.
+
+The resulting persisted conversation contained:
+
+~~~text
+USER       prompt 1
+ASSISTANT  response 1
+USER       prompt 2
+ASSISTANT  response 2
+~~~
+
+This validated the existing-history seed behavior.
+
+## Browser validation — live partial rendering
+
+A final experiment used a 100-line response and browser network throttling to
+make the live phase observable.
+
+While the UI badge still showed:
+
+~~~text
+STREAMING
+~~~
+
+the screen simultaneously showed:
+
+~~~text
+Run ID       populated
+Run status   —
+Graph next   —
+Checkpoint   —
+~~~
+
+and the Assistant card already contained progressive output:
+
+~~~text
+LIVE_001
+LIVE_002
+LIVE_003
+...
+~~~
+
+This provides direct end-to-end evidence that `messages/partial` is being
+projected before final Runtime resource reconciliation.
+
+Only one Assistant card grew during the stream.
+
+## Network behavior
+
+The integration preserved the 2.2C execution topology:
+
+~~~text
+POST /threads/{thread}/runs/stream
+GET  /threads/{thread}/runs/{run}
+GET  /threads/{thread}/state
+~~~
+
+Browser CORS preflight may appear separately before the streaming fetch.
+
+It is transport setup, not execution polling.
+
+No repeated Run GET polling loop was reintroduced.
+
+## Quality gates
+
+The final implementation passes:
+
+~~~text
+oxlint
+TypeScript
+Vite production build
+git diff --check
+~~~
+
+Static polling-regression checks remain empty.
+
+## 2.2D conclusion
+
+The frontend now has three explicitly separated notions of state:
+
+~~~text
+streamed message projection
+    -> provisional interaction view
+
+streamed values projection
+    -> provisional complete graph-state view
+
+ThreadState
+    -> persisted reconciliation authority
+~~~
+
+The final authority model is:
+
+~~~text
+messages/partial
+        |
+        -> replace cumulative Message by identity
+        |
+values
+        |
+        -> replace provisional complete snapshot
+        |
+SSE closes
+        |
+GET Run
+        |
+        -> final lifecycle authority
+        |
+GET ThreadState
+        |
+        -> final persisted state/message authority
+~~~
+
+The next sub-block is:
+
+~~~text
+2.2E — Disconnect, reconnect and replay
+~~~
+
+It must validate transport interruption, resumable streaming, Last-Event-ID,
+at-least-once replay and idempotent frontend projection.

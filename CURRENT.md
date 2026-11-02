@@ -1399,42 +1399,107 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2D Message and state projection
+## Completed sub-block — 2.2D Message and state projection
 
-The next experiment projects selected live SSE payloads into frontend state.
+Live SSE payloads now project into provisional frontend state before persisted
+Runtime reconciliation.
 
-The key known behavior from 2.2A is:
+Empirically validated semantics:
 
 ~~~text
 messages/partial
-    = cumulative/progressive snapshots
-    != token deltas
+    -> cumulative AI Message snapshot
+    -> merge/replace by message.id
+
+values
+    -> complete provisional graph-state snapshot
+
+updates
+    -> heterogeneous event data
+    -> not treated as generic whole state
 ~~~
 
-Therefore message streaming must not append each chunk's content.
+The pure projector is:
 
-The integration must determine:
+~~~text
+apps/web/src/execution/stream-projector.ts
+~~~
 
-1. How to identify a logical streamed message.
-2. How to replace/merge cumulative message snapshots.
-3. How messages/metadata relates to messages/partial.
-4. Whether values should project whole state during execution.
-5. Whether updates should remain diagnostic or affect UI state.
-6. How live state differs from persisted ThreadState.
-7. How to reconcile live projections with final persisted messages.
-8. How to avoid duplicate final message rendering.
-9. How malformed or unknown stream events affect live projection.
-10. Which projection logic belongs in execution versus a dedicated stream
-    projector.
+Browser validation proved that while:
+
+~~~text
+phase = streaming
+Run ID = known
+Run status = —
+Graph next = —
+Checkpoint = —
+~~~
+
+the Assistant message already grows inside one card.
+
+Existing Thread history also remains visible across subsequent executions.
+
+Final reconciliation remains:
+
+~~~text
+GET Run
+GET ThreadState
+~~~
+
+and persisted ThreadState replaces provisional stream projection.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2E Disconnect, reconnect and replay
+
+The next experiment validates resumable streaming under transport loss.
+
+Known evidence from 2.2A:
+
+~~~text
+stream_resumable = true
+
+content-location
+    -> resumable stream location
+
+Last-Event-ID
+    -> replay cursor
+
+SSE IDs
+    -> not globally unique semantic event identities
+
+same SSE ID may be shared by different event families
+~~~
+
+The experiment must determine:
+
+1. how the browser intentionally disconnects an active stream;
+2. behavior with `on_disconnect=continue`;
+3. behavior with `on_disconnect=cancel`;
+4. how reconnect targets the original Run without creating another Run;
+5. how Last-Event-ID is supplied by the fetch-based transport;
+6. exactly which events are replayed;
+7. whether `(id, event)` is sufficient for replay deduplication;
+8. whether identical `(id, event)` can still repeat under replay;
+9. how provisional message projection remains idempotent;
+10. how final persisted reconciliation resolves any replay ambiguity;
+11. what happens when disconnect occurs before metadata/run_id observation;
+12. what happens after lifecycle completion but before the client consumes EOF.
 
 The implementation must preserve:
 
 ~~~text
-stream projection = provisional UI observation
+transport reconnect != new execution
 
-ThreadState = persisted reconciliation authority
+replay = at-least-once observation
 
-messages/partial = snapshot, not delta
+stream projection must be idempotent
+
+ThreadState remains final persisted authority
 ~~~
 
 ## Reference environment
