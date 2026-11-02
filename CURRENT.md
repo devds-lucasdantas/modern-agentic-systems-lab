@@ -1152,51 +1152,135 @@ Detailed experimental evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current block — 2.2 Event streaming
+## Completed sub-block — 2.2A Pinned streaming contract discovery
 
-The next architectural change replaces REST polling as the primary live
-observation mechanism.
+The pinned Agent Server SSE contract has been observed directly.
 
-Control implementation:
+The stateful creation endpoint is:
 
 ~~~text
-create Run
-    -> poll GET Run every ~500 ms
-    -> observe terminal Run lifecycle
-    -> GET ThreadState
-    -> reconcile persisted state
+POST /threads/{thread_id}/runs/stream
 ~~~
 
-The streaming implementation must preserve all existing Runtime identities and
-persistence boundaries.
+with:
+
+~~~text
+Content-Type: application/json
+Accept: text/event-stream
+~~~
+
+The streaming request schema is:
+
+~~~text
+RunCreateStreamingStateful
+    =
+RunCreateStateful
+    +
+on_disconnect
+~~~
+
+where:
+
+~~~text
+on_disconnect = continue | cancel
+
+default = continue
+~~~
+
+Observed event families were:
+
+~~~text
+metadata
+checkpoints
+values
+updates
+messages/metadata
+messages/partial
+~~~
+
+The first experiment produced:
+
+~~~text
+23 events
+21 unique SSE IDs
+~~~
+
+proving that SSE ID alone is not a unique semantic-event identity.
+
+`messages/partial` was observed to contain cumulative snapshots of one AI
+message rather than token deltas.
+
+The final streamed checkpoint/state converged with persisted ThreadState.
+
+The resulting authority model is:
+
+~~~text
+stream
+    = live observation
+
+ThreadState
+    = persisted authority
+~~~
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2B SSE transport client
+
+The next step implements the transport boundary without yet integrating
+streaming into React execution state.
+
+Target layering:
+
+~~~text
+fetch POST
+    |
+    v
+ReadableStream<Uint8Array>
+    |
+    v
+UTF-8 decoder
+    |
+    v
+SSE framing parser
+    |
+    v
+SseEvent
+    |
+    v
+Agent Server stream-event decoder
+~~~
+
+The first implementation must preserve raw transport semantics:
+
+~~~text
+event
+id
+data
+retry
+comments / blank-line framing
+multi-line data
+partial byte chunks
+partial UTF-8 sequences
+~~~
 
 Initial questions:
 
-1. Which pinned Agent Server streaming endpoint should the browser use first?
-2. Which stream mode provides the minimum useful live execution surface?
-3. How should SSE framing be parsed without conflating transport events with
-   frontend domain entities?
-4. How should streamed message chunks relate to persisted ThreadState messages?
-5. How should lifecycle events and graph execution position remain independent?
-6. How should disconnect and reconnect behave?
-7. Which events may be replayed after reconnect?
-8. What client-side idempotency strategy is required for at-least-once replay?
-9. When should the frontend reconcile stream-derived state against persisted
-   ThreadState?
-10. Should the pinned REST/SSE surface remain the first implementation before
-    testing compatibility with the modern JavaScript SDK?
-
-The baseline intentionally still contains no:
-
-~~~text
-EventSource
-WebSocket
-Last-Event-ID
-LangGraph JavaScript SDK
-AG-UI
-~~~
-
-Those boundaries will now be introduced experimentally rather than assumed.
+1. Can SSE framing be implemented independently from Agent Server event types?
+2. How should arbitrary network chunk boundaries be handled?
+3. How should multi-line data fields be joined?
+4. How should comments and unknown SSE fields be handled?
+5. How should the final event be flushed if EOF occurs without a final blank
+   line?
+6. How should malformed JSON be represented without breaking SSE framing?
+7. How should unknown Agent Server event families be preserved?
+8. What transport identity should be retained for future replay handling?
+9. How should AbortSignal propagate through the streaming request?
+10. Can the client remain independent from EventSource and the modern LangGraph
+    JavaScript SDK?
 
 ## Reference environment
 
