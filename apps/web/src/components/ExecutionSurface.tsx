@@ -78,6 +78,7 @@ export function ExecutionSurface({
       runId,
       run,
       state,
+      projectionAuthority,
       messages,
       error,
       execute,
@@ -380,6 +381,20 @@ export function ExecutionSurface({
                       state.checkpoint
                         .checkpointId,
                     )}
+              </strong>
+            </article>
+
+            <article>
+              <span>
+                Message authority
+              </span>
+
+              <strong
+                data-projection-authority={
+                  projectionAuthority
+                }
+              >
+                {projectionAuthority}
               </strong>
             </article>
           </div>

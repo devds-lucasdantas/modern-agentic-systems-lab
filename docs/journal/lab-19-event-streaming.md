@@ -2992,3 +2992,581 @@ The next sub-block is:
 ~~~text
 2.2F — Persisted-state reconciliation
 ~~~
+
+---
+
+# 2.2F — Persisted-state reconciliation
+
+## Objective
+
+Formalize the boundary between provisional stream observations and persisted
+Runtime authority.
+
+The frontend already had three execution views:
+
+~~~text
+messages/partial
+    -> progressive message observation
+
+values
+    -> provisional graph-state snapshot
+
+ThreadState
+    -> persisted Runtime state
+~~~
+
+This block determines which view owns the UI at each stage of execution and
+what happens when reconciliation succeeds, execution is interrupted, or final
+persisted-state retrieval fails.
+
+## Discovery A — live values versus persisted ThreadState
+
+A direct Runtime harness captured:
+
+~~~text
+values events      = 3
+checkpoint events  = 7
+message partials   = 12
+~~~
+
+The final live `values` snapshot contained:
+
+~~~text
+keys:
+    messages
+~~~
+
+with exactly two messages:
+
+~~~text
+human
+AI
+~~~
+
+The final persisted ThreadState contained:
+
+~~~text
+keys:
+    memory_contents
+    messages
+    skills_metadata
+~~~
+
+Its messages were JSON-equivalent to the final live messages, including stable
+message IDs and final content.
+
+Therefore:
+
+~~~text
+last values.messages
+    == persisted ThreadState.values.messages
+~~~
+
+for the observed successful execution, while:
+
+~~~text
+last values
+    != complete persisted ThreadState.values
+~~~
+
+The persisted state contained additional middleware-produced state not present
+in the final live values event.
+
+## State authority consequence
+
+`values` is suitable for incremental frontend interaction, but cannot replace:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+as the complete persisted graph-state authority.
+
+The ownership boundary is:
+
+~~~text
+messages/partial
+values
+    -> provisional interaction projection
+
+GET Run
+    -> lifecycle authority
+
+GET ThreadState
+    -> persisted graph-state authority
+~~~
+
+## Checkpoint observations
+
+The live checkpoints event exposed fields including:
+
+~~~text
+config
+metadata
+next
+parent_config
+tasks
+values
+~~~
+
+The persisted ThreadState separately exposed:
+
+~~~text
+checkpoint
+parent_checkpoint
+next
+tasks
+interrupts
+values
+~~~
+
+The current UI deliberately does not project Graph next or Checkpoint from
+streamed checkpoints events.
+
+Those UI fields continue to come only from reconciled ThreadState.
+
+This keeps live execution telemetry separate from persisted graph authority.
+
+## Playwright reconciliation baseline
+
+The browser-level reconciliation contract is now tested with Playwright.
+
+The first reconciliation test deliberately delays:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+after the Run resource has already been reconciled.
+
+This creates a deterministic intermediate state:
+
+~~~text
+phase = refreshing-state
+
+Run status = success
+
+Assistant message = visible
+
+Graph next = —
+Checkpoint = —
+~~~
+
+Once the delayed ThreadState request is released:
+
+~~~text
+phase = completed
+
+Run status = success
+Graph next = END
+Checkpoint = populated
+~~~
+
+The Assistant message remains present exactly once.
+
+This proves that lifecycle and persisted graph-state reconciliation are
+independent steps.
+
+## Discovery B — streamed partial does not imply persistence
+
+An active Run was explicitly cancelled with lifecycle action:
+
+~~~text
+interrupt
+~~~
+
+after Assistant partial output was already visible in the browser.
+
+The browser had observed content such as:
+
+~~~text
+INTERRUPTED_001
+INTERRUPTED_002
+...
+~~~
+
+However, cancellation occurred before the model node committed an AIMessage to
+persisted ThreadState.
+
+The first test incorrectly expected one final Assistant card.
+
+The actual persisted state contained:
+
+~~~text
+AI messages = 0
+~~~
+
+After persisted reconciliation, the provisional Assistant card disappeared.
+
+This behavior is correct.
+
+It establishes:
+
+~~~text
+messages/partial observed
+    != AIMessage guaranteed to persist
+~~~
+
+A streamed partial is an execution observation, not a persistence commitment.
+
+## Interrupted reconciliation invariant
+
+The interrupted Playwright test was updated to derive final UI cardinality from
+persisted ThreadState.
+
+The invariant is:
+
+~~~text
+final Assistant cards
+    ==
+persisted AI messages
+~~~
+
+If persisted ThreadState contains no AIMessage, all provisional AI output must
+be removed.
+
+If persisted ThreadState does contain an AIMessage, the rendered content must
+match the persisted content exactly.
+
+The test now passes.
+
+## Run lifecycle versus frontend completion
+
+The frontend treats these Runtime statuses as terminal:
+
+~~~text
+success
+interrupted
+error
+timeout
+~~~
+
+A terminal Runtime status does not itself determine frontend success or failure.
+
+For example:
+
+~~~text
+Run.status = interrupted
+ThreadState reconciliation = successful
+
+    -> frontend phase = completed
+    -> projection authority = persisted
+~~~
+
+`completed` therefore means that frontend orchestration and reconciliation
+finished, not that agent execution necessarily succeeded.
+
+An actual Runtime `error` lifecycle was not independently induced during this
+block. The same terminal reconciliation path handles it structurally, but that
+specific Runtime behavior remains suitable for later resilience coverage.
+
+## Discovery C — persisted reconciliation failure
+
+A Playwright route injected:
+
+~~~text
+GET /threads/{thread_id}/state
+    -> HTTP 503
+~~~
+
+after:
+
+~~~text
+SSE completed
+GET Run succeeded
+Run.status = success
+~~~
+
+The resulting frontend state was:
+
+~~~text
+phase = failed
+
+Run status = success
+
+Graph next = —
+Checkpoint = —
+
+live Assistant output = preserved
+~~~
+
+This is not contradictory.
+
+It means:
+
+~~~text
+Runtime execution succeeded
+
+but
+
+frontend failed to obtain final persisted ThreadState authority
+~~~
+
+## Why provisional output is preserved
+
+Deleting provisional output after a temporary reconciliation failure would
+produce poor interaction behavior:
+
+~~~text
+user observes completed response
+        |
+GET ThreadState temporarily fails
+        |
+response disappears
+~~~
+
+Instead the frontend preserves the most recent live projection while explicitly
+marking that it has not been reconciled.
+
+## ProjectionAuthority
+
+Authority is now represented directly in ExecutionSnapshot:
+
+~~~text
+ProjectionAuthority
+    none
+    live
+    persisted
+    unreconciled
+~~~
+
+Semantics:
+
+~~~text
+none
+    -> no meaningful rendered execution projection yet
+
+live
+    -> messages currently come from SSE projection
+
+persisted
+    -> messages were replaced by reconciled ThreadState
+
+unreconciled
+    -> live projection remains visible because persisted
+       reconciliation failed
+~~~
+
+This is deliberately separate from ExecutionPhase.
+
+For example:
+
+~~~text
+phase = failed
+projectionAuthority = unreconciled
+Run.status = success
+~~~
+
+is a valid state.
+
+So is:
+
+~~~text
+phase = completed
+projectionAuthority = persisted
+Run.status = interrupted
+~~~
+
+## Authority transitions
+
+The normal path is:
+
+~~~text
+none
+    |
+    | first semantic live projection
+    v
+live
+    |
+    | GET ThreadState succeeds
+    v
+persisted
+~~~
+
+The failed-reconciliation path is:
+
+~~~text
+live
+    |
+    | GET ThreadState fails
+    v
+unreconciled
+~~~
+
+Loading an existing Thread directly from persisted state produces:
+
+~~~text
+persisted
+~~~
+
+without passing through live execution.
+
+## UI provenance
+
+The execution surface now exposes:
+
+~~~text
+Message authority
+~~~
+
+alongside:
+
+~~~text
+Run
+Run status
+Graph next
+Checkpoint
+~~~
+
+This makes data provenance visible instead of requiring users or tests to infer
+it from phase names.
+
+The rendered authority is also exposed through:
+
+~~~text
+data-projection-authority
+~~~
+
+for deterministic browser testing.
+
+## Playwright authority assertions
+
+The successful reconciliation test proves:
+
+~~~text
+streaming / refreshing-state
+    -> Message authority = live
+
+completed
+    -> Message authority = persisted
+~~~
+
+The interrupted reconciliation test proves:
+
+~~~text
+partial AI visible
+    -> authority = live
+
+Run interrupted
+ThreadState reconciled
+    -> authority = persisted
+
+provisional-only AI output
+    -> removed when not persisted
+~~~
+
+The reconciliation-failure test proves:
+
+~~~text
+live response visible
+    -> authority = live
+
+GET ThreadState -> 503
+    -> phase = failed
+    -> authority = unreconciled
+    -> response remains visible
+~~~
+
+## Streaming E2E suite
+
+The Phase 2 streaming browser suite now contains four complementary tests:
+
+~~~text
+resumable-stream.spec.ts
+    -> transport loss
+    -> same Run reconnect
+    -> Last-Event-ID replay
+
+persisted-reconciliation.spec.ts
+    -> success
+    -> lifecycle before persisted state
+    -> live -> persisted
+
+interrupted-reconciliation.spec.ts
+    -> provisional AI output
+    -> lifecycle interruption
+    -> exact persisted replacement
+
+reconciliation-failure.spec.ts
+    -> Run success
+    -> ThreadState HTTP failure
+    -> live -> unreconciled
+~~~
+
+All four tests pass together in Chromium:
+
+~~~text
+4 passed
+~~~
+
+## Final authority architecture
+
+The resulting frontend model is:
+
+~~~text
+                    Agent Server SSE
+                          |
+          +---------------+---------------+
+          |                               |
+          v                               v
+ messages/partial                      values
+          |                               |
+          +---------------+---------------+
+                          |
+                          v
+                 provisional projection
+                          |
+                          v
+              projectionAuthority = live
+                          |
+                          | stream completes
+                          v
+                      GET Run
+                          |
+                          v
+                 lifecycle authority
+                          |
+                          v
+                  GET ThreadState
+                    /           \
+                   /             \
+                  v               v
+              success           failure
+                 |                 |
+                 v                 v
+            persisted        unreconciled
+                 |
+                 v
+       persisted graph authority
+~~~
+
+## 2.2F conclusion
+
+The frontend no longer treats rendered messages as having one implicit source.
+
+Message projection now carries explicit authority.
+
+Key invariants are:
+
+~~~text
+stream observation != persistence commitment
+
+Run lifecycle != graph-state authority
+
+terminal Run != successful frontend reconciliation
+
+persisted ThreadState always wins when reconciliation succeeds
+
+live output may remain visible after reconciliation failure,
+but must be explicitly marked unreconciled
+~~~
+
+The next sub-block is:
+
+~~~text
+2.2G — Streaming baseline review
+~~~
+
+That review will consolidate the complete 2.2 streaming architecture, verify
+boundaries and invariants across all streaming tests, update architectural
+documentation, and determine whether 2.2 is ready to close before Shared State.

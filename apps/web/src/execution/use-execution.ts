@@ -46,6 +46,13 @@ export type ExecutionPhase =
   | 'failed'
 
 
+export type ProjectionAuthority =
+  | 'none'
+  | 'live'
+  | 'persisted'
+  | 'unreconciled'
+
+
 export interface ExecutionSnapshot {
   readonly phase:
     ExecutionPhase
@@ -77,6 +84,25 @@ export interface ExecutionSnapshot {
   readonly liveValues:
     StateValues | null
 
+  /**
+   * Authority of the currently rendered message projection.
+   *
+   * none:
+   *     no meaningful projection yet
+   *
+   * live:
+   *     provisional SSE observation
+   *
+   * persisted:
+   *     reconciled from ThreadState
+   *
+   * unreconciled:
+   *     provisional projection retained because persisted
+   *     reconciliation failed
+   */
+  readonly projectionAuthority:
+    ProjectionAuthority
+
   readonly messages:
     readonly Message[]
 
@@ -104,6 +130,7 @@ const initialSnapshot:
   run: null,
   state: null,
   liveValues: null,
+  projectionAuthority: 'none',
   messages: [],
   error: null,
 }
@@ -267,6 +294,8 @@ export function useExecution() {
             run: null,
             state,
             liveValues: null,
+            projectionAuthority:
+              'persisted',
             messages:
               projectMessagesFromState(
                 state,
@@ -337,6 +366,8 @@ export function useExecution() {
               run: null,
               state: null,
               liveValues: null,
+              projectionAuthority:
+                'none',
               messages: [],
               error: null,
             })
@@ -536,6 +567,11 @@ export function useExecution() {
                         projectionChanged
                           ? liveProjection.values
                           : current.liveValues,
+
+                      projectionAuthority:
+                        projectionChanged
+                          ? 'live'
+                          : current.projectionAuthority,
                     }),
                   )
                 }
@@ -774,6 +810,9 @@ export function useExecution() {
             liveValues:
               null,
 
+            projectionAuthority:
+              'persisted',
+
             messages:
               projectMessagesFromState(
                 state,
@@ -794,6 +833,12 @@ export function useExecution() {
               ...current,
               phase:
                 'failed',
+
+              projectionAuthority:
+                current.projectionAuthority ===
+                  'live'
+                  ? 'unreconciled'
+                  : current.projectionAuthority,
 
               error:
                 normalized,

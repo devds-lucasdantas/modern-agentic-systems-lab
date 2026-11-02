@@ -1529,36 +1529,141 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2F Persisted-state reconciliation
+## Completed sub-block — 2.2F Persisted-state reconciliation
 
-The next block must formalize the boundary between provisional stream state and
-persisted Runtime authority.
+The frontend now distinguishes provisional stream observation from persisted
+Runtime authority explicitly.
 
-Questions to validate:
-
-1. what exact persisted state replaces liveValues after stream completion;
-2. reconciliation after normal success;
-3. reconciliation after reconnect/replay;
-4. reconciliation after interrupted/error lifecycle states;
-5. whether final stream values can differ temporarily from GET ThreadState;
-6. checkpoint identity and graph position during final reconciliation;
-7. how stale provisional state is cleared on success and failure;
-8. whether UI should expose live-vs-persisted provenance explicitly;
-9. behavior when stream EOF arrives before Run lifecycle becomes terminal;
-10. behavior when Run is terminal before all replay events are consumed.
-
-The invariant remains:
+Empirical Runtime discovery established:
 
 ~~~text
-stream projection
-    -> provisional observation
+last live values:
+    keys = messages
 
-Run resource
-    -> lifecycle authority
-
-ThreadState
-    -> persisted graph-state authority
+final persisted ThreadState:
+    keys =
+        memory_contents
+        messages
+        skills_metadata
 ~~~
+
+For the successful experiment:
+
+~~~text
+live messages == persisted messages
+
+but
+
+live values != complete persisted state
+~~~
+
+Therefore live values cannot replace GET ThreadState as the final graph-state
+authority.
+
+A streamed AI partial also does not imply persistence.
+
+An interrupted Run demonstrated:
+
+~~~text
+Assistant partial visible in browser
+    -> Run lifecycle interrupted
+    -> model node had not committed AIMessage
+    -> persisted AI messages = 0
+    -> persisted reconciliation removed provisional card
+~~~
+
+The frontend now models message provenance through:
+
+~~~text
+ProjectionAuthority
+    none
+    live
+    persisted
+    unreconciled
+~~~
+
+Normal authority transition:
+
+~~~text
+none
+    -> live
+    -> persisted
+~~~
+
+Persisted-state retrieval failure:
+
+~~~text
+live
+    -> unreconciled
+~~~
+
+This permits:
+
+~~~text
+Run.status = success
+phase = failed
+projectionAuthority = unreconciled
+~~~
+
+without discarding useful provisional output.
+
+It also permits:
+
+~~~text
+Run.status = interrupted
+phase = completed
+projectionAuthority = persisted
+~~~
+
+when persisted Runtime reconciliation succeeds.
+
+The browser UI exposes Message authority explicitly.
+
+The current Phase 2 streaming E2E suite validates:
+
+~~~text
+resumable transport + replay
+successful persisted reconciliation
+interrupted persisted reconciliation
+persisted-state reconciliation failure
+~~~
+
+All four Playwright tests pass together.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2G Streaming baseline review
+
+The next block closes the Event Streaming section.
+
+Review goals:
+
+1. consolidate the complete streaming architecture;
+2. verify transport/domain/UI boundaries;
+3. review all execution phases and projection-authority states;
+4. confirm Run identity ownership and CORS fallback;
+5. confirm replay-cursor safety and at-least-once semantics;
+6. confirm live-message idempotency;
+7. confirm persisted-state authority;
+8. review failure and reconnect behavior;
+9. run the full static and browser test matrix;
+10. update docs/architecture.md with the final frontend streaming model;
+11. identify residual limitations and deferred production concerns;
+12. decide whether 2.2 Event streaming is ready to close.
+
+Known residual item to record rather than silently infer:
+
+~~~text
+actual Runtime status=error
+    -> not independently forced during 2.2F
+~~~
+
+The reconciliation code structurally handles terminal error/timeout statuses,
+but dedicated resilience coverage may be revisited during Phase 4.
 
 ## Reference environment
 

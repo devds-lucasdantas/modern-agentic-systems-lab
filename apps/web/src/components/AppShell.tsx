@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.2F
+            2.2G
           </strong>
 
           <span>
-            Persisted-state reconciliation
+            Streaming baseline review
           </span>
         </div>
       </aside>

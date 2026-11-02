@@ -114,7 +114,7 @@
   - [x] 2.2C Live Run streaming integration
   - [x] 2.2D Message and state projection
   - [x] 2.2E Disconnect, reconnect and replay
-  - [ ] 2.2F Persisted-state reconciliation
+  - [x] 2.2F Persisted-state reconciliation
   - [ ] 2.2G Streaming baseline review
 - [ ] 2.3 Shared state
 - [ ] 2.4 Interrupts
