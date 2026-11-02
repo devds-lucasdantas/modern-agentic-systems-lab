@@ -2055,3 +2055,706 @@ The next section is:
 
 That section can now introduce Run creation and execution while preserving the
 resource model established by the previous frontend foundations.
+
+---
+
+# 2.1E — First execution surface
+
+## Objective
+
+Introduce the first user-controlled stateful execution flow in the frontend
+without introducing streaming.
+
+The section must preserve the Runtime distinctions established during Phase 1:
+
+~~~text
+Thread
+    !=
+Run
+
+Run lifecycle
+    !=
+graph execution position
+
+message projection
+    !=
+Runtime execution identity
+~~~
+
+The first execution surface therefore treats messages as a projection of
+persisted ThreadState rather than as the primary application state.
+
+---
+
+## Execution contract discovery
+
+Before implementing the UI, the pinned Runtime was inspected to determine the
+actual graph input and persisted message contracts.
+
+The Assistant schema confirmed that the `deep_agent` input requires:
+
+~~~text
+messages
+~~~
+
+and accepts LangChain message variants including:
+
+~~~text
+HumanMessage
+AIMessage
+ChatMessage
+SystemMessage
+FunctionMessage
+ToolMessage
+message chunks
+~~~
+
+A previously successful Run was then inspected.
+
+Its input contained:
+
+~~~text
+input:
+    messages:
+        - role: human
+          content: <text>
+          id: <message id>
+~~~
+
+The corresponding persisted ThreadState contained messages shaped as:
+
+~~~text
+type: human
+content: <text>
+id: <message id>
+~~~
+
+followed by:
+
+~~~text
+type: ai
+content: <text>
+id: <message id>
+~~~
+
+This establishes three separate representations:
+
+~~~text
+Run input wire
+        !=
+persisted message wire
+        !=
+frontend Message domain
+~~~
+
+---
+
+## Message projection
+
+The execution layer introduces:
+
+~~~text
+src/execution/message-projector.ts
+~~~
+
+The projector accepts raw persisted Runtime message representations and maps
+them into the frontend Message domain.
+
+Observed and supported mappings include:
+
+~~~text
+human
+HumanMessage
+HumanMessageChunk
+user
+    ->
+user
+
+ai
+AIMessage
+AIMessageChunk
+assistant
+    ->
+assistant
+
+system
+SystemMessage
+SystemMessageChunk
+    ->
+system
+
+tool
+ToolMessage
+FunctionMessage
+and chunks
+    ->
+tool
+~~~
+
+The frontend domain therefore remains independent from LangChain message class
+names.
+
+---
+
+## Content projection
+
+Persisted message content can be either:
+
+~~~text
+string
+~~~
+
+or structured content.
+
+The projector normalizes:
+
+~~~text
+string
+    ->
+TextMessageBlock
+
+object or other structured value
+    ->
+DataMessageBlock
+~~~
+
+Objects containing a string `text` field are represented as text blocks.
+
+Unknown structured content is preserved rather than discarded.
+
+---
+
+## StateValues narrowing
+
+The frontend StateValues domain supports both:
+
+~~~text
+StateRecord
+
+or
+
+readonly StateRecord[]
+~~~
+
+because the pinned ThreadState OpenAPI allows both forms.
+
+TypeScript 7 does not reliably narrow the readonly-array union through a simple
+`Array.isArray` negative check for subsequent property access.
+
+The projector therefore uses an explicit object guard that rejects arrays before
+reading:
+
+~~~text
+values.messages
+~~~
+
+This keeps the domain type accurate without casting away the union.
+
+---
+
+## Message projector validation
+
+A temporary Vite SSR harness validated:
+
+~~~text
+role=human
+    -> user
+
+type=human
+    -> user
+
+type=ai
+    -> assistant
+
+type=tool
+    -> tool
+~~~
+
+It also validated a complete persisted values object containing:
+
+~~~text
+messages
+memory_contents
+skills_metadata
+~~~
+
+and projected exactly two messages in the expected order.
+
+Array-form StateValues are intentionally not interpreted as the graph message
+state used by this frontend surface.
+
+The temporary test source was removed after validation.
+
+---
+
+## Execution hook
+
+The execution layer introduces:
+
+~~~text
+src/execution/use-execution.ts
+~~~
+
+The hook explicitly represents execution phases:
+
+~~~text
+idle
+
+loading-state
+
+creating-thread
+
+creating-run
+
+polling
+
+refreshing-state
+
+completed
+
+failed
+~~~
+
+This phase is UI orchestration state.
+
+It is not a replacement for Runtime Run status.
+
+---
+
+## New conversation flow
+
+When no Thread is selected, submission performs:
+
+~~~text
+POST /threads
+        |
+        v
+Thread
+        |
+        v
+POST /threads/{thread_id}/runs
+~~~
+
+The newly created Thread identity is retained independently from the Run
+identity.
+
+The UI therefore creates the execution context before starting execution.
+
+---
+
+## Run input
+
+The first execution surface submits the observed minimal graph input shape:
+
+~~~text
+{
+    messages: [
+        {
+            role: "human",
+            content: <user input>,
+            id: <generated UUID>
+        }
+    ]
+}
+~~~
+
+The frontend does not submit its Message domain object directly.
+
+It explicitly constructs the Runtime input wire representation.
+
+---
+
+## Multitask policy
+
+The first execution surface explicitly selects:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+rather than relying on the Runtime default of enqueue.
+
+This is a UI policy for the initial surface:
+
+~~~text
+one active user-triggered execution
+per selected Thread
+~~~
+
+It does not redefine Runtime concurrency semantics.
+
+The Runtime remains capable of:
+
+~~~text
+reject
+enqueue
+interrupt
+rollback
+~~~
+
+as established in Phase 1.
+
+---
+
+## REST polling
+
+Section 2.1E intentionally does not introduce SSE.
+
+After Run creation, the frontend polls:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}
+~~~
+
+until a terminal Run lifecycle status is observed.
+
+Terminal statuses are:
+
+~~~text
+success
+error
+timeout
+interrupted
+~~~
+
+Polling currently occurs at approximately:
+
+~~~text
+500 ms
+~~~
+
+with a bounded maximum duration.
+
+This implementation is intentionally temporary.
+
+Phase 2.2 will replace the observation mechanism with event streaming while
+preserving the execution domain model.
+
+---
+
+## Post-Run state refresh
+
+A terminal Run does not itself provide the persisted graph state required by
+the frontend.
+
+After the Run becomes terminal, the client performs:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+and separately reads:
+
+~~~text
+GraphPosition
+Checkpoint
+persisted values
+messages
+interrupts
+tasks
+~~~
+
+The UI therefore never derives graph completion from Run lifecycle alone.
+
+---
+
+## Runtime invariant in the UI
+
+The first execution surface deliberately displays two independent facts:
+
+~~~text
+Run status
+
+Graph next
+~~~
+
+and includes the explicit invariant:
+
+~~~text
+Run status ≠ graph position
+~~~
+
+This encodes one of the most important Phase 1 findings directly into the user
+interface.
+
+For the first live execution the observed final values were:
+
+~~~text
+Run status
+    success
+
+Graph next
+    END
+~~~
+
+These values happened to align for that Run, but they were obtained from
+different Runtime resources.
+
+---
+
+## First real browser execution
+
+The first user-controlled browser execution used:
+
+~~~text
+User input:
+    teste
+~~~
+
+The frontend visibly progressed through execution and reached:
+
+~~~text
+phase
+    completed
+
+Run status
+    success
+
+Graph next
+    END
+
+Checkpoint
+    present
+~~~
+
+The persisted message projection displayed:
+
+~~~text
+USER
+teste
+
+ASSISTANT
+O teste foi recebido.
+~~~
+
+This validates the full non-streaming execution path.
+
+---
+
+## Full execution path
+
+The validated flow is:
+
+~~~text
+textarea
+    |
+    v
+Runtime input wire
+role = human
+    |
+    v
+POST /threads
+    |
+    v
+Thread
+    |
+    v
+POST /threads/{thread_id}/runs
+    |
+    v
+Run
+pending / running
+    |
+    v
+REST polling
+    |
+    v
+Run terminal lifecycle
+    |
+    v
+GET ThreadState
+    |
+    v
+persisted LangChain messages
+type = human / ai
+    |
+    v
+message projector
+    |
+    v
+frontend Message
+user / assistant
+    |
+    v
+React MessageList
+~~~
+
+---
+
+## Existing Thread loading
+
+Selecting an existing Thread uses:
+
+~~~text
+GET /threads/{thread_id}/state
+~~~
+
+without creating a new Run.
+
+Messages are re-projected from the persisted Runtime state.
+
+This preserves:
+
+~~~text
+Agent Server / ThreadState
+    = source of truth
+
+React component history
+    != source of truth
+~~~
+
+---
+
+## Execution surface
+
+The application now contains:
+
+~~~text
+Assistant selector
+
+Thread selector
+    existing Thread
+    or New Thread on submit
+
+User input composer
+
+Create Run control
+
+execution phase indicator
+
+Run identity
+
+Run lifecycle status
+
+Graph next position
+
+Checkpoint identity
+
+persisted message projection
+~~~
+
+Runs are no longer merely a future navigation placeholder.
+
+The shell exposes the execution surface as a navigable application section.
+
+---
+
+## Failure handling
+
+Execution failures are stored separately from Runtime state and rendered in the
+execution surface.
+
+The hook distinguishes:
+
+~~~text
+execution orchestration phase
+Run lifecycle status
+transport/application error
+persisted ThreadState
+~~~
+
+rather than collapsing them into one `isLoading` or `error` flag.
+
+---
+
+## No streaming yet
+
+The first execution surface deliberately uses REST polling.
+
+It does not yet implement:
+
+~~~text
+SSE
+incremental token rendering
+stream mode selection
+Last-Event-ID
+reconnection
+resumable stream replay
+partial message chunks
+~~~
+
+Those concerns belong to:
+
+~~~text
+2.2 — Event streaming
+~~~
+
+The 2.1E implementation therefore establishes a baseline against which the
+streaming implementation can later be compared.
+
+---
+
+## Architectural model
+
+The application execution architecture is now:
+
+~~~text
+                     React UI
+                        |
+            +-----------+-----------+
+            |                       |
+            v                       v
+       AppShell              ExecutionSurface
+                                    |
+                                    v
+                              useExecution
+                                    |
+                 +------------------+------------------+
+                 |                                     |
+                 v                                     v
+        AgentServerClient                    message projector
+                 |                                     ^
+                 v                                     |
+             Thread / Run                         ThreadState
+                 |                                     ^
+                 +------------------+------------------+
+                                    |
+                                    v
+                              Agent Server
+~~~
+
+The domain remains below both transport and execution orchestration.
+
+---
+
+## 2.1E conclusion
+
+The frontend now supports its first complete stateful agent execution.
+
+It can:
+
+~~~text
+select an Assistant
+select an existing Thread
+create a new Thread
+submit graph input
+create a stateful Run
+observe Run lifecycle through polling
+retrieve persisted ThreadState
+display graph execution position
+display checkpoint identity
+project persisted messages
+render user and assistant messages
+~~~
+
+while preserving:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph position
+
+wire message != persisted message != domain Message
+
+ThreadState = persisted message source of truth
+~~~
+
+The next section is:
+
+~~~text
+2.1F — Frontend baseline review
+~~~
+
+That review will consolidate the complete pre-streaming frontend architecture
+before Phase 2.2 changes the execution observation model from REST polling to
+event streaming.

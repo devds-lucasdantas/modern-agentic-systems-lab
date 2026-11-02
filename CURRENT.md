@@ -1027,50 +1027,103 @@ Detailed evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current sub-block — 2.1E First execution surface
+## Completed sub-block — 2.1E First execution surface
 
-The next step introduces the first user-controlled execution flow.
+The frontend now supports its first complete stateful execution flow.
 
-The implementation must preserve:
-
-~~~text
-Thread
-    !=
-Run
-
-Run lifecycle
-    !=
-graph execution position
-
-message projection
-    !=
-Runtime execution identity
-~~~
-
-Initial target:
+Validated browser path:
 
 ~~~text
-select or create Thread
 select Assistant
-submit one user input
-create stateful Run
-observe Run lifecycle
-refresh persisted ThreadState
-render message projection from Runtime state
+    -> create/select Thread
+    -> submit human message input
+    -> create stateful Run
+    -> poll Run lifecycle
+    -> read persisted ThreadState
+    -> project Runtime messages
+    -> render user/assistant conversation
 ~~~
 
-Streaming remains outside this sub-block and belongs to Phase 2.2.
+The first live UI execution reached:
+
+~~~text
+Run status = success
+Graph next = END
+Checkpoint = present
+~~~
+
+and persisted:
+
+~~~text
+USER
+teste
+
+ASSISTANT
+O teste foi recebido.
+~~~
+
+The UI deliberately displays Run lifecycle and graph position independently.
+
+The message boundary is:
+
+~~~text
+Run input wire
+    !=
+persisted LangChain message
+    !=
+frontend Message
+~~~
+
+The current execution surface uses REST polling. Event streaming remains reserved
+for Phase 2.2.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current sub-block — 2.1F Frontend baseline review
+
+The next step is to review and close the complete pre-streaming frontend
+baseline.
+
+The review must verify:
+
+~~~text
+frontend architecture
+dependency direction
+Runtime identity boundaries
+REST transport behavior
+schema drift handling
+configuration and browser boundary
+Thread / Run separation
+message projection
+execution lifecycle
+graph-state separation
+documentation consistency
+repository cleanliness
+~~~
+
+The purpose of 2.1F is not to add another major feature.
+
+It is the architectural closure gate before:
+
+~~~text
+2.2 — Event streaming
+~~~
 
 Initial questions:
 
-1. How should the shell select and retain an active Thread?
-2. Should new conversations create a Thread before any Run exists?
-3. What is the smallest safe Run creation payload?
-4. How should pending/running/success/error/interrupted status be represented?
-5. How should messages be projected from ThreadState.values without making
-   Message[] the source of truth?
-6. How should execution remain usable before SSE streaming is introduced?
-7. How do we prevent Run success from being interpreted as graph END?
+1. Are the domain, transport, application and execution layers still
+   unidirectional?
+2. Did any wire representation leak into the stable domain?
+3. Is ThreadState still the persisted source of truth for messages?
+4. Is Run lifecycle visibly independent from graph execution position?
+5. Which parts of the REST polling implementation are intentionally temporary?
+6. What invariants must event streaming preserve when it replaces polling?
+7. Is the frontend baseline reproducible and sufficiently documented to serve as
+   the control implementation for later streaming experiments?
 
 Phase 2 will build the client-facing layer over the Runtime contracts established
 during Phase 1.

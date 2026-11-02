@@ -11,6 +11,10 @@ import {
   useRuntimeOverview,
 } from '../app/use-runtime-overview'
 
+import {
+  ExecutionSurface,
+} from './ExecutionSurface'
+
 const shortId = (
   value: string,
 ): string =>
@@ -171,15 +175,12 @@ export function AppShell() {
             Threads
           </a>
 
-          <span
-            className="nav-item disabled"
-            aria-disabled="true"
+          <a
+            className="nav-item"
+            href="#execution"
           >
-            Runs
-            <small>
-              2.1E
-            </small>
-          </span>
+            Execution
+          </a>
 
           <span
             className="nav-item disabled"
@@ -198,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.1D
+            2.1E
           </strong>
 
           <span>
-            Application shell
+            First execution surface
           </span>
         </div>
       </aside>
@@ -436,6 +437,12 @@ export function AppShell() {
             </div>
           </section>
         </div>
+
+        <ExecutionSurface
+          assistants={assistants}
+          threads={threads}
+          onRuntimeChanged={refresh}
+        />
       </main>
     </div>
   )
