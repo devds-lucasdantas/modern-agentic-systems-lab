@@ -1228,59 +1228,197 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2B SSE transport client
+## Completed sub-block — 2.2B SSE transport client
 
-The next step implements the transport boundary without yet integrating
-streaming into React execution state.
+A fetch-based browser-compatible SSE transport is implemented.
 
-Target layering:
+Generic framing:
 
 ~~~text
-fetch POST
-    |
-    v
 ReadableStream<Uint8Array>
-    |
-    v
-UTF-8 decoder
-    |
-    v
-SSE framing parser
-    |
-    v
-SseEvent
-    |
-    v
-Agent Server stream-event decoder
+    -> TextDecoder
+    -> SSE line parser
+    -> SseEvent
 ~~~
 
-The first implementation must preserve raw transport semantics:
+Agent Server decoding:
 
 ~~~text
-event
-id
-data
-retry
-comments / blank-line framing
+SseEvent
+    -> known
+    -> unknown
+    -> malformed-json
+~~~
+
+The existing AgentServerClient now exposes:
+
+~~~text
+streamRun(...)
+~~~
+
+using:
+
+~~~text
+POST /threads/{thread_id}/runs/stream
+~~~
+
+The implementation preserves the existing transport conventions for:
+
+~~~text
+base URL normalization
+fetch injection
+credentials
+HTTP status handling
+AgentServerHttpError
+~~~
+
+and adds explicit validation for:
+
+~~~text
+text/event-stream
+Response.body
+~~~
+
+Successful responses with invalid streaming envelopes become:
+
+~~~text
+AgentServerDecodeError
+~~~
+
+StreamRunInput also separates:
+
+~~~text
+AbortSignal
+    = local request cancellation
+
+onDisconnect
+    = Runtime policy after connection loss
+~~~
+
+Deterministic validation covered:
+
+~~~text
+arbitrary byte boundaries
+split UTF-8 code points
+LF / CRLF / CR
 multi-line data
-partial byte chunks
-partial UTF-8 sequences
+comments
+unknown fields
+retry parsing
+last-event-ID inheritance
+NUL-containing IDs
+empty IDs
+EOF without final blank line
+unknown Agent Server events
+malformed JSON
+request mapping
+HTTP/decode error layering
+AbortSignal propagation
+~~~
+
+A live pinned-Runtime smoke test successfully observed:
+
+~~~text
+metadata
+updates
+values
+checkpoints
+messages/metadata
+messages/partial
+~~~
+
+and then reconciled persisted ThreadState through the existing REST client.
+
+The two live experiments also showed that:
+
+~~~text
+messages/partial count
+    != stable protocol contract
+~~~
+
+because one Run produced six partial snapshots and another produced seven.
+
+No streaming dependency has entered:
+
+~~~text
+src/domain
+src/app
+src/components
+src/execution
+~~~
+
+The React execution path therefore still uses the 2.1 REST-polling control.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2C Live Run streaming integration
+
+The next experiment connects the validated streaming transport to execution
+orchestration.
+
+Current control implementation:
+
+~~~text
+createRun
+    -> poll getRun every ~500 ms
+    -> terminal Run lifecycle
+    -> getThreadState
+~~~
+
+Target experimental path:
+
+~~~text
+streamRun
+    -> live Agent Server events
+    -> stream closes
+    -> getRun
+    -> getThreadState
+~~~
+
+The final REST calls remain important because they reconcile two independent
+authorities:
+
+~~~text
+getRun
+    -> final Run lifecycle
+
+getThreadState
+    -> persisted graph position and state
 ~~~
 
 Initial questions:
 
-1. Can SSE framing be implemented independently from Agent Server event types?
-2. How should arbitrary network chunk boundaries be handled?
-3. How should multi-line data fields be joined?
-4. How should comments and unknown SSE fields be handled?
-5. How should the final event be flushed if EOF occurs without a final blank
-   line?
-6. How should malformed JSON be represented without breaking SSE framing?
-7. How should unknown Agent Server event families be preserved?
-8. What transport identity should be retained for future replay handling?
-9. How should AbortSignal propagate through the streaming request?
-10. Can the client remain independent from EventSource and the modern LangGraph
-    JavaScript SDK?
+1. How should useExecution represent streaming lifecycle?
+2. How should the Run ID be acquired from the metadata event?
+3. Which stream modes are required for the first integration?
+4. Should message events affect UI state yet, or remain observational until
+   2.2D?
+5. What does stream completion mean relative to Run lifecycle completion?
+6. Should final getRun always execute after the stream closes?
+7. Should final getThreadState always execute after the stream closes?
+8. How should AbortController lifetime be owned by execution orchestration?
+9. How should a stream transport failure surface without accidentally creating
+   a second Run?
+10. How should the old polling path be removed while retaining a clear
+    reconciliation boundary?
+
+The integration must preserve:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph position
+
+stream closure != Run success
+
+stream observation != persisted truth
+
+ThreadState = persisted reconciliation authority
+~~~
 
 ## Reference environment
 

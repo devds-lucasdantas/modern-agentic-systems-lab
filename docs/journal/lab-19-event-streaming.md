@@ -827,3 +827,665 @@ bytes
 ~~~
 
 before any mapping into Agent Server stream-event families.
+
+---
+
+# 2.2B — SSE transport client
+
+## Objective
+
+Implement the browser-facing Agent Server SSE transport without integrating it
+into React execution state.
+
+The implementation preserves the layering established in 2.2A:
+
+~~~text
+network bytes
+    |
+    v
+SSE framing
+    |
+    v
+Agent Server stream event
+    |
+    v
+future semantic projection
+~~~
+
+The transport layer does not create frontend Message, Run or ThreadState domain
+objects from streaming events.
+
+## SSE framing layer
+
+The generic SSE parser is implemented in:
+
+~~~text
+apps/web/src/transport/agent-server/sse.ts
+~~~
+
+Its output contract is:
+
+~~~text
+SseEvent
+    id
+    event
+    data
+    retry
+~~~
+
+The parser has no Agent Server, LangGraph or React dependency.
+
+## Byte-stream model
+
+The parser consumes:
+
+~~~text
+ReadableStream<Uint8Array>
+~~~
+
+through:
+
+~~~text
+reader.read()
+    |
+    v
+TextDecoder.decode(..., stream=true)
+    |
+    v
+text accumulator
+    |
+    v
+line parser
+    |
+    v
+SSE field accumulator
+    |
+    v
+blank-line dispatch
+~~~
+
+Streaming TextDecoder mode is required because UTF-8 code points may be split
+across arbitrary network chunks.
+
+## SSE line endings and chunk boundaries
+
+The parser explicitly accepts:
+
+~~~text
+LF
+CRLF
+CR
+~~~
+
+Network chunks do not need to align with lines.
+
+The deterministic torture test delivered one byte per stream chunk, forcing
+boundaries inside:
+
+~~~text
+field names
+field values
+line endings
+UTF-8 multibyte sequences
+~~~
+
+## SSE data fields
+
+Multiple SSE data fields are joined with LF.
+
+Observed deterministic example:
+
+~~~text
+data: first
+data: segundo 🙂
+
+    ->
+
+first
+segundo 🙂
+~~~
+
+This happens before Agent Server JSON decoding.
+
+## Comments and unknown SSE fields
+
+Lines beginning with:
+
+~~~text
+:
+~~~
+
+are treated as SSE comments and ignored.
+
+Unknown framing fields are also ignored.
+
+These are generic SSE behaviors rather than Agent Server semantics.
+
+## SSE event ID state
+
+The parser maintains the SSE last-event-ID buffer across events.
+
+An event without an explicit `id` can therefore inherit the previous effective
+ID.
+
+The deterministic test validated:
+
+~~~text
+event alpha
+id = 42
+
+event beta
+no explicit id
+effective id = 42
+~~~
+
+An ID containing U+0000 is ignored.
+
+An explicit empty ID:
+
+~~~text
+id:
+~~~
+
+updates the effective ID to the empty string.
+
+These semantics will matter in the later replay experiments.
+
+## Retry fields
+
+A numeric SSE retry field is parsed and exposed on SseEvent.
+
+Invalid retry values are ignored.
+
+The parser deliberately does not implement reconnect timing.
+
+Reconnect policy belongs to a higher layer.
+
+## EOF policy
+
+The fetch-based parser implements an explicit robustness policy:
+
+~~~text
+EOF
++
+pending data fields
++
+no final blank line
+
+    -> dispatch pending event
+~~~
+
+This is a client policy for the custom fetch-based transport.
+
+It must not be confused with assumptions about native browser EventSource
+behavior.
+
+## Agent Server stream-event layer
+
+Agent Server event decoding is implemented separately in:
+
+~~~text
+apps/web/src/transport/agent-server/stream-events.ts
+~~~
+
+The decoder receives an already-framed:
+
+~~~text
+SseEvent
+~~~
+
+and attempts to decode its data as JSON.
+
+Its output distinguishes:
+
+~~~text
+known
+unknown
+malformed-json
+~~~
+
+## Known event families
+
+The initial known set is based on direct pinned-Runtime observation:
+
+~~~text
+metadata
+checkpoints
+values
+updates
+messages/metadata
+messages/partial
+~~~
+
+This list is intentionally not treated as exhaustive for future Agent Server
+versions or additional stream modes.
+
+## Unknown event preservation
+
+Unknown Agent Server event families do not fail the stream.
+
+Validated example:
+
+~~~text
+event: future/event
+data: {"future":1}
+~~~
+
+is preserved as:
+
+~~~text
+kind = unknown
+event = future/event
+~~~
+
+with its parsed JSON data.
+
+This preserves forward compatibility.
+
+## Malformed JSON preservation
+
+JSON decoding failure does not destroy SSE framing or terminate the connection.
+
+Validated example:
+
+~~~text
+event: updates
+data: {not-json}
+~~~
+
+becomes:
+
+~~~text
+kind = malformed-json
+event = updates
+rawData = {not-json}
+~~~
+
+This establishes:
+
+~~~text
+valid SSE framing
+    !=
+valid Agent Server JSON
+~~~
+
+## Type narrowing
+
+Known event names are narrowed through:
+
+~~~text
+isKnownAgentServerStreamEvent(...)
+~~~
+
+instead of a manual type assertion inside the returned object.
+
+An initial line-broken `as` assertion exposed a Vite/Rolldown syntax failure.
+
+The type guard removes that ambiguity and makes the narrowing explicit.
+
+## AgentServerClient integration
+
+The existing AgentServerClient now exposes:
+
+~~~text
+streamRun(...)
+~~~
+
+The method reuses the same private HTTP request machinery as the REST client.
+
+Streaming therefore inherits:
+
+~~~text
+base URL normalization
+fetch injection
+credentials
+JSON request behavior
+HTTP status validation
+AgentServerHttpError
+~~~
+
+No parallel HTTP client was introduced.
+
+## Stream request contract
+
+The client sends:
+
+~~~text
+POST /threads/{thread_id}/runs/stream
+~~~
+
+with:
+
+~~~text
+Accept: text/event-stream
+Content-Type: application/json
+~~~
+
+Frontend names are mapped to the wire boundary:
+
+~~~text
+assistantId
+    -> assistant_id
+
+multitaskStrategy
+    -> multitask_strategy
+
+streamMode
+    -> stream_mode
+
+streamResumable
+    -> stream_resumable
+
+streamSubgraphs
+    -> stream_subgraphs
+
+onDisconnect
+    -> on_disconnect
+~~~
+
+Snake-case wire names therefore remain outside the frontend domain.
+
+## AbortSignal boundary
+
+StreamRunInput accepts:
+
+~~~text
+signal?: AbortSignal
+~~~
+
+The signal is passed directly to fetch and is not serialized into JSON.
+
+Two independent controls therefore exist:
+
+~~~text
+AbortSignal
+    = local transport/request cancellation
+
+on_disconnect
+    = Runtime behavior after connection loss
+~~~
+
+These concepts must not be collapsed.
+
+## Successful-response validation
+
+After normal HTTP status validation, streamRun verifies:
+
+~~~text
+Content-Type starts with text/event-stream
+~~~
+
+and:
+
+~~~text
+Response.body != null
+~~~
+
+An invalid successful-response envelope becomes:
+
+~~~text
+AgentServerDecodeError
+~~~
+
+rather than AgentServerHttpError.
+
+## HTTP versus decoding errors
+
+The deterministic envelope test established:
+
+~~~text
+HTTP 500
+    -> AgentServerHttpError
+
+HTTP 200
+Content-Type: application/json
+    -> AgentServerDecodeError
+       path = RunStream.response.content-type
+~~~
+
+Failures therefore remain classified according to the layer that detected them.
+
+## AsyncGenerator surface
+
+The public transport exposes:
+
+~~~text
+AsyncGenerator<AgentServerStreamEvent>
+~~~
+
+Conceptually:
+
+~~~text
+for await (event of client.streamRun(...))
+~~~
+
+Each yielded object is an Agent Server transport event.
+
+It is not yet a frontend semantic event.
+
+## Deterministic client validation
+
+A fake-fetch harness validated:
+
+~~~text
+URL encoding
+POST method
+credentials propagation
+AbortSignal propagation
+Accept header
+Content-Type header
+assistant_id mapping
+multitask_strategy mapping
+stream_mode mapping
+stream_resumable mapping
+stream_subgraphs mapping
+on_disconnect mapping
+known event decoding
+unknown event preservation
+~~~
+
+The validated URL was:
+
+~~~text
+http://runtime.test/threads/thread%2Ftest/runs/stream
+~~~
+
+## Framing torture test
+
+The parser validation exercised:
+
+~~~text
+one byte per network chunk
+UTF-8 multibyte splitting
+LF
+CRLF
+CR
+comments
+unknown SSE fields
+multi-line data
+valid retry
+invalid retry
+last-event-ID inheritance
+NUL-containing ID
+empty ID
+known Agent Server event
+unknown Agent Server event
+malformed JSON
+EOF without final blank line
+~~~
+
+Observed result:
+
+~~~text
+events: 9
+multiline: "first\nsegundo 🙂"
+utf8: true
+inherited id: 42
+unknown family: unknown future/event
+malformed JSON: malformed-json
+EOF flush: final
+
+PASS: SSE transport framing
+~~~
+
+## Live Runtime validation
+
+The new transport was also validated directly against the pinned Agent Server.
+
+A new Thread and stateful streaming Run were created through AgentServerClient.
+
+The live stream produced:
+
+~~~text
+checkpoints          7
+messages/metadata    1
+messages/partial     7
+metadata             1
+updates              5
+values               3
+~~~
+
+The metadata event supplied the Runtime Run ID.
+
+The final persisted ThreadState contained:
+
+~~~text
+graph next = []
+
+checkpoint = present
+
+values keys:
+    memory_contents
+    messages
+    skills_metadata
+~~~
+
+The stream client therefore consumed the real pinned Runtime wire and could
+subsequently reconcile persisted state through the existing REST surface.
+
+## Partial-message count is not stable
+
+The 2.2A Run produced:
+
+~~~text
+messages/partial = 6
+~~~
+
+The independent 2.2B smoke test produced:
+
+~~~text
+messages/partial = 7
+~~~
+
+Both represented a very small model answer.
+
+Therefore:
+
+~~~text
+number of messages/partial events
+    != stable protocol contract
+~~~
+
+The frontend must never depend on a fixed number of partial snapshots.
+
+## Architecture validation
+
+After adding streaming transport, searches confirmed no streaming dependency in:
+
+~~~text
+src/domain
+src/app
+src/components
+src/execution
+~~~
+
+The architecture therefore remains:
+
+~~~text
+React / execution
+      |
+      | still REST polling
+      v
+AgentServerClient
+      |
+      +---- REST resources
+      |
+      +---- SSE transport
+                |
+                v
+        Agent Server stream
+~~~
+
+The capability now exists, but the UI has not adopted it.
+
+## Quality gates
+
+The implementation passes:
+
+~~~text
+oxlint
+    0 warnings
+    0 errors
+
+TypeScript
+    PASS
+
+Vite production build
+    PASS
+~~~
+
+## 2.2B conclusion
+
+A robust SSE transport client now exists independently from React and semantic
+frontend projection.
+
+The implemented pipeline is:
+
+~~~text
+fetch POST
+    |
+    v
+ReadableStream<Uint8Array>
+    |
+    v
+TextDecoder
+    |
+    v
+SSE framing parser
+    |
+    v
+SseEvent
+    |
+    v
+Agent Server event decoder
+    |
+    v
+AgentServerStreamEvent
+~~~
+
+The following invariants remain preserved:
+
+~~~text
+SSE framing != Agent Server semantics
+
+Agent Server stream event != frontend domain entity
+
+unknown events do not break the stream
+
+malformed JSON does not break SSE framing
+
+HTTP failure != successful-response decode failure
+
+AbortSignal != Runtime on_disconnect policy
+
+stream observation != persisted state
+~~~
+
+The next sub-block is:
+
+~~~text
+2.2C — Live Run streaming integration
+~~~
+
+That step will replace REST polling as the primary live Run observation
+mechanism while retaining explicit final Run and ThreadState reconciliation.

@@ -17,7 +17,15 @@ import {
   decodeThreadStateDto,
   isJsonObject,
 } from './decode'
-import { AgentServerHttpError } from './errors'
+import {
+  AgentServerDecodeError,
+  AgentServerHttpError,
+} from './errors'
+import {
+  decodeAgentServerStreamEvent,
+  type AgentServerStreamEvent,
+} from './stream-events'
+import { parseSseStream } from './sse'
 import {
   mapAssistant,
   mapRun,
@@ -50,6 +58,43 @@ export interface CreateRunInput {
   readonly input?: unknown
   readonly metadata?: Metadata
   readonly multitaskStrategy?: MultitaskStrategy
+}
+
+export type StreamMode =
+  | 'values'
+  | 'messages'
+  | 'messages-tuple'
+  | 'tasks'
+  | 'checkpoints'
+  | 'updates'
+  | 'events'
+  | 'debug'
+  | 'custom'
+
+export type StreamDisconnectMode =
+  | 'cancel'
+  | 'continue'
+
+export interface StreamRunInput
+  extends CreateRunInput {
+  readonly streamMode?:
+    | StreamMode
+    | readonly StreamMode[]
+
+  readonly streamResumable?: boolean
+  readonly streamSubgraphs?: boolean
+
+  readonly onDisconnect?:
+    StreamDisconnectMode
+
+  /**
+   * Transport cancellation only.
+   *
+   * This AbortSignal controls the browser/fetch request.
+   * Runtime behavior after disconnect remains governed by
+   * `onDisconnect`.
+   */
+  readonly signal?: AbortSignal
 }
 
 export interface ListRunsOptions
@@ -367,6 +412,101 @@ export class AgentServerClient {
     return mapRun(
       decodeRunDto(body),
     )
+  }
+
+  async *streamRun(
+    id: ThreadId,
+    input: StreamRunInput,
+  ): AsyncGenerator<
+    AgentServerStreamEvent,
+    void,
+    undefined
+  > {
+    const path =
+      `/threads/${encodeURIComponent(id)}/runs/stream`
+
+    const response =
+      await this.#request(
+        path,
+        {
+          method: 'POST',
+
+          headers: {
+            accept:
+              'text/event-stream',
+          },
+
+          body: JSON.stringify({
+            assistant_id:
+              input.assistantId,
+
+            input:
+              input.input,
+
+            metadata:
+              input.metadata,
+
+            multitask_strategy:
+              input.multitaskStrategy,
+
+            stream_mode:
+              input.streamMode,
+
+            stream_resumable:
+              input.streamResumable,
+
+            stream_subgraphs:
+              input.streamSubgraphs,
+
+            on_disconnect:
+              input.onDisconnect,
+          }),
+
+          signal:
+            input.signal,
+        },
+      )
+
+    const contentType =
+      response.headers.get(
+        'content-type',
+      )
+
+    if (
+      contentType === null ||
+      !contentType
+        .toLowerCase()
+        .startsWith(
+          'text/event-stream',
+        )
+    ) {
+      throw new AgentServerDecodeError(
+        'RunStream.response.content-type',
+        'text/event-stream',
+      )
+    }
+
+    if (
+      response.body === null
+    ) {
+      throw new AgentServerDecodeError(
+        'RunStream.response.body',
+        'ReadableStream<Uint8Array>',
+      )
+    }
+
+    for await (
+      const frame
+      of parseSseStream(
+        response.body,
+      )
+    ) {
+      yield (
+        decodeAgentServerStreamEvent(
+          frame,
+        )
+      )
+    }
   }
 
   async listRuns(
