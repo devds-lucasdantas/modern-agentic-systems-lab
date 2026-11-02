@@ -2374,3 +2374,577 @@ event streaming
 
 while preserving every Runtime identity and persistence invariant established by
 the control implementation.
+
+---
+
+## Version 0.5 — Phase 2 frontend streaming architecture
+
+Phase 2 sections 2.1 and 2.2 introduced the browser application boundary over
+the Agent Server Runtime.
+
+Detailed experimental evidence is preserved in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+docs/journal/lab-19-event-streaming.md
+~~~
+
+### Frontend stack
+
+The frontend baseline is:
+
+~~~text
+React
+TypeScript
+Vite
+pnpm
+Playwright
+~~~
+
+The application talks directly to the Agent Server during the current local
+laboratory phase.
+
+No BFF or protocol gateway has been introduced yet.
+
+### Frontend Runtime model
+
+The UI preserves Runtime concepts rather than reducing execution to:
+
+~~~text
+Message[]
+isLoading
+~~~
+
+Important frontend concepts include:
+
+~~~text
+Assistant
+Thread
+Run
+ThreadState
+Checkpoint
+ExecutionPhase
+ProjectionAuthority
+~~~
+
+Run lifecycle and persisted graph position remain separate dimensions.
+
+### Streaming architecture
+
+The final streaming stack is:
+
+~~~text
+Agent Server
+    |
+    | HTTP + SSE
+    v
+AgentServerClient
+    |
+    v
+RunStreamSession
+    |
+    +-- Run identity
+    +-- resumable stream URL
+    +-- safe replay cursor
+    +-- reconnect
+    |
+    v
+parseSseStream
+    |
+    v
+AgentServerStreamEvent
+    |
+    v
+stream projector
+    |
+    +-- provisional messages
+    +-- provisional values
+    |
+    v
+useExecution
+    |
+    +-- execution phases
+    +-- reconnect policy
+    +-- lifecycle reconciliation
+    +-- persisted-state reconciliation
+    |
+    v
+ExecutionSurface
+~~~
+
+### SSE framing boundary
+
+`parseSseStream` owns SSE framing only.
+
+It handles transport details such as:
+
+~~~text
+event
+data
+id
+retry
+multiline data
+UTF-8 chunk boundaries
+LF / CRLF / CR
+EOF flush
+~~~
+
+It does not own:
+
+~~~text
+Run identity
+reconnect policy
+React state
+graph-state semantics
+~~~
+
+### Runtime stream session
+
+`RunStreamSession` owns Runtime-specific resumability.
+
+Its responsibilities include:
+
+~~~text
+Thread identity
+Run identity
+stream URL
+committed Last-Event-ID
+current SSE-ID group
+metadata identity validation
+reconnect
+~~~
+
+Run identity can be established through:
+
+~~~text
+HTTP Location
+~~~
+
+or, when Location is hidden from browser JavaScript by CORS:
+
+~~~text
+metadata.run_id
+~~~
+
+The session validates the two identities if both are observed.
+
+### Replay cursor
+
+SSE IDs are replay-group coordinates rather than globally unique semantic event
+identifiers.
+
+Observed behavior includes multiple semantic events sharing one SSE ID.
+
+Therefore the safe cursor algorithm is:
+
+~~~text
+current ID group
+    remains uncommitted
+
+observe a different next ID
+    -> previous group is proven complete
+    -> commit previous ID
+
+natural EOF
+    -> final current group is complete
+    -> commit final ID
+
+network failure / abort / consumer break
+    -> current group remains uncommitted
+~~~
+
+Reconnect uses:
+
+~~~text
+GET /threads/{thread_id}/runs/{run_id}/stream
+Last-Event-ID: <safe committed group>
+~~~
+
+Replay is treated as at-least-once.
+
+### No generic transport deduplication
+
+The frontend deliberately does not deduplicate SSE events using:
+
+~~~text
+id
+~~~
+
+or:
+
+~~~text
+(id, event)
+~~~
+
+Both were observed to be non-unique at the semantic-event level.
+
+Replay safety instead belongs to the semantic projection.
+
+### Message projection
+
+`messages/partial` is cumulative rather than token-delta based.
+
+A stable message ID is therefore used to replace the current version of the same
+logical message.
+
+~~~text
+same Message ID
+    -> replace current provisional message
+~~~
+
+An unidentified partial is ignored instead of being duplicated.
+
+A later complete `values` snapshot provides a recovery path.
+
+### Values projection
+
+A `values` stream event represents a complete live graph-state snapshot for that
+instant.
+
+It therefore replaces the provisional values snapshot and its message
+projection.
+
+However:
+
+~~~text
+live values != complete persisted ThreadState
+~~~
+
+was empirically established.
+
+The final successful live values snapshot contained:
+
+~~~text
+messages
+~~~
+
+while persisted ThreadState also contained middleware state such as:
+
+~~~text
+memory_contents
+skills_metadata
+~~~
+
+Therefore live values are interaction state, not final persistence authority.
+
+### Projection authority
+
+Rendered message provenance is explicit:
+
+~~~text
+ProjectionAuthority
+    none
+    live
+    persisted
+    unreconciled
+~~~
+
+Normal transition:
+
+~~~text
+none
+    -> live
+    -> persisted
+~~~
+
+Failed persisted-state reconciliation:
+
+~~~text
+live
+    -> unreconciled
+~~~
+
+This is independent from execution phase.
+
+Valid combinations include:
+
+~~~text
+phase = completed
+Run.status = interrupted
+projectionAuthority = persisted
+~~~
+
+and:
+
+~~~text
+phase = failed
+Run.status = success
+projectionAuthority = unreconciled
+~~~
+
+### Execution phases
+
+The browser orchestration state machine currently exposes:
+
+~~~text
+idle
+loading-state
+creating-thread
+creating-run
+streaming
+reconnecting-stream
+reconciling-run
+refreshing-state
+completed
+failed
+~~~
+
+These describe frontend orchestration, not Runtime lifecycle directly.
+
+### Disconnect and reconnect
+
+Streaming Runs use:
+
+~~~text
+stream_resumable = true
+on_disconnect = continue
+~~~
+
+Transport loss therefore does not implicitly cancel Runtime execution.
+
+Reconnect targets the existing Run.
+
+~~~text
+one POST
+    -> creates one Run
+
+transport failure
+
+GET same Run stream
+    -> resumes observation
+~~~
+
+A reconnect must never create a second POST merely to recover transport.
+
+### Browser connectivity policy
+
+Transient stream failures use bounded reconnect backoff.
+
+If the browser explicitly reports:
+
+~~~text
+navigator.onLine = false
+~~~
+
+the frontend waits for the browser `online` event without consuming retry
+budget.
+
+Protocol/decode failures are not retried as transport failures.
+
+### Lifecycle versus stream consumption
+
+Runtime lifecycle completion and stream consumption completion are separate.
+
+A Run can reach:
+
+~~~text
+status = success
+~~~
+
+before a particular client has consumed all replayable stream events.
+
+Therefore a terminal lifecycle state does not authorize the frontend to skip
+stream replay when observations may still be missing.
+
+### Persisted-state reconciliation
+
+After natural stream completion, the frontend performs:
+
+~~~text
+GET Run
+    -> lifecycle authority
+
+GET ThreadState
+    -> persisted graph-state authority
+~~~
+
+Graph position and checkpoint displayed by the current UI come from persisted
+ThreadState, not streamed checkpoint telemetry.
+
+### Stream observation does not imply persistence
+
+An interrupted execution demonstrated:
+
+~~~text
+AI partial visible in browser
+    |
+    v
+lifecycle interruption before model node commit
+    |
+    v
+persisted ThreadState contains no AIMessage
+    |
+    v
+persisted reconciliation removes provisional Assistant card
+~~~
+
+Therefore:
+
+~~~text
+messages/partial observed
+    !=
+message guaranteed to persist
+~~~
+
+Persisted ThreadState always wins after successful reconciliation.
+
+### Reconciliation failure
+
+If final ThreadState retrieval fails after live output exists, the frontend does
+not erase the user's observed response.
+
+Instead:
+
+~~~text
+phase = failed
+projectionAuthority = unreconciled
+~~~
+
+The live projection remains visible while explicitly losing persisted authority.
+
+### Browser E2E validation
+
+Playwright is the browser-level integration harness.
+
+The current streaming suite covers:
+
+~~~text
+resumable-stream.spec.ts
+persisted-reconciliation.spec.ts
+interrupted-reconciliation.spec.ts
+reconciliation-failure.spec.ts
+~~~
+
+It validates:
+
+~~~text
+same-Run reconnect
+Last-Event-ID replay
+live message projection
+persisted replacement
+interrupted replacement
+reconciliation failure
+projection authority
+no duplicate Assistant cards
+Run / ThreadState reconciliation
+~~~
+
+### Layer ownership
+
+The intended boundaries are:
+
+~~~text
+SSE parser
+    -> framing
+
+Agent Server event decoder
+    -> wire-semantic decoding
+
+RunStreamSession
+    -> Runtime resumability
+
+stream projector
+    -> provisional semantic UI projection
+
+useExecution
+    -> orchestration and reconciliation
+
+ExecutionSurface
+    -> presentation
+~~~
+
+No layer should absorb responsibilities from the layer below merely for
+convenience.
+
+### Known limitations
+
+The Phase 2 streaming baseline intentionally leaves several production concerns
+for later work.
+
+#### CORS identity window
+
+If:
+
+~~~text
+Location is hidden by CORS
+AND
+transport fails before metadata.run_id is observed
+~~~
+
+the current browser session does not yet know enough Runtime identity to build
+the Run-specific reconnect URL.
+
+A production deployment can reduce this risk by explicitly exposing Location or
+providing another supported identity-recovery mechanism.
+
+#### Runtime error lifecycle coverage
+
+`success` and explicit lifecycle `interrupted` behavior were exercised directly.
+
+An actual Runtime:
+
+~~~text
+status = error
+~~~
+
+was not independently forced during the Phase 2 streaming E2E suite.
+
+The frontend structurally accepts error and timeout as terminal lifecycle
+states, but dedicated resilience validation can be revisited later.
+
+#### Final reconciliation retries
+
+Run and ThreadState reconciliation do not yet implement an independent durable
+retry policy.
+
+A ThreadState HTTP failure currently produces:
+
+~~~text
+unreconciled
+~~~
+
+rather than silently claiming persisted authority.
+
+Broader retry and resilience policy belongs to the Production phase.
+
+#### Stream volume
+
+Cumulative `messages/partial` snapshots can create large SSE responses for long
+model outputs.
+
+Performance, backpressure, payload efficiency and alternative streaming
+protocols remain future concerns.
+
+#### Compatibility wrapper
+
+`AgentServerClient.streamRun()` remains as a compatibility wrapper over the
+session API.
+
+The application orchestration uses:
+
+~~~text
+openRunStream()
+~~~
+
+directly.
+
+### Phase boundary
+
+Phase 2.2 establishes a production-shaped streaming model, but not full
+production readiness.
+
+The section answers:
+
+~~~text
+How does a browser safely observe, resume, project and reconcile one Runtime
+Run?
+~~~
+
+The next frontend block is:
+
+~~~text
+2.3 Shared state
+~~~
+
+which moves from execution transport toward deliberate state sharing and
+mutation across the Agent ↔ UI boundary.

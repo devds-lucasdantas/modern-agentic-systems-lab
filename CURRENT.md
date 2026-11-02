@@ -1636,34 +1636,128 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2G Streaming baseline review
+## Completed block — 2.2 Event streaming
 
-The next block closes the Event Streaming section.
+The browser streaming baseline is complete.
 
-Review goals:
-
-1. consolidate the complete streaming architecture;
-2. verify transport/domain/UI boundaries;
-3. review all execution phases and projection-authority states;
-4. confirm Run identity ownership and CORS fallback;
-5. confirm replay-cursor safety and at-least-once semantics;
-6. confirm live-message idempotency;
-7. confirm persisted-state authority;
-8. review failure and reconnect behavior;
-9. run the full static and browser test matrix;
-10. update docs/architecture.md with the final frontend streaming model;
-11. identify residual limitations and deferred production concerns;
-12. decide whether 2.2 Event streaming is ready to close.
-
-Known residual item to record rather than silently infer:
+The final architecture separates:
 
 ~~~text
-actual Runtime status=error
-    -> not independently forced during 2.2F
+SSE framing
+    -> parseSseStream
+
+Agent Server event decoding
+    -> semantic stream events
+
+Runtime resumability
+    -> RunStreamSession
+
+provisional projection
+    -> stream projector
+
+execution orchestration
+    -> useExecution
+
+presentation
+    -> ExecutionSurface
 ~~~
 
-The reconciliation code structurally handles terminal error/timeout statuses,
-but dedicated resilience coverage may be revisited during Phase 4.
+Validated behavior includes:
+
+~~~text
+POST Run streaming
+live values
+cumulative messages/partial
+stable Message-ID replacement
+Run identity
+CORS metadata fallback
+safe replay cursor
+Last-Event-ID
+same-Run reconnect
+at-least-once replay
+online-aware retry
+lifecycle reconciliation
+persisted-state reconciliation
+projection authority
+interrupted provisional-state replacement
+unreconciled failure state
+~~~
+
+The frontend exposes two independent state dimensions:
+
+~~~text
+ExecutionPhase
+ProjectionAuthority
+~~~
+
+Projection authority is:
+
+~~~text
+none
+live
+persisted
+unreconciled
+~~~
+
+Persisted ThreadState remains authoritative whenever reconciliation succeeds.
+
+The browser E2E baseline consists of four Playwright scenarios:
+
+~~~text
+resumable stream
+successful persisted reconciliation
+interrupted persisted reconciliation
+persisted-state reconciliation failure
+~~~
+
+Known limitations are recorded in:
+
+~~~text
+docs/architecture.md
+docs/journal/lab-19-event-streaming.md
+~~~
+
+They include:
+
+~~~text
+pre-metadata reconnect when Location is hidden by CORS
+direct Runtime error lifecycle coverage
+independent reconciliation retry policy
+large cumulative partial-message payloads
+~~~
+
+These are not blockers for the Phase 2.2 baseline.
+
+## Current block — 2.3 Shared state
+
+The next block moves beyond execution transport.
+
+The objective is to determine how agent state should be intentionally exposed,
+edited and synchronized across the Agent ↔ UI boundary.
+
+Initial questions:
+
+1. which ThreadState values belong in application UI state;
+2. which graph-state fields should remain Runtime-internal;
+3. how frontend state mutations map to Runtime state updates;
+4. how checkpoint identity participates in safe state mutation;
+5. how concurrent UI and agent updates should be detected;
+6. whether optimistic updates are appropriate;
+7. how persisted state and local UI state should be separated;
+8. how reducers affect client-authored state updates;
+9. how shared state interacts with interrupted execution;
+10. what state model will later support frontend tools and AG-UI.
+
+The starting invariant is:
+
+~~~text
+Runtime ThreadState
+    !=
+arbitrary mutable frontend store
+~~~
+
+The frontend should project and mutate state deliberately rather than mirroring
+the entire graph state indiscriminately.
 
 ## Reference environment
 

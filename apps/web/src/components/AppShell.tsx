@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.2G
+            2.3
           </strong>
 
           <span>
-            Streaming baseline review
+            Shared state
           </span>
         </div>
       </aside>
