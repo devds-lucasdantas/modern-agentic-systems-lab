@@ -27,3 +27,8 @@ export {
   AgentServerDecodeError,
   AgentServerHttpError,
 } from './errors'
+
+export type {
+  RunStreamReconnectOptions,
+  RunStreamSession,
+} from './run-stream-session'

@@ -2325,3 +2325,670 @@ The next sub-block is:
 
 It must validate transport interruption, resumable streaming, Last-Event-ID,
 at-least-once replay and idempotent frontend projection.
+
+---
+
+# 2.2E — Disconnect, reconnect and replay
+
+## Objective
+
+Make live Run streaming resilient to transport loss without creating a second
+Runtime execution.
+
+The required invariant is:
+
+~~~text
+transport reconnect != new Run
+~~~
+
+A resumable frontend execution must preserve:
+
+~~~text
+Thread identity
+Run identity
+safe replay cursor
+live semantic projection
+final persisted reconciliation
+~~~
+
+## Runtime discovery
+
+Several live experiments were performed against the pinned Agent Server before
+changing the frontend transport architecture.
+
+### Location and Content-Location
+
+The initial stateful streaming response returned:
+
+~~~text
+Location:
+    /threads/{thread_id}/runs/{run_id}/stream
+
+Content-Location:
+    /threads/{thread_id}/runs/{run_id}
+~~~
+
+These headers have different roles.
+
+~~~text
+Location
+    -> resumable stream resource
+
+Content-Location
+    -> Run resource
+~~~
+
+When visible to JavaScript, Location makes Run identity available before any
+SSE event is consumed.
+
+### Safe replay cursor
+
+A single SSE ID is not a unique semantic event identity.
+
+Observed examples included:
+
+~~~text
+same SSE id
+    -> values
+    -> checkpoints
+~~~
+
+and even:
+
+~~~text
+same SSE id
+same event family
+    -> messages/partial
+    -> messages/partial
+~~~
+
+Therefore neither:
+
+~~~text
+id
+~~~
+
+nor:
+
+~~~text
+(id, event)
+~~~
+
+is safe as a generic frontend event-deduplication key.
+
+The safe cursor algorithm is group-based:
+
+~~~text
+observe id=A
+observe more events with id=A
+observe first event with id=B
+        |
+        v
+group A is now proven complete
+        |
+        v
+committedLastEventId = A
+~~~
+
+If transport fails while group B is being consumed, reconnect starts after A.
+
+This intentionally allows at-least-once replay of B.
+
+## Experiment A — continue + reconnect
+
+The initial stream was disconnected after:
+
+~~~text
+10 events
+run_id known
+safe cursor committed
+next SSE-ID group partially observed
+~~~
+
+The reconnect request used:
+
+~~~text
+GET /threads/{thread}/runs/{same_run}/stream
+Last-Event-ID: <committed prior group>
+~~~
+
+The first resumed event was an exact replay of an event observed immediately
+before disconnect.
+
+A later event with the same SSE ID but a different semantic event was also
+delivered.
+
+The original Run completed successfully.
+
+No second Run was created.
+
+Conclusion:
+
+~~~text
+on_disconnect=continue
+    -> Runtime Run survives transport loss
+
+reconnect
+    -> same Run
+    -> at-least-once observation
+~~~
+
+## Experiment B — on_disconnect=cancel
+
+The same transport-loss experiment was repeated with:
+
+~~~text
+on_disconnect=cancel
+~~~
+
+The original Run immediately reconciled as:
+
+~~~text
+Run.status = interrupted
+~~~
+
+while:
+
+~~~text
+ThreadState.next = ["model"]
+ThreadState.interrupts = []
+~~~
+
+This confirms again that:
+
+~~~text
+lifecycle interruption
+    != graph/HITL interrupt
+~~~
+
+Run lifecycle and graph execution position remain separate dimensions.
+
+## Experiment C — disconnect before metadata
+
+A stream was created and disconnected after HTTP headers but before consuming
+any SSE event.
+
+Observed:
+
+~~~text
+SSE events consumed = 0
+~~~
+
+Location already contained:
+
+~~~text
+thread_id
+run_id
+stream endpoint
+~~~
+
+The Run survived because:
+
+~~~text
+on_disconnect=continue
+~~~
+
+Reconnect without Last-Event-ID replayed the stream from the beginning,
+including:
+
+~~~text
+metadata
+checkpoints
+values
+updates
+messages/metadata
+messages/partial
+~~~
+
+The replayed:
+
+~~~text
+metadata.run_id
+~~~
+
+matched the Run identity extracted from Location.
+
+Conclusion:
+
+~~~text
+Location
+    -> immediate HTTP-level Run identity
+
+metadata.run_id
+    -> in-band identity confirmation
+~~~
+
+## Experiment D — lifecycle completes before client EOF
+
+The client deliberately stopped requesting new SSE events after establishing a
+safe replay cursor.
+
+The Runtime independently progressed until:
+
+~~~text
+Run.status = success
+~~~
+
+while the original client had still not consumed stream EOF.
+
+A subsequent reconnect using Last-Event-ID returned additional persisted stream
+events for that already-completed Run.
+
+Therefore:
+
+~~~text
+Run lifecycle terminal
+    != stream fully consumed by this client
+~~~
+
+A client cannot assume that a successful Run means reconnect/replay is no
+longer useful.
+
+## Resumable Run stream session
+
+The transport was refactored around:
+
+~~~text
+RunStreamSession
+~~~
+
+with explicit state:
+
+~~~text
+threadId
+runId
+streamUrl
+committedLastEventId
+currentEventId
+events()
+reconnect()
+~~~
+
+The layering is now:
+
+~~~text
+parseSseStream()
+    -> pure SSE framing
+
+RunStreamSession
+    -> Runtime stream identity
+    -> safe cursor tracking
+    -> reconnect transport
+    -> metadata identity validation
+
+useExecution
+    -> retry policy
+    -> live projection
+    -> lifecycle reconciliation
+    -> persisted-state reconciliation
+~~~
+
+The legacy:
+
+~~~text
+client.streamRun()
+~~~
+
+remains as a compatibility wrapper over:
+
+~~~text
+openRunStream()
+RunStreamSession.events()
+~~~
+
+## Natural EOF semantics
+
+The session commits the final current SSE-ID group only after natural EOF.
+
+~~~text
+natural EOF
+    -> current group is known complete
+    -> safe to commit final cursor
+~~~
+
+By contrast:
+
+~~~text
+abort
+network failure
+consumer break
+    -> current group remains uncommitted
+~~~
+
+This prevents skipping unseen semantic events that share the final observed ID.
+
+## Browser CORS discovery
+
+Node-based harnesses could read:
+
+~~~text
+Location
+~~~
+
+from the initial POST response.
+
+The browser could not.
+
+The reason is that Location is not automatically exposed to cross-origin
+JavaScript by CORS.
+
+Therefore browser execution uses a dual identity strategy:
+
+~~~text
+Location visible
+    -> Run identity immediately available
+
+Location hidden by CORS
+    -> session.runId initially null
+    -> metadata.run_id establishes identity
+    -> resumable URL derived locally
+~~~
+
+Once metadata has been observed, reconnect works normally.
+
+A browser that loses transport before both:
+
+~~~text
+Location visible
+metadata.run_id observed
+~~~
+
+does not possess enough information to construct the Run-specific reconnect
+endpoint.
+
+That limitation belongs to the HTTP/CORS contract, not the SSE parser.
+
+## Frontend reconnect policy
+
+`useExecution` now consumes:
+
+~~~text
+client.openRunStream()
+~~~
+
+rather than waiting for Runtime identity through manually parsed metadata.
+
+A new execution phase was introduced:
+
+~~~text
+reconnecting-stream
+~~~
+
+and is treated as busy by the execution surface.
+
+Transient reconnects use bounded backoff:
+
+~~~text
+250 ms
+500 ms
+1000 ms
+2000 ms
+~~~
+
+Decode/protocol failures are not retried.
+
+HTTP reconnect retries are limited to transient classes such as:
+
+~~~text
+408
+429
+5xx
+~~~
+
+Browser fetch/stream network failures are also reconnectable.
+
+## Browser offline behavior
+
+Manual Chrome DevTools Offline testing exposed a policy flaw.
+
+The first reconnect implementation consumed its retry budget while:
+
+~~~text
+navigator.onLine = false
+~~~
+
+Every retry was therefore guaranteed to fail.
+
+The policy was corrected to:
+
+~~~text
+transport failure
+    -> reconnecting-stream
+
+browser offline?
+    -> wait for online event
+    -> do not consume retry budget
+
+browser online
+    -> apply bounded reconnect backoff
+~~~
+
+This is retained in production code.
+
+## Why manual Offline was insufficient
+
+Chrome DevTools Offline did not reliably terminate an already-established SSE
+fetch.
+
+In one experiment the browser appeared offline for auxiliary requests while the
+original streaming POST continued until Runtime completion.
+
+The Runtime log showed:
+
+~~~text
+POST /runs/stream
+GET  /runs/{run}
+GET  /state
+~~~
+
+without:
+
+~~~text
+GET /runs/{run}/stream
+~~~
+
+Therefore toggling browser Offline is not a deterministic test of an existing
+ReadableStream failure.
+
+## Controlled browser transport experiment
+
+A temporary development-only fault injection used AbortController to terminate
+the initial streaming transport after partial output.
+
+The Runtime log then showed:
+
+~~~text
+POST /threads/{thread}/runs/stream
+GET  /threads/{thread}/runs/{same_run}/stream
+GET  /threads/{thread}/runs/{same_run}
+GET  /threads/{thread}/state
+~~~
+
+The background Run itself continued and succeeded.
+
+The temporary instrumentation was removed immediately after the experiment.
+
+No fault-injection code remains in production source.
+
+## Playwright E2E baseline
+
+Manual fault injection was replaced with a permanent Playwright end-to-end
+test.
+
+Dependencies now include:
+
+~~~text
+@playwright/test
+Chromium
+~~~
+
+The test lives at:
+
+~~~text
+apps/web/e2e/resumable-stream.spec.ts
+~~~
+
+and Playwright configuration lives at:
+
+~~~text
+apps/web/playwright.config.ts
+~~~
+
+The test starts or reuses:
+
+~~~text
+Agent Server :2024
+Vite         :5173
+~~~
+
+through Playwright webServer configuration.
+
+## Browser-native fault injection
+
+The E2E test uses:
+
+~~~text
+page.addInitScript()
+~~~
+
+to wrap `window.fetch` before application JavaScript executes.
+
+Only the first:
+
+~~~text
+POST /threads/{thread}/runs/stream
+~~~
+
+is wrapped.
+
+After the Assistant has begun receiving live output, the test terminates that
+ReadableStream and exposes a browser-style transport `TypeError` to the
+application.
+
+Production application source remains unchanged.
+
+## Automated assertions
+
+The Playwright test verifies:
+
+1. the initial stream is created through exactly one POST;
+2. Assistant partial output is visible before failure;
+3. the transport is intentionally terminated;
+4. the UI enters `reconnecting-stream`;
+5. reconnect is a GET against `/runs/{run_id}/stream`;
+6. the reconnect includes a non-empty Last-Event-ID;
+7. no second execution POST is created;
+8. the original Run reaches `success`;
+9. Graph position reconciles to `END`;
+10. the final lifecycle GET addresses the same Run used by reconnect;
+11. final Thread state is fetched;
+12. replay does not create duplicate Assistant cards;
+13. replay does not duplicate the beginning of the Assistant message.
+
+The test also records resumable-stream request evidence and a final screenshot
+as Playwright artifacts.
+
+## Automated result
+
+The test passed in both modes:
+
+~~~text
+headless
+    1 passed
+
+headed
+    1 passed
+~~~
+
+The tested contract is therefore:
+
+~~~text
+POST one Runtime Run
+        |
+        v
+live SSE projection
+        |
+        v
+transport failure
+        |
+        v
+reconnecting-stream
+        |
+        v
+GET same Run stream
+Last-Event-ID = safe committed group
+        |
+        v
+at-least-once replay
+        |
+        v
+idempotent semantic projection
+        |
+        v
+GET same Run
+GET ThreadState
+        |
+        v
+success / END
+~~~
+
+## Final replay rule
+
+The transport layer deliberately does not perform generic event deduplication.
+
+Instead:
+
+~~~text
+messages/partial
+    -> cumulative Message snapshot
+    -> replace by Message identity
+
+values
+    -> complete provisional snapshot
+    -> replace whole live state
+
+updates
+    -> heterogeneous
+    -> not projected generically
+
+checkpoints / metadata
+    -> retain protocol-specific responsibility
+~~~
+
+Persisted ThreadState remains the final authority after stream completion.
+
+## 2.2E conclusion
+
+Disconnect, reconnect and replay are now represented as explicit Runtime-aware
+transport semantics rather than hidden behavior inside the SSE parser.
+
+The final ownership model is:
+
+~~~text
+SSE parser
+    -> framing only
+
+RunStreamSession
+    -> resumable transport state
+    -> Run identity
+    -> safe replay cursor
+
+useExecution
+    -> reconnect policy
+    -> lifecycle orchestration
+
+stream projector
+    -> replay-safe semantic projection
+
+ThreadState
+    -> final persisted authority
+
+Playwright
+    -> reproducible browser transport validation
+~~~
+
+The next sub-block is:
+
+~~~text
+2.2F — Persisted-state reconciliation
+~~~

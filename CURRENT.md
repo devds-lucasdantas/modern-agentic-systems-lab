@@ -1454,52 +1454,110 @@ Detailed evidence is recorded in:
 docs/journal/lab-19-event-streaming.md
 ~~~
 
-## Current sub-block — 2.2E Disconnect, reconnect and replay
+## Completed sub-block — 2.2E Disconnect, reconnect and replay
 
-The next experiment validates resumable streaming under transport loss.
-
-Known evidence from 2.2A:
+The frontend now models resumable Run transport explicitly.
 
 ~~~text
-stream_resumable = true
-
-content-location
-    -> resumable stream location
-
-Last-Event-ID
-    -> replay cursor
-
-SSE IDs
-    -> not globally unique semantic event identities
-
-same SSE ID may be shared by different event families
+RunStreamSession
+    threadId
+    runId
+    streamUrl
+    committedLastEventId
+    currentEventId
+    events()
+    reconnect()
 ~~~
 
-The experiment must determine:
-
-1. how the browser intentionally disconnects an active stream;
-2. behavior with `on_disconnect=continue`;
-3. behavior with `on_disconnect=cancel`;
-4. how reconnect targets the original Run without creating another Run;
-5. how Last-Event-ID is supplied by the fetch-based transport;
-6. exactly which events are replayed;
-7. whether `(id, event)` is sufficient for replay deduplication;
-8. whether identical `(id, event)` can still repeat under replay;
-9. how provisional message projection remains idempotent;
-10. how final persisted reconciliation resolves any replay ambiguity;
-11. what happens when disconnect occurs before metadata/run_id observation;
-12. what happens after lifecycle completion but before the client consumes EOF.
-
-The implementation must preserve:
+Validated Runtime semantics include:
 
 ~~~text
-transport reconnect != new execution
+on_disconnect=continue
+    -> original Run survives transport loss
 
-replay = at-least-once observation
+on_disconnect=cancel
+    -> original Run becomes interrupted
 
-stream projection must be idempotent
+Location
+    -> resumable stream identity when CORS-visible
 
-ThreadState remains final persisted authority
+metadata.run_id
+    -> browser fallback identity and consistency check
+
+Last-Event-ID
+    -> replay after last safely completed SSE-ID group
+
+replay
+    -> at-least-once
+    -> no generic event deduplication
+~~~
+
+Browser CORS hides Location in the current local cross-origin setup, so the
+session supports deferred identity through metadata.run_id.
+
+`useExecution` now owns reconnect policy and exposes:
+
+~~~text
+reconnecting-stream
+~~~
+
+as a first-class execution phase.
+
+Browser offline state does not consume reconnect retry budget.
+
+Playwright was added as the permanent browser E2E harness.
+
+The resumable-stream E2E test proves:
+
+~~~text
+one POST creates one Run
+    -> partial live output
+    -> controlled SSE body failure
+    -> reconnecting-stream
+    -> GET same Run stream
+    -> Last-Event-ID present
+    -> replay
+    -> one Assistant card
+    -> success / END
+~~~
+
+The test passes in both headless and headed Chromium.
+
+Detailed evidence is recorded in:
+
+~~~text
+docs/journal/lab-19-event-streaming.md
+~~~
+
+## Current sub-block — 2.2F Persisted-state reconciliation
+
+The next block must formalize the boundary between provisional stream state and
+persisted Runtime authority.
+
+Questions to validate:
+
+1. what exact persisted state replaces liveValues after stream completion;
+2. reconciliation after normal success;
+3. reconciliation after reconnect/replay;
+4. reconciliation after interrupted/error lifecycle states;
+5. whether final stream values can differ temporarily from GET ThreadState;
+6. checkpoint identity and graph position during final reconciliation;
+7. how stale provisional state is cleared on success and failure;
+8. whether UI should expose live-vs-persisted provenance explicitly;
+9. behavior when stream EOF arrives before Run lifecycle becomes terminal;
+10. behavior when Run is terminal before all replay events are consumed.
+
+The invariant remains:
+
+~~~text
+stream projection
+    -> provisional observation
+
+Run resource
+    -> lifecycle authority
+
+ThreadState
+    -> persisted graph-state authority
 ~~~
 
 ## Reference environment

@@ -33,6 +33,7 @@ const busyPhases =
     'creating-thread',
     'creating-run',
     'streaming',
+    'reconnecting-stream',
     'reconciling-run',
     'refreshing-state',
   ])

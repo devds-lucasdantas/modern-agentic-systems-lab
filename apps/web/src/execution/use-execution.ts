@@ -5,7 +5,6 @@ import {
 
 import {
   assistantId,
-  runId,
   type AssistantId,
   type Message,
   type Run,
@@ -19,8 +18,9 @@ import {
   useRuntime,
 } from '../app/use-runtime'
 
-import type {
-  AgentServerStreamEvent,
+import {
+  AgentServerDecodeError,
+  AgentServerHttpError,
 } from '../transport/agent-server'
 
 import {
@@ -32,24 +32,32 @@ import {
   projectStreamEvent,
 } from './stream-projector'
 
+
 export type ExecutionPhase =
   | 'idle'
   | 'loading-state'
   | 'creating-thread'
   | 'creating-run'
   | 'streaming'
+  | 'reconnecting-stream'
   | 'reconciling-run'
   | 'refreshing-state'
   | 'completed'
   | 'failed'
 
+
 export interface ExecutionSnapshot {
-  readonly phase: ExecutionPhase
+  readonly phase:
+    ExecutionPhase
 
   /**
-   * Runtime Run identity observed from SSE metadata.
+   * Runtime Run identity.
    *
-   * It can exist before the final Run resource is reconciled.
+   * It may be available immediately from the HTTP Location
+   * header or, in a cross-origin browser where Location is not
+   * exposed by CORS, after the first metadata.run_id event.
+   *
+   * It exists before the final Run resource is reconciled.
    */
   readonly runId:
     RunId | null
@@ -76,6 +84,7 @@ export interface ExecutionSnapshot {
     Error | null
 }
 
+
 export interface ExecuteInput {
   readonly assistantId:
     AssistantId
@@ -86,6 +95,7 @@ export interface ExecuteInput {
   readonly text:
     string
 }
+
 
 const initialSnapshot:
   ExecutionSnapshot = {
@@ -98,6 +108,7 @@ const initialSnapshot:
   error: null,
 }
 
+
 const terminalStatuses =
   new Set([
     'error',
@@ -106,36 +117,117 @@ const terminalStatuses =
     'interrupted',
   ])
 
+
+const reconnectDelaysMs =
+  [
+    250,
+    500,
+    1_000,
+    2_000,
+  ] as const
+
+
 const asError = (
   value: unknown,
 ): Error =>
   value instanceof Error
     ? value
-    : new Error(String(value))
+    : new Error(
+        String(value),
+      )
 
-const isObject = (
-  value: unknown,
-): value is Record<string, unknown> =>
-  typeof value === 'object' &&
-  value !== null &&
-  !Array.isArray(value)
 
-const runIdFromStreamEvent = (
-  event: AgentServerStreamEvent,
-): RunId | null => {
-  if (
-    event.kind !== 'known' ||
-    event.event !== 'metadata' ||
-    !isObject(event.data) ||
-    typeof event.data.run_id !== 'string'
-  ) {
-    return null
+const waitForReconnectDelay = (
+  milliseconds: number,
+): Promise<void> =>
+  new Promise(
+    (resolve) => {
+      globalThis.setTimeout(
+        resolve,
+        milliseconds,
+      )
+    },
+  )
+
+
+const waitForBrowserOnline =
+  async (): Promise<void> => {
+    if (
+      typeof navigator ===
+        'undefined' ||
+      navigator.onLine
+    ) {
+      return
+    }
+
+    await new Promise<void>(
+      (resolve) => {
+        globalThis.addEventListener(
+          'online',
+          () => {
+            resolve()
+          },
+          {
+            once: true,
+          },
+        )
+      },
+    )
   }
 
-  return runId(
-    event.data.run_id,
-  )
+
+const isReconnectableStreamError = (
+  value: unknown,
+): boolean => {
+  /*
+   * Decode failures are protocol/contract failures.
+   * Retrying the same stream cannot repair them.
+   */
+  if (
+    value instanceof
+      AgentServerDecodeError
+  ) {
+    return false
+  }
+
+  /*
+   * Retry only HTTP failures that can reasonably be transient.
+   */
+  if (
+    value instanceof
+      AgentServerHttpError
+  ) {
+    return (
+      value.status === 408 ||
+      value.status === 429 ||
+      value.status >= 500
+    )
+  }
+
+  /*
+   * Browser fetch and ReadableStream network failures normally
+   * surface as TypeError.
+   */
+  if (
+    value instanceof TypeError
+  ) {
+    return true
+  }
+
+  if (
+    typeof DOMException !==
+      'undefined' &&
+    value instanceof DOMException
+  ) {
+    return (
+      value.name ===
+      'NetworkError'
+    )
+  }
+
+  return false
 }
+
 
 export function useExecution() {
   const { client } =
@@ -148,6 +240,7 @@ export function useExecution() {
     initialSnapshot,
   )
 
+
   const loadThreadState =
     useCallback(
       async (
@@ -158,7 +251,7 @@ export function useExecution() {
           phase: 'loading-state',
           runId: null,
           run: null,
-            liveValues: null,
+          liveValues: null,
           error: null,
         }))
 
@@ -186,17 +279,20 @@ export function useExecution() {
           const normalized =
             asError(error)
 
-          setSnapshot((current) => ({
-            ...current,
-            phase: 'failed',
-            error: normalized,
-          }))
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase: 'failed',
+              error: normalized,
+            }),
+          )
 
           throw normalized
         }
       },
       [client],
     )
+
 
   const reset =
     useCallback(() => {
@@ -205,13 +301,16 @@ export function useExecution() {
       )
     }, [])
 
+
   const execute =
     useCallback(
       async ({
         assistantId:
           selectedAssistantId,
+
         threadId:
           selectedThreadId,
+
         text,
       }: ExecuteInput):
       Promise<ThreadId> => {
@@ -228,7 +327,9 @@ export function useExecution() {
           selectedThreadId
 
         try {
-          if (activeThread === null) {
+          if (
+            activeThread === null
+          ) {
             setSnapshot({
               phase:
                 'creating-thread',
@@ -247,36 +348,38 @@ export function useExecution() {
               createdThread.id
           }
 
-          setSnapshot((current) => ({
-            ...current,
-            phase: 'creating-run',
-            runId: null,
-            run: null,
-            liveValues: null,
-            error: null,
-          }))
+
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase:
+                'creating-run',
+              runId: null,
+              run: null,
+              liveValues: null,
+              error: null,
+            }),
+          )
+
 
           let liveProjection = {
             ...emptyLiveStreamProjection,
 
-            // Preserve already reconciled history
-            // for an existing Thread until the first
-            // complete values snapshot arrives.
+            /*
+             * Preserve already reconciled history for an
+             * existing Thread until the first complete values
+             * snapshot arrives.
+             */
             messages:
-              selectedThreadId === null
+              selectedThreadId ===
+              null
                 ? []
                 : snapshot.messages,
           }
 
-          let observedRunId:
-            RunId | null = null
 
-          let streamStarted =
-            false
-
-          for await (
-            const event
-            of client.streamRun(
+          const session =
+            await client.openRunStream(
               activeThread,
               {
                 assistantId:
@@ -287,22 +390,29 @@ export function useExecution() {
                 input: {
                   messages: [
                     {
-                      role: 'human',
-                      content: trimmed,
+                      role:
+                        'human',
+
+                      content:
+                        trimmed,
+
                       id:
                         crypto.randomUUID(),
                     },
                   ],
                 },
 
-                // Preserve the single-active-execution
-                // policy from the REST baseline.
+                /*
+                 * Preserve the single-active-execution policy
+                 * from the REST baseline.
+                 */
                 multitaskStrategy:
                   'reject',
 
-                // Observe complementary live execution views.
-                // 2.2D projects messages/partial and complete
-                // values snapshots into provisional UI state.
+                /*
+                 * These complementary stream views feed the
+                 * 2.2D provisional projection.
+                 */
                 streamMode: [
                   'updates',
                   'values',
@@ -313,97 +423,286 @@ export function useExecution() {
                 streamResumable:
                   true,
 
-                // Transport loss must not implicitly
-                // cancel Runtime execution.
+                /*
+                 * Losing browser transport must not implicitly
+                 * cancel Runtime execution.
+                 */
                 onDisconnect:
                   'continue',
               },
             )
-          ) {
-            const metadataRunId =
-              runIdFromStreamEvent(
-                event,
-              )
 
-            if (
-              metadataRunId !== null
-            ) {
-              if (
-                observedRunId !== null &&
-                observedRunId !==
-                  metadataRunId
+
+          /*
+           * When Location is CORS-visible this is already
+           * populated.
+           *
+           * Otherwise it remains null until metadata.run_id is
+           * decoded by RunStreamSession.events().
+           */
+          let observedRunId:
+            RunId | null =
+              session.runId
+
+
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase:
+                'streaming',
+              runId:
+                observedRunId,
+            }),
+          )
+
+
+          /*
+           * Counts consecutive reconnect attempts.
+           *
+           * Observing any event on a resumed connection proves
+           * progress and resets the retry budget.
+           */
+          let reconnectAttempt =
+            0
+
+
+          streamConsumption:
+          while (true) {
+            try {
+              for await (
+                const event
+                of session.events()
               ) {
-                throw new Error(
-                  'Run stream changed run_id during one execution',
-                )
+                reconnectAttempt =
+                  0
+
+                /*
+                 * metadata.run_id is interpreted inside the
+                 * transport session.
+                 *
+                 * Reading the property after each event handles
+                 * the browser CORS fallback without duplicating
+                 * metadata parsing in React.
+                 */
+                const nextRunId =
+                  session.runId
+
+                const runIdChanged =
+                  nextRunId !== null &&
+                  nextRunId !==
+                    observedRunId
+
+                if (
+                  nextRunId !== null
+                ) {
+                  observedRunId =
+                    nextRunId
+                }
+
+
+                const nextProjection =
+                  projectStreamEvent(
+                    liveProjection,
+                    event,
+                  )
+
+                const projectionChanged =
+                  nextProjection !==
+                  liveProjection
+
+                liveProjection =
+                  nextProjection
+
+
+                if (
+                  runIdChanged ||
+                  projectionChanged
+                ) {
+                  setSnapshot(
+                    (current) => ({
+                      ...current,
+                      phase:
+                        'streaming',
+
+                      runId:
+                        observedRunId,
+
+                      messages:
+                        projectionChanged
+                          ? liveProjection.messages
+                          : current.messages,
+
+                      liveValues:
+                        projectionChanged
+                          ? liveProjection.values
+                          : current.liveValues,
+                    }),
+                  )
+                }
               }
 
-              observedRunId =
-                metadataRunId
-            }
 
-            const nextProjection =
-              projectStreamEvent(
-                liveProjection,
-                event,
-              )
-
-            const projectionChanged =
-              nextProjection !==
-              liveProjection
-
-            liveProjection =
-              nextProjection
-
-            if (
-              !streamStarted ||
-              metadataRunId !== null ||
-              projectionChanged
+              /*
+               * Natural EOF means this connection was fully
+               * consumed. RunStreamSession also commits the
+               * final SSE-ID group at this point.
+               */
+              break streamConsumption
+            } catch (
+              streamError
             ) {
+              if (
+                !isReconnectableStreamError(
+                  streamError,
+                )
+              ) {
+                throw streamError
+              }
+
+
+              let lastReconnectError:
+                unknown =
+                  streamError
+
+              let reconnected =
+                false
+
+
               setSnapshot(
                 (current) => ({
                   ...current,
                   phase:
-                    'streaming',
+                    'reconnecting-stream',
+
                   runId:
+                    session.runId ??
                     observedRunId,
-
-                  messages:
-                    projectionChanged
-                      ? liveProjection.messages
-                      : current.messages,
-
-                  liveValues:
-                    projectionChanged
-                      ? liveProjection.values
-                      : current.liveValues,
                 }),
               )
-            }
 
-            streamStarted = true
+
+              while (
+                reconnectAttempt <
+                reconnectDelaysMs.length
+              ) {
+                /*
+                 * Do not consume retry budget while the browser
+                 * explicitly reports that it is offline.
+                 *
+                 * Chrome DevTools Offline and real browser
+                 * connectivity loss both surface through this
+                 * boundary.
+                 */
+                await waitForBrowserOnline()
+
+
+                const delayMs =
+                  reconnectDelaysMs[
+                    reconnectAttempt
+                  ]
+
+                reconnectAttempt +=
+                  1
+
+
+                await waitForReconnectDelay(
+                  delayMs,
+                )
+
+
+                try {
+                  /*
+                   * reconnect() issues GET against the original
+                   * Run stream and supplies the last safe
+                   * Last-Event-ID when one exists.
+                   *
+                   * It NEVER creates another Run.
+                   */
+                  await session.reconnect()
+
+                  reconnected =
+                    true
+
+                  observedRunId =
+                    session.runId ??
+                    observedRunId
+
+                  setSnapshot(
+                    (current) => ({
+                      ...current,
+                      phase:
+                        'streaming',
+
+                      runId:
+                        observedRunId,
+                    }),
+                  )
+
+                  break
+                } catch (
+                  reconnectError
+                ) {
+                  lastReconnectError =
+                    reconnectError
+
+                  if (
+                    !isReconnectableStreamError(
+                      reconnectError,
+                    )
+                  ) {
+                    throw reconnectError
+                  }
+                }
+              }
+
+
+              if (!reconnected) {
+                throw asError(
+                  lastReconnectError,
+                )
+              }
+
+
+              /*
+               * Resume consumption.
+               *
+               * We intentionally do NOT generically deduplicate
+               * replayed SSE events:
+               *
+               * - messages/partial replaces by Message ID;
+               * - values replaces the complete live snapshot;
+               * - updates are not semantically projected.
+               */
+              continue streamConsumption
+            }
           }
 
+
+          const finalRunId =
+            session.runId ??
+            observedRunId
+
+
           if (
-            observedRunId === null
+            finalRunId === null
           ) {
             throw new Error(
-              'Run stream completed without metadata run_id',
+              'Run stream completed without recoverable Runtime identity',
             )
           }
 
-          const finalRunId =
-            observedRunId
 
           setSnapshot(
             (current) => ({
               ...current,
               phase:
                 'reconciling-run',
+
               runId:
                 finalRunId,
             }),
           )
+
 
           const reconciledRun =
             await client.getRun(
@@ -411,17 +710,21 @@ export function useExecution() {
               finalRunId,
             )
 
+
           setSnapshot(
             (current) => ({
               ...current,
               phase:
                 'reconciling-run',
+
               runId:
                 finalRunId,
+
               run:
                 reconciledRun,
             }),
           )
+
 
           if (
             !terminalStatuses.has(
@@ -434,54 +737,78 @@ export function useExecution() {
             )
           }
 
+
           setSnapshot(
             (current) => ({
               ...current,
               phase:
                 'refreshing-state',
+
               runId:
                 finalRunId,
+
               run:
                 reconciledRun,
             }),
           )
+
 
           const state =
             await client.getThreadState(
               activeThread,
             )
 
+
           setSnapshot({
-            phase: 'completed',
+            phase:
+              'completed',
+
             runId:
               finalRunId,
+
             run:
               reconciledRun,
+
             state,
-            liveValues: null,
+
+            liveValues:
+              null,
+
             messages:
               projectMessagesFromState(
                 state,
               ),
-            error: null,
+
+            error:
+              null,
           })
+
 
           return activeThread
         } catch (error) {
           const normalized =
             asError(error)
 
-          setSnapshot((current) => ({
-            ...current,
-            phase: 'failed',
-            error: normalized,
-          }))
+          setSnapshot(
+            (current) => ({
+              ...current,
+              phase:
+                'failed',
+
+              error:
+                normalized,
+            }),
+          )
 
           throw normalized
         }
       },
-      [client, snapshot.messages],
+      [
+        client,
+        snapshot.messages,
+      ],
     )
+
 
   return {
     ...snapshot,

@@ -18,14 +18,15 @@ import {
   isJsonObject,
 } from './decode'
 import {
-  AgentServerDecodeError,
   AgentServerHttpError,
 } from './errors'
-import {
-  decodeAgentServerStreamEvent,
-  type AgentServerStreamEvent,
+import type {
+  AgentServerStreamEvent,
 } from './stream-events'
-import { parseSseStream } from './sse'
+import {
+  createRunStreamSession,
+  type RunStreamSession,
+} from './run-stream-session'
 import {
   mapAssistant,
   mapRun,
@@ -414,14 +415,10 @@ export class AgentServerClient {
     )
   }
 
-  async *streamRun(
+  async openRunStream(
     id: ThreadId,
     input: StreamRunInput,
-  ): AsyncGenerator<
-    AgentServerStreamEvent,
-    void,
-    undefined
-  > {
+  ): Promise<RunStreamSession> {
     const path =
       `/threads/${encodeURIComponent(id)}/runs/stream`
 
@@ -467,47 +464,69 @@ export class AgentServerClient {
         },
       )
 
-    const contentType =
-      response.headers.get(
-        'content-type',
-      )
+    return createRunStreamSession({
+      baseUrl:
+        this.#baseUrl,
 
-    if (
-      contentType === null ||
-      !contentType
-        .toLowerCase()
-        .startsWith(
-          'text/event-stream',
-        )
-    ) {
-      throw new AgentServerDecodeError(
-        'RunStream.response.content-type',
-        'text/event-stream',
-      )
-    }
+      threadId:
+        id,
 
-    if (
-      response.body === null
-    ) {
-      throw new AgentServerDecodeError(
-        'RunStream.response.body',
-        'ReadableStream<Uint8Array>',
-      )
-    }
+      response,
 
-    for await (
-      const frame
-      of parseSseStream(
-        response.body,
-      )
-    ) {
-      yield (
-        decodeAgentServerStreamEvent(
-          frame,
-        )
-      )
-    }
+      reconnect:
+        async ({
+          path:
+            streamPath,
+
+          lastEventId,
+
+          signal,
+        }) => {
+          const headers =
+            new Headers({
+              accept:
+                'text/event-stream',
+            })
+
+          if (
+            lastEventId !== null
+          ) {
+            headers.set(
+              'last-event-id',
+              lastEventId,
+            )
+          }
+
+          return this.#request(
+            streamPath,
+            {
+              method: 'GET',
+              headers,
+              signal,
+            },
+          )
+        },
+    })
   }
+
+
+  async *streamRun(
+    id: ThreadId,
+    input: StreamRunInput,
+  ): AsyncGenerator<
+    AgentServerStreamEvent,
+    void,
+    undefined
+  > {
+    const session =
+      await this.openRunStream(
+        id,
+        input,
+      )
+
+    yield* session.events()
+  }
+
 
   async listRuns(
     id: ThreadId,

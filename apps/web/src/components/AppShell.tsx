@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.2E
+            2.2F
           </strong>
 
           <span>
-            Disconnect, reconnect and replay
+            Persisted-state reconciliation
           </span>
         </div>
       </aside>
