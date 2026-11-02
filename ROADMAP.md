@@ -100,13 +100,13 @@
 
 ## Phase 2 — Agent ↔ UI
 
-- [ ] 2.1 Frontend application
+- [x] 2.1 Frontend application
   - [x] 2.1A Frontend stack and scaffold
   - [x] 2.1B Runtime domain model
   - [x] 2.1C Agent Server REST client baseline
   - [x] 2.1D Application shell
   - [x] 2.1E First execution surface
-  - [ ] 2.1F Frontend baseline review
+  - [x] 2.1F Frontend baseline review
 
 - [ ] 2.2 Event streaming
 - [ ] 2.3 Shared state

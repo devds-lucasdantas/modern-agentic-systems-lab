@@ -2758,3 +2758,570 @@ The next section is:
 That review will consolidate the complete pre-streaming frontend architecture
 before Phase 2.2 changes the execution observation model from REST polling to
 event streaming.
+
+---
+
+# 2.1F — Frontend baseline review
+
+## Goal
+
+Close the complete pre-streaming frontend baseline and verify that the
+incremental implementation still preserves the Runtime semantics established in
+Phase 1.
+
+This section adds no major product feature.
+
+It is an architectural closure gate before:
+
+~~~text
+2.2 — Event streaming
+~~~
+
+---
+
+## Review scope
+
+The review covers:
+
+~~~text
+repository structure
+dependency direction
+Runtime identity boundaries
+transport decoding
+configuration
+real-browser connectivity
+Thread / Run separation
+message projection
+execution lifecycle
+graph-state separation
+temporary polling behavior
+pre-streaming protocol boundary
+documentation consistency
+repository cleanliness
+~~~
+
+---
+
+## Automated frontend baseline gate
+
+A reusable audit script was added:
+
+~~~text
+scripts/check-frontend-baseline.py
+~~~
+
+The gate verifies the frontend structure and architectural invariants without
+executing model inference.
+
+The final audit passes completely.
+
+---
+
+## Required structure
+
+The gate confirms the existence of the baseline layers:
+
+~~~text
+apps/web/src/domain/
+
+apps/web/src/transport/agent-server/
+
+apps/web/src/app/
+
+apps/web/src/execution/
+
+apps/web/src/components/
+~~~
+
+and their principal source files.
+
+---
+
+## Dependency direction
+
+The final audit validates:
+
+~~~text
+domain has no React dependency
+
+domain has no transport dependency
+
+domain has no application dependency
+
+domain has no execution dependency
+
+domain has no browser configuration
+
+domain has no fetch
+~~~
+
+It also validates:
+
+~~~text
+transport does not depend on
+    app
+    components
+    execution
+~~~
+
+The final dependency model remains:
+
+~~~text
+components
+     |
+     v
+application / execution
+     |
+     v
+transport
+     |
+     v
+domain
+~~~
+
+---
+
+## Audit-gate false positive
+
+The first version of the dependency audit reported:
+
+~~~text
+FAIL
+transport does not depend on React app
+~~~
+
+Manual inspection showed no such dependency.
+
+The gate used a lexical expression containing:
+
+~~~text
+app
+~~~
+
+which also matched the substring inside:
+
+~~~text
+mappers
+~~~
+
+The audit was corrected to parse import specifiers and compare actual path
+segments.
+
+After correction:
+
+~~~text
+PASS
+transport does not depend on React app: none
+~~~
+
+This is an important methodological lesson:
+
+~~~text
+lexical substring presence
+    !=
+architectural dependency
+~~~
+
+The same principle was already important during protocol analysis in Phase 1.
+
+---
+
+## Identity invariants
+
+The automated gate confirms branded identities for:
+
+~~~text
+AssistantId
+ThreadId
+RunId
+~~~
+
+and verifies that ThreadId and RunId remain separate nominal types.
+
+The implementation therefore continues to encode:
+
+~~~text
+Thread != Run
+~~~
+
+instead of preserving that distinction only in documentation.
+
+---
+
+## Runtime semantic invariants
+
+The review confirms that the execution implementation:
+
+~~~text
+creates a stateful Run
+
+polls Run explicitly
+
+retrieves ThreadState separately
+
+projects messages from ThreadState
+~~~
+
+The UI separately renders:
+
+~~~text
+Run status
+
+Graph next
+~~~
+
+and retains the explicit statement:
+
+~~~text
+Run status != graph position
+~~~
+
+---
+
+## Persisted message authority
+
+The review confirms that:
+
+~~~text
+projectMessagesFromState
+~~~
+
+remains the path used to construct frontend conversation messages after
+execution.
+
+The authoritative history is therefore:
+
+~~~text
+ThreadState.values.messages
+~~~
+
+rather than a component-local append-only Message array.
+
+---
+
+## Transport boundary
+
+The final baseline confirms:
+
+~~~text
+browser fetch binding is explicit
+
+successful response bodies enter as unknown
+
+required transport fields are decoded
+
+decode failures have their own error type
+
+ThreadState is retrieved through the REST client
+~~~
+
+Observed Runtime/OpenAPI drift remains represented explicitly in the transport
+layer instead of leaking into the stable domain.
+
+---
+
+## Configuration boundary
+
+The Runtime URL remains provided through:
+
+~~~text
+VITE_AGENT_SERVER_URL
+~~~
+
+with:
+
+~~~text
+.env.example
+~~~
+
+documenting the local baseline.
+
+Browser/environment configuration does not enter the domain layer.
+
+---
+
+## Real-browser gate
+
+The frontend baseline was not considered complete based solely on:
+
+~~~text
+TypeScript
+lint
+Vite build
+Node / SSR validation
+~~~
+
+Real-browser testing additionally validated:
+
+~~~text
+native browser fetch behavior
+CORS
+Windows browser -> WSL localhost
+live Runtime requests
+React rendering of Runtime resources
+stateful execution
+persisted message projection
+~~~
+
+This caught the native fetch receiver bug that server-side validation had not
+exposed.
+
+---
+
+## Polling control implementation
+
+The pre-streaming execution implementation contains an intentionally explicit
+polling loop.
+
+Observed source markers include:
+
+~~~text
+terminalStatuses
+
+maxPolls = 240
+
+sleep(500)
+
+client.getRun
+
+client.getThreadState
+~~~
+
+The baseline therefore has a clear control implementation for later comparison.
+
+---
+
+## Streaming absence gate
+
+The review verifies that the source still contains no implementation of:
+
+~~~text
+EventSource
+
+WebSocket
+
+Last-Event-ID
+
+text/event-stream
+~~~
+
+and no dependency on:
+
+~~~text
+@langchain/langgraph-sdk
+
+AG-UI packages
+~~~
+
+This matters because Phase 2.2 should introduce streaming as a discrete
+architectural experiment rather than hiding it inside the frontend foundation
+work.
+
+---
+
+## Quality gates
+
+The final frontend baseline passes:
+
+~~~text
+pnpm lint
+    -> 0 warnings
+    -> 0 errors
+
+pnpm build
+    -> TypeScript PASS
+    -> Vite production build PASS
+
+git diff --check
+    -> PASS
+~~~
+
+The Lab 18 Markdown fence audit also passes.
+
+---
+
+## Documentation architecture
+
+The repository uses:
+
+~~~text
+docs/architecture.md
+~~~
+
+as its consolidated architecture document.
+
+There is no:
+
+~~~text
+docs/architecture/
+~~~
+
+directory.
+
+Earlier inspection logic incorrectly assumed that directory might exist.
+
+The consolidated document is therefore updated in place with:
+
+~~~text
+Version 1.0 — Phase 2 frontend baseline
+~~~
+
+rather than creating a new parallel documentation hierarchy.
+
+---
+
+## Pre-streaming control architecture
+
+The final baseline is:
+
+~~~text
+Browser
+   |
+   v
+React
+   |
+   +--> AppShell
+   |
+   +--> ExecutionSurface
+            |
+            v
+       useExecution
+            |
+            v
+     AgentServerClient
+            |
+            v
+     tolerant REST boundary
+            |
+            v
+       Agent Server
+            |
+            +--> Thread
+            +--> Run
+            +--> ThreadState
+            +--> Checkpoint
+~~~
+
+Messages are derived from ThreadState through a separate projector.
+
+---
+
+## Invariants carried into 2.2
+
+Event streaming must preserve:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph execution position
+
+Run success != graph END
+
+Thread status is not an authoritative concurrency lock
+
+ThreadState remains persisted truth
+
+stream events are observations, not automatically persisted truth
+
+message stream projection != persisted message representation
+
+graph/HITL interrupt != lifecycle cancellation
+
+checkpoint identity remains explicit
+~~~
+
+Additionally, Phase 1 streaming experiments established that reconnection can
+produce replay.
+
+The frontend must therefore be prepared for:
+
+~~~text
+at-least-once observation
+duplicate semantic events
+idempotent event processing
+reconciliation against persisted state
+~~~
+
+---
+
+## Intentional debt handed to 2.2
+
+The following behavior is intentionally retained at this closure point:
+
+~~~text
+500 ms REST polling
+
+bounded polling loop
+
+no incremental message chunks
+
+no stream reconnect
+
+no replay cursor
+
+no Last-Event-ID
+
+no resumable stream client
+
+no event deduplication
+~~~
+
+These are not accidental omissions.
+
+They form the explicit delta for the Event Streaming block.
+
+---
+
+## 2.1F conclusion
+
+The pre-streaming frontend baseline is architecturally closed.
+
+All automated architecture gates pass.
+
+The application now provides:
+
+~~~text
+modern React / TypeScript scaffold
+
+transport-independent Runtime domain
+
+tolerant Agent Server REST boundary
+
+validated browser configuration
+
+Runtime-aware application shell
+
+Assistant and Thread projections
+
+first stateful Run execution
+
+explicit Run lifecycle observation
+
+independent graph-state observation
+
+persisted message projection
+
+real-browser validation
+
+reusable frontend architecture gate
+~~~
+
+while retaining the essential Phase 1 distinctions.
+
+The complete section:
+
+~~~text
+2.1 — Frontend application
+~~~
+
+is ready to close.
+
+The next experiment is:
+
+~~~text
+2.2 — Event streaming
+~~~
+
+Its task is to replace REST polling as the primary live observation mechanism
+without changing the identity, persistence and reconciliation semantics
+validated by the control implementation.

@@ -1706,3 +1706,671 @@ frontend tools
 AG-UI
 generative UI patterns
 ~~~
+
+---
+
+## Version 1.0 — Phase 2 frontend baseline
+
+Phase 2 introduces the first browser-facing layer over the Runtime architecture
+validated during Phase 1.
+
+The initial frontend is intentionally built without a higher-level LangGraph
+JavaScript SDK, AG-UI abstraction or streaming client.
+
+The purpose of this baseline is to preserve the Runtime semantics already
+established before changing the observation mechanism in later experiments.
+
+### Frontend stack
+
+The validated application baseline is:
+
+~~~text
+React
+TypeScript
+Vite
+pnpm
+~~~
+
+Repository location:
+
+~~~text
+apps/web/
+~~~
+
+The frontend is greenfield relative to the pinned Interrupt 2026 workshop.
+
+### Layer model
+
+The frontend architecture is divided into four principal layers:
+
+~~~text
+React components
+        |
+        v
+application / execution orchestration
+        |
+        v
+Agent Server transport
+        |
+        v
+frontend domain
+~~~
+
+The dependency direction is intentionally asymmetric.
+
+The domain does not depend on:
+
+~~~text
+React
+browser APIs
+fetch
+Vite environment configuration
+Agent Server DTOs
+application hooks
+execution orchestration
+~~~
+
+Transport can depend on the domain because it normalizes external
+representations into stable frontend concepts.
+
+### Runtime domain model
+
+The frontend models Runtime concepts directly instead of using a generic chat
+state object.
+
+Core concepts include:
+
+~~~text
+Assistant
+Thread
+Run
+ThreadState
+Checkpoint
+GraphPosition
+GraphInterrupt
+Message
+~~~
+
+Identifiers use branded TypeScript string types:
+
+~~~text
+GraphId
+AssistantId
+ThreadId
+RunId
+CheckpointId
+InterruptId
+MessageId
+~~~
+
+Therefore:
+
+~~~text
+ThreadId != RunId
+AssistantId != GraphId
+~~~
+
+at compile time even though the underlying wire values are strings.
+
+### Run lifecycle versus graph position
+
+The frontend preserves two independent dimensions:
+
+~~~text
+Run
+    -> lifecycle status
+
+ThreadState
+    -> persisted graph position
+~~~
+
+The UI explicitly renders both:
+
+~~~text
+Run status
+
+Graph next
+~~~
+
+and states the invariant:
+
+~~~text
+Run status != graph position
+~~~
+
+A successful Run must therefore not be interpreted by the frontend as proof
+that the graph reached END.
+
+### Interrupt taxonomy
+
+The frontend preserves the Phase 1 distinction between:
+
+~~~text
+execution breakpoint
+graph / HITL interrupt
+lifecycle cancellation
+~~~
+
+These concepts are not collapsed into one generic interrupt domain entity.
+
+Lifecycle cancellation includes control actions such as:
+
+~~~text
+interrupt
+rollback
+~~~
+
+while graph interruption remains persisted workflow state.
+
+### Message boundary
+
+Messages have three distinct representations in the baseline:
+
+~~~text
+Run input wire
+        !=
+persisted LangChain message
+        !=
+frontend Message
+~~~
+
+Observed input used:
+
+~~~text
+role = human
+~~~
+
+while persisted state used representations such as:
+
+~~~text
+type = human
+type = ai
+~~~
+
+The message projector normalizes these into frontend roles:
+
+~~~text
+user
+assistant
+system
+tool
+~~~
+
+The stable Message domain therefore does not expose LangChain message class
+names.
+
+### ThreadState as message source of truth
+
+Conversation history is not stored as authoritative component-local
+`Message[]` state.
+
+The source is:
+
+~~~text
+Agent Server
+    -> ThreadState.values.messages
+    -> message projector
+    -> frontend Message[]
+~~~
+
+Selecting an existing Thread reloads persisted ThreadState and reconstructs the
+message projection.
+
+Therefore:
+
+~~~text
+ThreadState
+    = persisted source of truth
+
+React Message[]
+    = derived UI projection
+~~~
+
+### Agent Server transport
+
+The frontend initially integrates directly with the pinned Agent Server REST
+API.
+
+The boundary is:
+
+~~~text
+HTTP response
+      |
+      v
+unknown JSON
+      |
+      v
+tolerant decoder
+      |
+      v
+wire DTO
+      |
+      v
+mapper
+      |
+      v
+frontend domain
+~~~
+
+Raw JSON is not cast directly into frontend domain objects.
+
+### OpenAPI versus observed Runtime
+
+The pinned OpenAPI description is useful but is not treated as perfectly
+authoritative.
+
+Live Runtime inspection found differences including:
+
+~~~text
+ThreadState checkpoint = null
+ThreadState metadata = null
+ThreadState created_at = null
+
+checkpoint_id
+parent_checkpoint_id
+~~~
+
+for valid empty ThreadState responses even when the schema described a stricter
+shape.
+
+A live Thread response also exposed a field not represented in the corresponding
+OpenAPI schema.
+
+The baseline therefore uses tolerant explicit decoding of the observed contract
+instead of blindly generated strict validators.
+
+### Checkpoint normalization
+
+Wire CheckpointConfig fields are optional.
+
+A frontend CheckpointRef represents an identifiable persisted checkpoint.
+
+The mapper therefore creates a CheckpointRef only when a checkpoint ID exists.
+
+Checkpoint identity is not derived from logical step number.
+
+### Runtime client
+
+The initial AgentServerClient supports the minimum pre-streaming surface needed
+by the UI:
+
+~~~text
+Assistant
+    search
+    get
+
+Thread
+    create
+    search
+    get
+    delete
+
+Run
+    create
+    list
+    get
+
+ThreadState
+    get
+~~~
+
+The client also separates:
+
+~~~text
+HTTP failure
+    -> AgentServerHttpError
+
+successful response with invalid required shape
+    -> AgentServerDecodeError
+~~~
+
+### Browser configuration
+
+The Runtime URL enters the application through:
+
+~~~text
+VITE_AGENT_SERVER_URL
+~~~
+
+and is validated in the application layer.
+
+The domain is unaware of Vite environment configuration.
+
+The development baseline uses direct browser access to:
+
+~~~text
+http://127.0.0.1:2024
+~~~
+
+No Vite reverse proxy is currently required.
+
+### Browser fetch boundary
+
+Real-browser testing exposed a behavior not reproduced by the initial Node
+validation harness.
+
+Storing native fetch and calling it as a class member caused Chrome to report:
+
+~~~text
+Illegal invocation
+~~~
+
+The default implementation therefore uses an explicit global receiver:
+
+~~~text
+globalThis.fetch.bind(globalThis)
+~~~
+
+Injected fetch implementations remain supported.
+
+This established real-browser validation as a required frontend gate in
+addition to TypeScript, lint and server-side harnesses.
+
+### React composition root
+
+The React composition root is:
+
+~~~text
+AppConfig
+    |
+    v
+RuntimeProvider
+    |
+    v
+AgentServerClient
+    |
+    v
+application hooks and components
+~~~
+
+The RuntimeProvider owns a stable client instance for the configured Agent
+Server URL.
+
+No global state-management library is required by the baseline.
+
+### Runtime overview
+
+The initial shell exposes:
+
+~~~text
+connection status
+Assistant count and list
+Thread total
+currently loaded Thread count
+Thread lifecycle status
+Runtime endpoint
+transport type
+~~~
+
+Pagination total and loaded item count remain distinct.
+
+For example:
+
+~~~text
+Threads = total Runtime resources
+
+Loaded = resources in the current client page
+~~~
+
+### First stateful execution surface
+
+The first execution path is:
+
+~~~text
+select Assistant
+        |
+        v
+select existing Thread
+or create new Thread
+        |
+        v
+submit user input
+        |
+        v
+create stateful Run
+        |
+        v
+observe Run lifecycle
+        |
+        v
+retrieve ThreadState
+        |
+        v
+project persisted messages
+        |
+        v
+render UI
+~~~
+
+A new conversation creates the Thread before starting the Run.
+
+Thread identity and Run identity remain independent.
+
+### First Run input
+
+The first experimentally validated input shape is:
+
+~~~text
+{
+    messages: [
+        {
+            role: "human",
+            content: <user text>,
+            id: <generated UUID>
+        }
+    ]
+}
+~~~
+
+The frontend domain Message object is not serialized directly as graph input.
+
+### Multitask baseline
+
+The first execution surface explicitly selects:
+
+~~~text
+multitask_strategy = reject
+~~~
+
+to avoid multiple simultaneous user-triggered Runs on the selected Thread.
+
+This is a UI policy.
+
+It does not redefine Runtime support for:
+
+~~~text
+reject
+enqueue
+interrupt
+rollback
+~~~
+
+### Pre-streaming observation model
+
+The control implementation observes Runs through bounded REST polling:
+
+~~~text
+create Run
+    |
+    v
+GET Run approximately every 500 ms
+    |
+    v
+terminal lifecycle status
+    |
+    v
+GET ThreadState
+~~~
+
+Terminal Run states recognized by the UI include:
+
+~~~text
+success
+error
+timeout
+interrupted
+~~~
+
+Polling is intentionally temporary.
+
+It exists as the control implementation against which event streaming will be
+compared.
+
+### Live browser validation
+
+The baseline was validated end-to-end in a real browser.
+
+Observed execution included:
+
+~~~text
+Run status = running
+        |
+        v
+Run status = success
+~~~
+
+followed by persisted state:
+
+~~~text
+Graph next = END
+
+Checkpoint = present
+~~~
+
+and projected messages:
+
+~~~text
+USER
+teste
+
+ASSISTANT
+O teste foi recebido.
+~~~
+
+The Run lifecycle and graph position were obtained from separate Runtime
+surfaces even though they happened to align in this execution.
+
+### Pre-streaming boundary
+
+The Version 1.0 baseline intentionally contains no:
+
+~~~text
+EventSource
+WebSocket client
+Last-Event-ID handling
+SSE parser
+stream replay
+stream reconnection
+LangGraph JavaScript SDK
+AG-UI client
+~~~
+
+Those concerns begin only after the frontend application baseline is closed.
+
+### Invariants for event streaming
+
+A streaming implementation is correct only if it preserves the baseline
+semantics established here.
+
+At minimum:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph position
+
+Thread status is not an execution lock
+
+ThreadState remains the persisted state authority
+
+streamed messages do not replace persisted reconciliation
+
+wire events do not become domain entities automatically
+
+graph interrupt != lifecycle cancellation
+
+checkpoint identity remains explicit
+
+reconnection must tolerate replay / duplicate delivery
+
+side effects must not rely on exactly-once stream delivery
+~~~
+
+### Known temporary implementation debt
+
+The following are intentionally temporary or incomplete:
+
+~~~text
+REST polling for Run observation
+
+fixed polling interval
+
+bounded polling timeout
+
+no stream reconnection
+
+no incremental message rendering
+
+no streaming checkpoint projection
+
+no shared cross-surface state abstraction
+
+no interrupt controls
+
+no frontend tools
+
+no AG-UI
+
+no generative UI
+~~~
+
+These are roadmap items rather than hidden deficiencies.
+
+### Phase boundary
+
+Version 1.0 closes the first frontend application baseline.
+
+The architecture at the boundary is:
+
+~~~text
+Browser
+   |
+   v
+React UI
+   |
+   +--> Runtime overview
+   |
+   +--> execution surface
+            |
+            v
+      execution orchestration
+            |
+            v
+      AgentServerClient
+            |
+            v
+      tolerant REST transport
+            |
+            v
+        Agent Server
+            |
+            +--> Assistant
+            +--> Thread
+            +--> Run
+            +--> ThreadState
+            +--> Checkpoint
+~~~
+
+The next architectural change is not another frontend foundation layer.
+
+It is:
+
+~~~text
+REST polling
+      |
+      v
+event streaming
+~~~
+
+while preserving every Runtime identity and persistence invariant established by
+the control implementation.

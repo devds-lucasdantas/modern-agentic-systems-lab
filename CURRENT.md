@@ -1083,69 +1083,120 @@ Detailed evidence is recorded in:
 docs/journal/lab-18-frontend-foundations.md
 ~~~
 
-## Current sub-block — 2.1F Frontend baseline review
+## Completed block — 2.1 Frontend application
 
-The next step is to review and close the complete pre-streaming frontend
-baseline.
+The complete pre-streaming frontend baseline is closed.
 
-The review must verify:
-
-~~~text
-frontend architecture
-dependency direction
-Runtime identity boundaries
-REST transport behavior
-schema drift handling
-configuration and browser boundary
-Thread / Run separation
-message projection
-execution lifecycle
-graph-state separation
-documentation consistency
-repository cleanliness
-~~~
-
-The purpose of 2.1F is not to add another major feature.
-
-It is the architectural closure gate before:
+Implemented and validated:
 
 ~~~text
-2.2 — Event streaming
+2.1A Frontend stack and scaffold
+2.1B Runtime domain model
+2.1C Agent Server REST client baseline
+2.1D Application shell
+2.1E First execution surface
+2.1F Frontend baseline review
 ~~~
+
+The final control architecture is:
+
+~~~text
+React UI
+    -> application / execution orchestration
+    -> tolerant Agent Server REST transport
+    -> frontend Runtime domain
+~~~
+
+The browser can now:
+
+~~~text
+observe Assistants
+observe Threads
+create Threads
+create stateful Runs
+poll Run lifecycle
+retrieve persisted ThreadState
+display graph position
+display checkpoint identity
+project persisted messages
+~~~
+
+while preserving:
+
+~~~text
+Thread != Run
+
+Run lifecycle != graph position
+
+ThreadState = persisted message authority
+
+wire message != persisted message != frontend Message
+~~~
+
+The frontend architecture is consolidated in:
+
+~~~text
+docs/architecture.md
+    Version 1.0 — Phase 2 frontend baseline
+~~~
+
+The reusable closure gate is:
+
+~~~text
+scripts/check-frontend-baseline.py
+~~~
+
+Detailed experimental evidence is recorded in:
+
+~~~text
+docs/journal/lab-18-frontend-foundations.md
+~~~
+
+## Current block — 2.2 Event streaming
+
+The next architectural change replaces REST polling as the primary live
+observation mechanism.
+
+Control implementation:
+
+~~~text
+create Run
+    -> poll GET Run every ~500 ms
+    -> observe terminal Run lifecycle
+    -> GET ThreadState
+    -> reconcile persisted state
+~~~
+
+The streaming implementation must preserve all existing Runtime identities and
+persistence boundaries.
 
 Initial questions:
 
-1. Are the domain, transport, application and execution layers still
-   unidirectional?
-2. Did any wire representation leak into the stable domain?
-3. Is ThreadState still the persisted source of truth for messages?
-4. Is Run lifecycle visibly independent from graph execution position?
-5. Which parts of the REST polling implementation are intentionally temporary?
-6. What invariants must event streaming preserve when it replaces polling?
-7. Is the frontend baseline reproducible and sufficiently documented to serve as
-   the control implementation for later streaming experiments?
+1. Which pinned Agent Server streaming endpoint should the browser use first?
+2. Which stream mode provides the minimum useful live execution surface?
+3. How should SSE framing be parsed without conflating transport events with
+   frontend domain entities?
+4. How should streamed message chunks relate to persisted ThreadState messages?
+5. How should lifecycle events and graph execution position remain independent?
+6. How should disconnect and reconnect behave?
+7. Which events may be replayed after reconnect?
+8. What client-side idempotency strategy is required for at-least-once replay?
+9. When should the frontend reconcile stream-derived state against persisted
+   ThreadState?
+10. Should the pinned REST/SSE surface remain the first implementation before
+    testing compatibility with the modern JavaScript SDK?
 
-Phase 2 will build the client-facing layer over the Runtime contracts established
-during Phase 1.
-
-The initial architectural question is:
-
-~~~text
-How should a frontend observe, represent and control Agent Server execution
-without collapsing Run, Thread, graph state and protocol semantics into one
-client-side concept?
-~~~
-
-The Phase 2 roadmap then continues through:
+The baseline intentionally still contains no:
 
 ~~~text
-Event streaming
-Shared state
-Interrupts
-Frontend tools
+EventSource
+WebSocket
+Last-Event-ID
+LangGraph JavaScript SDK
 AG-UI
-Generative UI patterns
 ~~~
+
+Those boundaries will now be introduced experimentally rather than assumed.
 
 ## Reference environment
 
