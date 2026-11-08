@@ -2,16 +2,14 @@
 
 ## Current phase
 
-Phase 1 — Agent Runtime & Protocols
+Phase 2 — Agent ↔ UI
 
-Current block:
+Current sub-block:
 
 ~~~text
-1.7 MCP
-    -> MCP protocol contract and transport model
-    -> Assistant-as-Tool projection
-    -> pinned Agent Server MCP adapter
-    -> schema, execution, error and session semantics
+2.3B Frontend state projection boundary
+    -> typed, readonly Runtime state projections
+    -> separation of graph state and application UI state
 ~~~
 
 ## Completed
@@ -1728,36 +1726,90 @@ large cumulative partial-message payloads
 
 These are not blockers for the Phase 2.2 baseline.
 
-## Current block — 2.3 Shared state
+## Completed sub-block — 2.3A Runtime shared-state contract discovery
 
-The next block moves beyond execution transport.
+Graph-aware state mutation was validated against the pinned Runtime without
+executing any model.
 
-The objective is to determine how agent state should be intentionally exposed,
-edited and synchronized across the Agent ↔ UI boundary.
-
-Initial questions:
-
-1. which ThreadState values belong in application UI state;
-2. which graph-state fields should remain Runtime-internal;
-3. how frontend state mutations map to Runtime state updates;
-4. how checkpoint identity participates in safe state mutation;
-5. how concurrent UI and agent updates should be detected;
-6. whether optimistic updates are appropriate;
-7. how persisted state and local UI state should be separated;
-8. how reducers affect client-authored state updates;
-9. how shared state interacts with interrupted execution;
-10. what state model will later support frontend tools and AG-UI.
-
-The starting invariant is:
+Observed prerequisites and semantics:
 
 ~~~text
-Runtime ThreadState
-    !=
-arbitrary mutable frontend store
+Thread metadata.graph_id = deep_agent
+
+POST ThreadStateUpdate
+    -> reducer-aware values
+    -> as_node execution positioning
+    -> new persisted checkpoint
+
+GET ThreadState
+    -> authoritative resulting state
 ~~~
 
-The frontend should project and mutate state deliberately rather than mirroring
-the entire graph state indiscriminately.
+An unassigned Thread returned HTTP 400 when updated before graph identity
+was established.
+
+The update response included:
+
+~~~text
+checkpoint
+configurable
+checkpoint_id
+~~~
+
+Sequential state updates established:
+
+~~~text
+new message ID
+    -> append
+
+existing message ID
+    -> replace
+
+three sequential updates
+    -> C1 -> C2 -> C3
+~~~
+
+Historical checkpoint reads preserved the original messages and did not
+move the Thread HEAD.
+
+Six semantic assertions passed using the reproducible harness:
+
+~~~text
+scripts/lab-23a-shared-state.py
+~~~
+
+Detailed results:
+
+~~~text
+docs/journal/lab-20-shared-state.md
+~~~
+
+This does not establish stale-write protection or concurrency guarantees.
+
+## Current sub-block — 2.3B Frontend state projection boundary
+
+Define deliberate frontend projections of persisted Runtime state.
+
+Initial responsibilities:
+
+1. separate message projection from other graph values;
+2. distinguish persisted state from provisional stream state;
+3. preserve checkpoint and execution position as control metadata;
+4. avoid exposing arbitrary state channels as mutable UI fields;
+5. define typed, readonly UI-facing state projections;
+6. establish the read-side contract before adding write operations.
+
+The working principle is:
+
+~~~text
+ThreadState
+    -> explicit read projection
+    -> frontend presentation
+
+UI intent
+    -> future typed command
+    -> graph-aware mutation
+~~~
 
 ## Reference environment
 

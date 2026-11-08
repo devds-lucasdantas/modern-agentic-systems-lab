@@ -117,6 +117,13 @@
   - [x] 2.2F Persisted-state reconciliation
   - [x] 2.2G Streaming baseline review
 - [ ] 2.3 Shared state
+  - [x] 2.3A Runtime shared-state contract discovery
+  - [ ] 2.3B Frontend state projection boundary
+  - [ ] 2.3C Explicit state-update client
+  - [ ] 2.3D Checkpoint-aware mutation
+  - [ ] 2.3E Shared-state UI
+  - [ ] 2.3F Concurrency and stale-state protection
+  - [ ] 2.3G Shared-state baseline review
 - [ ] 2.4 Interrupts
 - [ ] 2.5 Frontend tools
 - [ ] 2.6 AG-UI
