@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3D Checkpoint-aware mutation
-    -> investigate checkpoint-selected state updates and branching
-    -> define explicit mutation and re-read policy
-    -> do not assume CAS or stale-write protection
+2.3E Shared-state UI
+    -> render allowlisted persisted shared-state projection
+    -> expose explicit, deliberate user mutation actions
+    -> preserve checkpoint and reconciliation semantics
 ~~~
 
 ## Completed
@@ -1888,13 +1888,70 @@ scripts/lab-23c-state-update.{mjs,py}
 Full reproducible evidence is recorded in docs/journal/lab-20-shared-state.md.
 No React/SSE/useExecution/UI mutation controls were added in this sub-block.
 
-## Current sub-block — 2.3D Checkpoint-aware mutation
+## Completed sub-block — 2.3D Checkpoint-aware mutation
 
-Investigate the semantics of checkpoint-selected mutations, lineage and
-branching against the pinned Runtime, before choosing a mutation/re-read policy.
-Checkpoint selection has not been established as compare-and-swap, stale-write
-rejection, concurrency control, multiuser authorization or an execution lock.
-Concurrency and stale-state protection remain reserved for 2.3F.
+The pinned Runtime accepted historical-checkpoint-selected updates after HEAD
+had already moved. Starting from C1 (message A), an ordinary update created C2
+(A+B). Selecting C1 then created C3 (A+C), with parent C1. Selecting C2 after
+C3 then created C4 (A+B+D), with parent C2. The observed lineage was:
+
+~~~text
+    C1 (A)
+    |-- C2 (A+B)
+    |    `-- C4 (A+B+D)   <- observed final HEAD
+    `-- C3 (A+C)
+~~~
+
+After each selected write, a separate GET ThreadState returned that write's
+checkpoint as HEAD. All earlier checkpoints remained readable and unchanged.
+Four distinct checkpoints were observed; no Runs or model calls were created.
+The disposable Thread and isolated pinned Runtime process were cleaned up.
+
+### Readback and mutation policy
+
+- A supplied CheckpointRef is a branching source selector, not a concurrency
+  precondition or expected-HEAD compare-and-swap token.
+- updateThreadState() returns the created CheckpointRef only. It does not return
+  the complete persisted state or an authoritative frontend projection.
+- After a write, GET ThreadState independently to observe the then-current HEAD.
+  Compare the returned checkpoint ID with the mutation result; when they differ,
+  do not falsely claim that the mutation failed or that its state is the HEAD.
+- When reading a historical checkpoint by ID, verify that the actual returned
+  checkpoint ID matches the requested ID. The pinned Runtime can return a
+  synthetic empty HTTP 200 result for missing checkpoint selectors.
+- Explicit historical selection may replace the visible HEAD with a different
+  branch. A UI must make that choice deliberate and must not silently replay a
+  stale selector as if it guarded concurrent updates.
+
+This was a sequential experiment, NOT a simultaneous-writer test. It did not
+prove stale-write rejection, CAS, locking or multiuser authorization. Those
+policies and race tests remain in 2.3F.
+
+Reproducible scripts:
+
+~~~text
+scripts/lab-23d-checkpoint-aware.py
+scripts/lab-23d-checkpoint-aware.mjs
+~~~
+
+The initial experiment recorded ten true semantic observations in
+/tmp/masl-23d-observations-910.json. The path and checkpoint IDs were ephemeral
+and are not requirements for reproducing the experiment.
+
+Full results and architectural interpretation are recorded in:
+
+~~~text
+docs/journal/lab-20-shared-state.md
+~~~
+
+## Current sub-block — 2.3E Shared-state UI
+
+Introduce user-facing shared-state presentation and deliberate mutation
+controls on top of the explicit 2.3C client and the checkpoint semantics
+established in 2.3D. Reuse the persisted allowlist projection rather than
+copying arbitrary Runtime values into React state. Keep checkpoint identity,
+mutation result and authoritative readback separate. Do not claim built-in
+optimistic concurrency, stale-write protection or multiuser authorization.
 
 ## Reference environment
 

@@ -847,3 +847,118 @@ checkpoint-selected writes. Those are future investigations in 2.3D/2.3F.
 No UI mutation controls, streaming changes or Run creation were introduced.
 The existing browser E2E suite was not rerun for this transport-only change;
 no new browser-test result is claimed here.
+
+## 2.3D — Checkpoint-aware mutation
+
+### Objective and scope
+
+Determine empirically whether `checkpoint` on `POST /threads/{thread_id}/state`
+selects historical state, how that affects checkpoint ancestry and the Thread
+HEAD, and what the frontend must do to reconcile a mutation. Do not assume CAS
+or implement multiwriter protection in this stage.
+
+### Reproducible pinned Runtime experiment
+
+Run from the repository root:
+
+~~~bash
+python3 scripts/lab-23d-checkpoint-aware.py
+~~~
+
+The Python harness compiles the actual frontend AgentServerClient with Vite,
+starts the pinned graph Runtime on an isolated ephemeral port, and runs the
+Node experiment. No Run or model is invoked. It deletes the disposable Thread
+and terminates the Runtime process in cleanup.
+
+The Node script uses the typed updateThreadState() from 2.3C, explicit
+getThreadState() HEAD reads, and direct HTTP historical state queries. It
+verifies checkpoint identity on historical reads because the pinned Runtime
+can return a synthetic empty HTTP 200 for missing historical selectors.
+
+### Observed checkpoint graph
+
+~~~text
+C1: messages = [A]                     parent = none
+ |-- C2: messages = [A, B]              parent = C1
+ |    `-- C4: messages = [A, B, D]      parent = C2
+ `-- C3: messages = [A, C]             parent = C1
+~~~
+
+Execution order: C1 -> C2 -> C3 (selected C1) -> C4 (selected C2).
+The drawing above is ancestry, not chronological creation order.
+
+C1 and C2 were first created sequentially. After HEAD became C2, a POST
+selecting C1 returned a new C3. The separate HEAD read returned C3, not C2.
+C3 contained A and C but not B, and identified C1 as its parent.
+
+After HEAD became C3, a POST selecting historical C2 returned a new C4. The
+separate HEAD read returned C4. C4 contained A, B and D but not C, and
+identified C2 as its parent.
+
+Historical reads after both branch writes continued to return the original C1,
+C2 and C3 snapshots. Four distinct checkpoint IDs were observed. No Run was
+created, no model was called, and disposable resources were cleaned up.
+
+The saved experiment result was:
+
+~~~text
+/tmp/masl-23d-observations-910.json
+~~~
+
+That path is an ephemeral local observation artifact; checkpoint IDs and port
+numbers must not be hard-coded in clients or test expectations.
+
+### Ten observed semantic checks
+
+~~~text
+c1SelectedWriteAcceptedAfterC2: true
+c2SelectedWriteAcceptedAfterC1Branch: true
+c1SelectedWriteParentIsC1: true
+c2SelectedWriteParentIsC2: true
+c1SelectedWriteContainsAAndCNotB: true
+c2SelectedWriteContainsABAndDNotC: true
+headAfterFirstBranchMatchesResult: true
+headAfterSecondBranchMatchesResult: true
+c1C2AndFirstBranchHistoryPreserved: true
+noRunsCreated: true
+~~~
+
+### Explicit frontend mutation and readback policy
+
+1. Treat `checkpoint` as a historical branching selector, **not** a version
+   precondition. A stale historical selector was accepted sequentially.
+2. Preserve the POST's returned CheckpointRef as the mutation result; do not
+   treat it as a full ThreadState or mark projection authority `persisted`.
+3. Issue a separate GET ThreadState to observe the then-current HEAD and graph
+   position; compare its checkpoint identity against the POST result.
+4. If those checkpoint IDs differ, report HEAD divergence instead of silently
+   discarding the mutation result or presenting the current HEAD as that write's
+   verified snapshot. A different writer or branch may have advanced HEAD.
+5. Historical readback of a particular checkpoint must verify the returned
+   checkpoint ID even on HTTP 200; a synthetic missing-state response is not
+   proof that the requested checkpoint exists.
+6. An explicit branch selection must be deliberate in the future UI. Avoid
+   generic automatic retries that reapply state updates at a historical source.
+
+This is a readback policy and a boundary statement, not a concurrency-control
+implementation. The existing 2.3C write method remains POST-only; its caller
+must explicitly initiate any reconciliation read.
+
+### Boundaries and limitations
+
+- Only sequential selected writes were tested; no simultaneous writers or race
+  windows were exercised.
+- A successful branch operation is not evidence of compare-and-swap, optimistic
+  locking, or stale-write rejection.
+- The local Thread identity consistency check is not multiuser authorization.
+- No mutation controls, React changes, streaming changes, SDK updates or new
+  dependencies are introduced by this discovery.
+- Proper concurrency/stale-state policy is reserved for 2.3F; 2.3E can build a
+  deliberately limited shared-state UI that does not claim those guarantees.
+
+### Architectural conclusion
+
+The pinned implementation behaved as a checkpoint DAG with branch-selected
+writes that advanced the visible HEAD. Historical state did not disappear.
+Checkpoint lineage, mutation result, current HEAD and persisted readback are
+separate concepts. The frontend must preserve those distinctions.
