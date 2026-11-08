@@ -1220,3 +1220,96 @@ A new trusted server-side write contract is required for stronger guarantees.
 
 The 2.3F scope is complete against its stated gates. The 2.3G baseline review,
 including consideration of broader regression coverage, remains pending.
+
+## 2.3G — Shared-state baseline review
+
+### Objective and scope
+
+Review the established 2.3A–2.3F shared-state contracts and UI behavior using
+one model-free, pinned, reproducible gate set. Close the scoped milestone only
+when all required gates pass. Do not infer transactional CAS, authorization,
+server locks or exactly-once delivery from this model-free baseline.
+
+### Reproduction and captured evidence
+
+~~~bash
+bash scripts/lab-23g-review.sh
+~~~
+
+The successful WSL review reported this ephemeral evidence directory:
+
+~~~text
+/tmp/masl-23g-review-K2ORrXRr
+~~~
+
+The directory contains `gates.tsv`, per-gate logs, and separate archived JSON
+for 2.3D checkpoint observations and 2.3F concurrency scenarios. Paths are
+observations, not fixed dependencies. The runner records the Git baseline
+`6e6865a211988ab2f29feab84b358e13375ceee9` and tests on descendants only
+while the pinned reviewed application/experiment sources remain unchanged.
+
+The reviewed execution produced:
+
+~~~text
+lint: PASS (0 warnings, 0 errors; 47 files, 116 rules)
+production-build: PASS (44 Vite modules)
+pure-23b-projection: PASS (12 assertions)
+pure-23c-client: PASS (20 assertions)
+pure-23e-readback: PASS (6 assertions)
+pure-23f-preflight: PASS (11 assertions)
+runtime-23a: PASS (message reducers, lineage, historical immutability)
+runtime-23c: PASS (typed POST and independent GET)
+runtime-23d: PASS (historical branching and ten observations)
+runtime-23f: PASS (four concurrency/failure scenarios)
+browser-23e-23f: PASS (4 Chromium tests)
+browser-22-model-dependent: SKIP (not enabled; model calls)
+
+Summary: 11/11 selected gates passed; 49 pure assertions; four Runtime
+probes; four model-free Playwright E2E scenarios.
+~~~
+
+### Observations and limits
+
+- The 2.3D selected-checkpoint experiment observed a checkpoint DAG and
+  independent HEAD movement; historical selection is not CAS.
+- The 2.3F experiment dispatched two writers concurrently and both were
+  accepted in the recorded case. It does not establish internal simultaneous
+  transaction execution or an always-accept policy.
+- An already-obsolete UI observation is blocked before POST if preflight
+  detects HEAD drift. This remains a best-effort time-of-check/time-of-use
+  mitigation; another writer can advance HEAD between GET and POST.
+- A POST's returned checkpoint is distinct from the independently fetched
+  persisted HEAD. Post-POST divergence requires explicit reload.
+- A lost POST response can conceal a persisted mutation. The frontend
+  cannot automatically replay such a request safely.
+- The pure preflight compares the complete CheckpointRef; the post-mutation
+  readback classifier uses Thread identity plus checkpoint ID. Namespace and
+  checkpoint-map equivalence after POST were not established by that classifier.
+- 2.2 model-dependent streaming browser regressions were deliberately not run
+  here; their earlier evidence is not reclassified as current full-suite PASS.
+- Trusted authorization, idempotency, distributed exclusion and transactional
+  conditional writes require a future server-side contract; they are not
+  guaranteed by this UI.
+
+### Review harness maintenance
+
+The integrated runner initially failed on Bash `local` expansion in the
+observation archiver; that was corrected by splitting declarations. The
+2.3F harness's original exact-commit guard was changed to a Git ancestry
+check so the published 2.3F can reproduce on descendant commits. The gate
+runner initially rejected this reviewed source hotfix and treated the 2.3F
+`scenarios` JSON as though it used the 2.3D `observations` schema. The final
+runner accepts only the reviewed 2.3F guard content, pins source integrity
+to the recorded baseline, and validates each experiment's actual evidence
+schema. The verified Playwright tests remained unchanged.
+
+This final review script is intended to remain runnable after its own Git
+commit; it explicitly rejects new changes to the application/probe sources
+without an updated baseline and independent re-review. The pinned reference
+workshop and dependencies were not updated, reset, or committed.
+
+### Milestone disposition
+
+**2.3 Shared state: COMPLETE (scoped, model-free reviewed baseline).**
+Next: **2.4 Interrupts**. No production concurrency or multiuser security
+claim is implied by this completion.

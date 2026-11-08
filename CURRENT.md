@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3G Shared-state baseline review
-    -> review contracts, evidence and regression coverage for 2.3A–2.3F
-    -> record limitations and baseline readiness
-    -> keep server-side CAS, authorization and idempotency outside this UI claim
+2.4 Interrupts
+    -> discover interrupt and resume contracts on the pinned Runtime
+    -> distinguish persisted graph interrupts from UI interaction
+    -> preserve the completed 2.3 shared-state baseline
 ~~~
 
 ## Completed
@@ -2081,13 +2081,62 @@ resolved by upgrading packages; references remain reproducible.
 The detailed evidence and limitations are in
 `docs/journal/lab-20-shared-state.md`. The baseline review remains 2.3G.
 
-## Current sub-block — 2.3G Shared-state baseline review
+## Completed sub-block — 2.3G Shared-state baseline review
 
-Review the integrated 2.3A–2.3F boundaries, tests, known races, checkpoint
-lineage, error recovery and evidence reproducibility. Do not mark the entire
-2.3 milestone complete until this review has its own gates and documented
-result. A trusted server-side concurrency/authorization protocol is outside
-the scope of the proven frontend guard.
+The integrated review of 2.3A–2.3F passed on the pinned WSL Runtime without
+model calls. It confirmed projection allowlisting, explicit state-update
+transport, checkpoint ancestry and branching, POST/readback separation,
+concurrency observations, and best-effort UI interlocks. Evidence was retained
+in a timestamp-independent ephemeral report directory with gate logs and
+archived 2.3D/2.3F JSON observations.
+
+~~~text
+11 selected gates passed:
+  - oxlint: 0 warnings / 0 errors (47 files, 116 rules)
+  - TypeScript + Vite production build: PASS (44 modules)
+  - pure projection, typed client, readback, preflight: 49 assertions
+  - Runtime probes: 2.3A, 2.3C, 2.3D, 2.3F
+  - Chromium shared-state UI: 4 E2E scenarios
+  - 2.2 model-dependent streaming E2E: SKIPPED (explicit opt-in)
+~~~
+
+Reproduction:
+
+~~~bash
+bash scripts/lab-23g-review.sh
+~~~
+
+The reviewer verifies that HEAD descends from the 2.3F baseline and that the
+reviewed application and experiment sources match the recorded baseline, so
+it can still be run after this documentation/runner commit. The 2.3F Python
+harness itself also accepts descendants of its original starting commit.
+
+### Architectural decision and open limits
+
+The successful frontend preflight GET is a stale-observation safeguard, not
+atomic compare-and-swap. Concurrent Runtime writers can still move HEAD
+between GET and POST or after POST. Historical checkpoint selection is a
+branch source, not a stale-version rejection condition. The readback comparator
+checks checkpoint ID and Thread identity, while the preflight comparator checks
+complete CheckpointRef identity including namespace and map; the two are not
+interchangeable. Mutations with lost POST responses remain ambiguous and must
+not be retried automatically.
+
+No server-side CAS, distributed lock, trusted per-user authorization,
+idempotency keys, exactly-once execution, or multiuser conflict resolution was
+implemented or established. 2.2 model-dependent browser regressions were not
+run in this baseline review; no full-suite claim is made. The local pinned
+Runtime's upstream EOL warning was not addressed by changing dependencies.
+
+The review journal and preserved gate logs describe the tested baseline. The
+2.3 milestone is complete within these documented scope and evidence limits.
+
+## Current sub-block — 2.4 Interrupts
+
+Begin interrupt/HITL contract discovery against the pinned Runtime. Identify
+interrupt identity, persistence, resume boundaries, and lifecycle semantics
+before implementing any frontend controls. Preserve the completed shared-state
+and SSE behavior; do not assume future authorization or concurrency contracts.
 
 ## Reference environment
 

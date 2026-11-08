@@ -53,9 +53,18 @@ def main():
     if not EXPERIMENT.is_file():
         raise RuntimeError(f"Node experiment not found: {EXPERIMENT}")
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    expected = "dd6d3546c4ca28fa00eed66945cddc16cbb16d3e"
-    if head != expected:
-        raise RuntimeError(f"Unexpected repository HEAD: {head}. Expected {expected}; inspect before proceeding.")
+    baseline = "dd6d3546c4ca28fa00eed66945cddc16cbb16d3e"
+    lineage = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", baseline, "HEAD"],
+        cwd=ROOT,
+        check=False,
+    )
+    if lineage.returncode != 0:
+        raise RuntimeError(
+            f"Unexpected repository HEAD: {head}. "
+            f"Expected a descendant of {baseline}; inspect before proceeding."
+        )
+    print(f"PASS: repository HEAD descends from 2.3F baseline ({head[:7]})", flush=True)
 
     port = reserve_port()
     base = f"http://127.0.0.1:{port}"
