@@ -7,9 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3B Frontend state projection boundary
-    -> typed, readonly Runtime state projections
-    -> separation of graph state and application UI state
+2.3C Explicit state-update client
+    -> typed graph-aware state-update requests
+    -> checkpoint response decoding
+    -> no UI mutation controls yet
 ~~~
 
 ## Completed
@@ -1786,30 +1787,88 @@ docs/journal/lab-20-shared-state.md
 
 This does not establish stale-write protection or concurrency guarantees.
 
-## Current sub-block — 2.3B Frontend state projection boundary
+## Completed sub-block — 2.3B Frontend state projection boundary
 
-Define deliberate frontend projections of persisted Runtime state.
+A pure read-side projection now separates selected persisted Runtime state
+from arbitrary internal graph values.
 
-Initial responsibilities:
-
-1. separate message projection from other graph values;
-2. distinguish persisted state from provisional stream state;
-3. preserve checkpoint and execution position as control metadata;
-4. avoid exposing arbitrary state channels as mutable UI fields;
-5. define typed, readonly UI-facing state projections;
-6. establish the read-side contract before adding write operations.
-
-The working principle is:
+Implementation:
 
 ~~~text
-ThreadState
-    -> explicit read projection
-    -> frontend presentation
-
-UI intent
-    -> future typed command
-    -> graph-aware mutation
+apps/web/src/execution/thread-state-projector.ts
 ~~~
+
+The projection exposes:
+
+~~~text
+PersistedThreadProjection
+    authority
+    threadId
+    messages
+    graph
+        status
+        next
+        checkpointId
+        parentCheckpointId
+        taskCount
+        interruptCount
+~~~
+
+Graph read status:
+
+~~~text
+uninitialized
+pending
+end
+~~~
+
+An empty Thread without a checkpoint is not represented as END.
+
+The projection reuses existing message normalization and deliberately excludes
+unselected graph values and raw Runtime control payloads.
+
+The execution hook and presentation layer now consume this projection for
+persisted messages and graph summaries.
+
+Validation:
+
+~~~text
+12 pure projection assertions passed
+4 browser E2E tests passed
+lint passed
+production build passed
+~~~
+
+Detailed evidence:
+
+~~~text
+docs/journal/lab-20-shared-state.md
+~~~
+
+## Current sub-block — 2.3C Explicit state-update client
+
+Introduce a typed Agent Server client operation for:
+
+~~~text
+POST /threads/{thread_id}/state
+~~~
+
+The operation must preserve:
+
+~~~text
+values
+checkpoint
+as_node
+~~~
+
+and decode the returned checkpoint identity.
+
+Do not infer optimistic concurrency guarantees from a checkpoint selector.
+
+No new mutation controls should be added to the UI during this sub-block.
+
+The client must continue to use GET ThreadState for authoritative
+post-mutation reconciliation.
 
 ## Reference environment
 

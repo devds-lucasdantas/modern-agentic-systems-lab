@@ -18,6 +18,10 @@ import {
 } from '../execution/use-execution'
 
 import {
+  projectThreadState,
+} from '../execution/thread-state-projector'
+
+import {
   MessageList,
 } from './MessageList'
 
@@ -98,6 +102,13 @@ export function ExecutionSurface({
       runId ??
       run?.id ??
       null
+
+  const persistedView =
+    state === null
+      ? null
+      : projectThreadState(
+          state,
+        )
 
   const handleAssistantChange = (
     event:
@@ -358,12 +369,14 @@ export function ExecutionSurface({
               </span>
 
               <strong>
-                {state === null
+                {persistedView === null ||
+                persistedView.graph.status ===
+                  'uninitialized'
                   ? '—'
-                  : state.position.next
-                      .length === 0
+                  : persistedView.graph.status ===
+                      'end'
                     ? 'END'
-                    : state.position.next
+                    : persistedView.graph.next
                         .join(', ')}
               </strong>
             </article>
@@ -374,12 +387,12 @@ export function ExecutionSurface({
               </span>
 
               <strong>
-                {state?.checkpoint === null ||
-                state === null
+                {persistedView === null ||
+                persistedView.graph.checkpointId ===
+                  null
                   ? '—'
                   : shortId(
-                      state.checkpoint
-                        .checkpointId,
+                      persistedView.graph.checkpointId,
                     )}
               </strong>
             </article>

@@ -439,10 +439,264 @@ model.
 
 ## 2.3B — Frontend state projection boundary
 
+### Objective
+
+Introduce a deterministic, explicit, read-only projection of persisted
+ThreadState for frontend consumption.
+
+The implementation must not expose arbitrary Runtime values or treat graph
+execution state as a generic frontend store.
+
+### Existing baseline
+
+Before 2.3B, persisted messages were projected through:
+
+~~~text
+projectMessagesFromState
+~~~
+
+However, ExecutionSurface still accessed:
+
+~~~text
+state.position.next
+state.checkpoint
+~~~
+
+directly.
+
+The new projection centralizes these read-side transformations.
+
+### Projection contract
+
+Implemented in:
+
+~~~text
+apps/web/src/execution/thread-state-projector.ts
+~~~
+
+Public API:
+
+~~~text
+projectThreadState(ThreadState)
+    -> PersistedThreadProjection
+~~~
+
+The projection includes:
+
+~~~text
+authority = persisted
+threadId
+messages
+graph
+    status
+    next
+    checkpointId
+    parentCheckpointId
+    taskCount
+    interruptCount
+~~~
+
+Only explicitly selected fields cross the read boundary.
+
+The projection does not copy:
+
+~~~text
+arbitrary StateValues channels
+raw Runtime metadata
+raw tasks
+interrupt payloads
+checkpoint configuration internals
+~~~
+
+This is an allowlist boundary, not a general-purpose data sanitizer.
+
+### Graph read status
+
+The graph summary distinguishes:
+
+~~~text
+uninitialized
+    -> checkpoint is absent
+
+pending
+    -> checkpoint exists
+    -> next is non-empty
+
+end
+    -> checkpoint exists
+    -> next is empty
+~~~
+
+An empty Thread must not be rendered as END merely because next is empty.
+
+The status `end` describes persisted execution position. It does not establish
+business-level success and is not a substitute for Run lifecycle state.
+
+### Message projection reuse
+
+The new projector delegates message normalization to the existing
+message-projector.
+
+~~~text
+ThreadState
+    -> projectMessagesFromState
+    -> normalized Message[]
+~~~
+
+No second message decoder was introduced.
+
+### Frontend integration
+
+The persisted-state reconciliation paths in useExecution now obtain messages
+through:
+
+~~~text
+projectThreadState(state).messages
+~~~
+
+ExecutionSurface obtains graph position and checkpoint information from:
+
+~~~text
+projectThreadState(state).graph
+~~~
+
+The SSE transport, reconnect algorithm and Runtime lifecycle reconciliation
+were not modified.
+
+### Read-side immutability
+
+The projection uses readonly TypeScript interfaces.
+
+The graph next array is copied rather than aliased to the input array.
+
+The tests verified that mutating the original next array does not change an
+already created projection.
+
+Readonly typing alone does not establish deep runtime immutability, complete
+payload isolation or authorization.
+
+### Pure projection tests
+
+The test source is:
+
+~~~text
+apps/web/src/execution/thread-state-projector.spec.ts
+~~~
+
+It runs independently of React rendering, HTTP requests and the Runtime.
+
+The test suite validated:
+
+~~~text
+1. empty Thread is uninitialized, not END
+2. projection exposes persisted provenance
+3. pending graph position is projected
+4. checkpoint identities are projected
+5. control data is summarized by counts
+6. supported messages channel is normalized
+7. internal Runtime payloads are not exposed
+8. projection is an explicit allowlist
+9. projected next array is detached from Runtime input
+10. source array mutation does not change projection
+11. persisted checkpoint with empty next is END
+12. unprojected values remain outside the UI boundary
+~~~
+
+Result:
+
+~~~text
+12 pure projection assertions passed
+~~~
+
+### Browser regression
+
+The existing Playwright suite was executed after the projection integration.
+
+Validated cases:
+
+~~~text
+interrupted-reconciliation.spec.ts
+persisted-reconciliation.spec.ts
+reconciliation-failure.spec.ts
+resumable-stream.spec.ts
+~~~
+
+Result:
+
+~~~text
+4 passed
+~~~
+
+Static validation also passed:
+
+~~~text
+oxlint: 0 warnings, 0 errors
+TypeScript and Vite production build: PASS
+git diff --check: PASS
+~~~
+
+### Reproduction
+
+From apps/web:
+
+~~~bash
+pnpm lint
+pnpm build
+
+pnpm exec vite build \
+  --ssr src/execution/thread-state-projector.spec.ts \
+  --outDir /tmp/masl-23b-projection \
+  --emptyOutDir
+
+printf '%s\n' '{"type":"module"}' \
+  > /tmp/masl-23b-projection/package.json
+
+node /tmp/masl-23b-projection/thread-state-projector.spec.js
+
+pnpm exec playwright test --project=chromium
+~~~
+
+The browser suite uses the real pinned Runtime and may execute model calls.
+The pure projection suite does not require a Runtime or model.
+
+### Architectural conclusion
+
+The read-side boundary is now:
+
+~~~text
+Runtime ThreadState
+    |
+    v
+projectThreadState
+    |
+    +-- normalized messages
+    |
+    +-- summarized graph control state
+    |
+    v
+readonly frontend projection
+~~~
+
+Graph persistence, reducers, execution positioning and checkpoint creation
+remain Runtime responsibilities.
+
+### Not established by 2.3B
+
+The following remain outside this sub-block:
+
+~~~text
+state-update REST client
+mutation authorization
+stale-write detection
+compare-and-swap semantics
+optimistic update policy
+concurrent update handling
+~~~
+
+## 2.3C — Explicit state-update client
+
 Pending.
 
-Determine which Runtime state fields can be exposed as stable, typed frontend
-projections without leaking graph-internal control state into generic UI stores.
-
-The first implementation should be read-only, deterministic and testable
-without HTTP or React.
+Introduce a typed REST client operation for graph-aware state updates,
+including request and response decoding, without yet exposing arbitrary
+mutation controls in the UI.

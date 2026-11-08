@@ -24,8 +24,8 @@ import {
 } from '../transport/agent-server'
 
 import {
-  projectMessagesFromState,
-} from './message-projector'
+  projectThreadState,
+} from './thread-state-projector'
 
 import {
   emptyLiveStreamProjection,
@@ -297,9 +297,9 @@ export function useExecution() {
             projectionAuthority:
               'persisted',
             messages:
-              projectMessagesFromState(
+              projectThreadState(
                 state,
-              ),
+              ).messages,
             error: null,
           })
 
@@ -814,9 +814,9 @@ export function useExecution() {
               'persisted',
 
             messages:
-              projectMessagesFromState(
+              projectThreadState(
                 state,
-              ),
+              ).messages,
 
             error:
               null,

@@ -118,7 +118,7 @@
   - [x] 2.2G Streaming baseline review
 - [ ] 2.3 Shared state
   - [x] 2.3A Runtime shared-state contract discovery
-  - [ ] 2.3B Frontend state projection boundary
+  - [x] 2.3B Frontend state projection boundary
   - [ ] 2.3C Explicit state-update client
   - [ ] 2.3D Checkpoint-aware mutation
   - [ ] 2.3E Shared-state UI
