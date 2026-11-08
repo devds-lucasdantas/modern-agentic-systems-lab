@@ -189,3 +189,126 @@ test('failed GET after state POST is visibly unreconciled and requires an explic
     await bestEffortDeleteThread(request, threadId)
   }
 })
+
+
+test('blocks stale UI mutation when another writer advances HEAD before preflight', async ({ page, request }) => {
+  const created = await request.post(`${origin}/threads`, {
+    data: { metadata: { graph_id: 'deep_agent', lab: '2.3F', purpose: 'preflight-stale-e2e' } },
+  })
+  expect(created.ok()).toBeTruthy()
+  const threadId = (await created.json()).thread_id as string
+  const stateUrl = `${origin}/threads/${encodeURIComponent(threadId)}/state`
+  let browserPosts = 0
+
+  try {
+    const seed = await request.post(stateUrl, {
+      data: { values: { messages: [{ type: 'human', id: 'lab-23f-a', content: 'A' }] }, as_node: '__start__' },
+    })
+    expect(seed.ok()).toBeTruthy()
+    const c1 = (await seed.json()).checkpoint.checkpoint_id as string
+    page.on('request', req => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname === `/threads/${encodeURIComponent(threadId)}/state`) browserPosts += 1
+    })
+    await openAndSelectThread(page, threadId)
+    const panel = page.getByRole('region', { name: 'Shared state laboratory' })
+    await expect(panel.getByText(c1)).toBeVisible()
+
+    // Another client updates the persisted HEAD without notifying this page.
+    const external = await request.post(stateUrl, {
+      data: { values: { messages: [{ type: 'human', id: 'lab-23f-b', content: 'B external' }] }, as_node: '__start__' },
+    })
+    expect(external.ok()).toBeTruthy()
+    const c2 = (await external.json()).checkpoint.checkpoint_id as string
+    expect(c2).not.toBe(c1)
+
+    await panel.getByLabel('New human message').fill('UNSENT_FROM_STALE_VIEW')
+    await panel.getByRole('checkbox', { name: /I understand this POST/ }).check()
+    await panel.getByRole('button', { name: 'Append message to graph state' }).click()
+
+    await expect(panel.locator('[data-mutation-stage="stale"]')).toBeVisible()
+    await expect(panel.getByRole('alert')).toContainText('No POST was sent')
+    await expect(panel.getByRole('button', { name: 'Append message to graph state' })).toBeDisabled()
+    expect(browserPosts).toBe(0)
+    const persisted = await request.get(stateUrl)
+    expect(persisted.ok()).toBeTruthy()
+    const body = await persisted.json() as {
+      checkpoint: { checkpoint_id: string }
+      values: { messages: Array<{ content: string }> }
+    }
+    expect(body.checkpoint.checkpoint_id).toBe(c2)
+    expect(body.values.messages.map(m => m.content)).toEqual(['A', 'B external'])
+
+    await panel.getByRole('button', { name: 'Reload persisted state' }).click()
+    await expect(panel.getByText(c2)).toBeVisible()
+    await expect(panel.locator('[data-mutation-stage]')).toHaveAttribute(
+      'data-mutation-stage',
+      'idle',
+    )
+    await expect(panel.getByRole('checkbox', { name: /I understand this POST/ })).not.toBeChecked()
+    expect(browserPosts).toBe(0)
+  } finally {
+    await bestEffortDeleteThread(request, threadId)
+  }
+})
+
+test('HEAD divergence after POST requires reload and never pretends to confirm written state', async ({ page, request }) => {
+  const created = await request.post(`${origin}/threads`, {
+    data: { metadata: { graph_id: 'deep_agent', lab: '2.3F', purpose: 'head-drift-e2e' } },
+  })
+  expect(created.ok()).toBeTruthy()
+  const threadId = (await created.json()).thread_id as string
+  const stateUrl = `${origin}/threads/${encodeURIComponent(threadId)}/state`
+  let browserPostSeen = false
+  let externalAdvance = false
+  let browserStatePosts = 0
+
+  try {
+    const seed = await request.post(stateUrl, {
+      data: { values: { messages: [{ type: 'human', id: 'lab-23f-base', content: 'BASE' }] }, as_node: '__start__' },
+    })
+    expect(seed.ok()).toBeTruthy()
+
+    await page.route(stateUrl, async route => {
+      const method = route.request().method()
+      if (method === 'POST') {
+        browserPostSeen = true
+        browserStatePosts += 1
+      }
+      if (method === 'GET' && browserPostSeen && !externalAdvance) {
+        externalAdvance = true
+        const external = await request.post(stateUrl, {
+          data: { values: { messages: [{ type: 'human', id: 'lab-23f-external', content: 'EXTERNAL_AFTER_POST' }] }, as_node: '__start__' },
+        })
+        expect(external.ok()).toBeTruthy()
+      }
+      await route.continue()
+    })
+
+    await openAndSelectThread(page, threadId)
+    const panel = page.getByRole('region', { name: 'Shared state laboratory' })
+    await panel.getByLabel('New human message').fill('UI_WRITE_BEFORE_EXTERNAL')
+    await panel.getByRole('checkbox', { name: /I understand this POST/ }).check()
+    await panel.getByRole('button', { name: 'Append message to graph state' }).click()
+
+    await expect(panel.locator('[data-mutation-stage="diverged"]')).toBeVisible()
+    await expect(panel.getByText(/Observed HEAD differs from POST checkpoint/)).toBeVisible()
+    await expect(panel.getByRole('alert')).toContainText('Reload before another edit')
+    await expect(panel.getByRole('button', { name: 'Append message to graph state' })).toBeDisabled()
+    expect(browserStatePosts).toBe(1)
+    expect(externalAdvance).toBe(true)
+
+    const persisted = await request.get(stateUrl)
+    expect(persisted.ok()).toBeTruthy()
+    const body = await persisted.json() as { values: { messages: Array<{ content: string }> } }
+    expect(body.values.messages.map(m => m.content)).toEqual(['BASE', 'UI_WRITE_BEFORE_EXTERNAL', 'EXTERNAL_AFTER_POST'])
+
+    await panel.getByRole('button', { name: 'Reload persisted state' }).click()
+    await expect(panel.locator('[data-mutation-stage]')).toHaveAttribute(
+      'data-mutation-stage',
+      'idle',
+    )
+    expect(browserStatePosts).toBe(1)
+  } finally {
+    await bestEffortDeleteThread(request, threadId)
+  }
+})

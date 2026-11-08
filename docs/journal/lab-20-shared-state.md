@@ -1084,3 +1084,139 @@ React refs warnings, subsequently resolved to zero warnings. The existing
 
 The 2.3E UI baseline is complete against its scoped gates. The broader shared
 state milestone remains open for 2.3F and the 2.3G review.
+
+## 2.3F — Concurrency and stale-state protection
+
+### Scope and non-goals
+
+Determine actual multiwriter and ambiguous-write behavior of the pinned
+Runtime, then implement an honest frontend best-effort safeguard. This lab does
+not introduce atomic compare-and-swap, server-side expected-version headers,
+locks, idempotency keys, or multiuser authorization.
+
+### 2.3F-A — Controlled concurrent-writer experiment
+
+Reproduce from the repository root:
+
+~~~bash
+python3 scripts/lab-23f-concurrency.py
+~~~
+
+The Python harness compiles the real frontend TypeScript client with Vite,
+starts the pinned graph Runtime on an isolated loopback port, executes four
+scenarios through the compiled client and shuts down the server. All test
+Threads are disposable. No Run or model invocation occurs.
+
+Observed results from the pinned runtime:
+
+~~~json
+{
+  "concurrentOutcomes": [
+    { "writer": "concurrent-A", "status": "fulfilled" },
+    { "writer": "concurrent-B", "status": "fulfilled" }
+  ],
+  "staleWriteAccepted": true,
+  "postCommittedButHeadDifferent": true,
+  "persistedAfterLostResponse": true,
+  "noRunPosts": true
+}
+~~~
+
+1. Simultaneously dispatched selected-checkpoint updates from two clients:
+   both returned fulfilled; final HEAD belonged to a successful write.
+2. A stale selected checkpoint was accepted after another client moved HEAD.
+3. POST A committed, then writer B advanced HEAD before A's independent GET;
+   the resulting observed HEAD differed from A's returned checkpoint.
+4. A simulated client network failure concealed a persisted POST. The harness
+   deliberately performed no automatic retry.
+
+This proves a lack of verified CAS behavior in the tested interaction and the
+risk of accepting stale write sources; it does not determine server-internal
+transaction scheduling or establish behavior under all races. The experiment
+wrote `/tmp/masl-23f-observations-20056.json` (ephemeral) and successfully
+cleaned up the pinned Runtime and all disposable Threads. The observed
+upstream EOL warning is not an experiment failure.
+
+### 2.3F-B — UI preflight and readback interlocks
+
+The existing `SharedStatePanel` gained a pre-POST GET and a pure comparator:
+
+~~~text
+persisted UI observation
+    -> explicit acknowledgement and submit
+    -> GET current HEAD
+    -> compare complete CheckpointRef identity
+       - different/unknown/error: block POST and request reload
+       - matching: allow POST (best-effort only)
+    -> POST state update
+    -> independent GET ThreadState
+       - matching POST checkpoint: observed readback
+       - different HEAD: diverged; block next write until reload
+       - GET error / POST ambiguity: unreconciled; no automatic retry
+    -> manual reload resets selector and acknowledgement
+~~~
+
+`classifyHeadPreflight()` checks Thread identity, checkpoint ID, namespace and
+checkpointMap. The `head` source mode (no checkpoint selector) still performs
+preflight: omitting the selector is not a stale-observation escape hatch. The
+panel tracks separate stages for checking, posting, reading, stale, diverged,
+unreconciled and failed outcomes. It uses the existing typed client and does
+not modify Run streaming or the pinned reference.
+
+Changed and added files:
+
+~~~text
+apps/web/src/components/SharedStatePanel.tsx
+apps/web/e2e/shared-state-ui.spec.ts
+apps/web/src/execution/state-mutation-preflight.ts
+apps/web/src/execution/state-mutation-preflight.spec.ts
+scripts/lab-23f-concurrency.py
+scripts/lab-23f-concurrency.mjs
+~~~
+
+### Reproducible gates and observed results
+
+From `apps/web`:
+
+~~~bash
+pnpm lint
+pnpm build
+pnpm exec vite build \
+  --ssr src/execution/state-mutation-preflight.spec.ts \
+  --outDir /tmp/masl-23f-preflight --emptyOutDir
+printf '%s\n' '{"type":"module"}' > /tmp/masl-23f-preflight/package.json
+node /tmp/masl-23f-preflight/state-mutation-preflight.spec.js
+CI=1 pnpm exec playwright test \
+  e2e/shared-state-ui.spec.ts --project=chromium --reporter=list
+~~~
+
+Observed on WSL with the pinned Runtime:
+
+~~~text
+oxlint: 0 warnings, 0 errors (47 files, 116 rules)
+TypeScript + Vite build: PASS (44 modules)
+11 head-preflight pure assertions passed
+4 Chromium E2E scenarios passed (9.7 s)
+~~~
+
+The 11 pure checks cover matching/empty checkpoint, current/displayed identity,
+HEAD drift, initially absent/present transitions, cross-Thread mismatch,
+namespace drift and checkpointMap drift. The four browser tests cover the
+previous 2.3E branch/reconciliation and GET failure cases as well as the new
+stale-before-POST and divergent-after-POST cases. Two new E2E assertions were
+initially incorrect: `.toBeVisible()` inspected an empty idle status div, which
+Playwright rightly reported as hidden. They were replaced with
+`.toHaveAttribute('data-mutation-stage', 'idle')`; both new tests then passed.
+
+### Concurrency guarantee boundary
+
+**Best-effort only**: a check immediately before POST is subject to TOCTOU.
+A second writer can change HEAD after GET and before POST. A successful
+subsequent GET records only a momentary HEAD snapshot, not a CAS transaction.
+The frontend cannot enforce cross-client isolation, atomicity, authorization,
+exactly-once execution or reliable rollback using this existing endpoint.
+A lost response is ambiguous and must not trigger automatic POST retry.
+A new trusted server-side write contract is required for stronger guarantees.
+
+The 2.3F scope is complete against its stated gates. The 2.3G baseline review,
+including consideration of broader regression coverage, remains pending.

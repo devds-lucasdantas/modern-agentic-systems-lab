@@ -23,6 +23,10 @@ import {
   type StateUpdateReadback,
 } from '../execution/state-update-readback'
 
+import {
+  classifyHeadPreflight,
+} from '../execution/state-mutation-preflight'
+
 import type {
   ProjectionAuthority,
 } from '../execution/use-execution'
@@ -31,7 +35,9 @@ const shortId = (id: string): string =>
   id.length <= 22 ? id : `${id.slice(0, 10)}…${id.slice(-8)}`
 
 type CheckpointSelection = 'head' | 'observed' | 'parent'
-type MutationStage = 'idle' | 'posting' | 'reading' | 'ready' | 'unreconciled' | 'failed'
+type MutationStage =
+  | 'idle' | 'checking-head' | 'posting' | 'reading' | 'ready'
+  | 'stale' | 'diverged' | 'unreconciled' | 'failed'
 
 interface MutationReport {
   readonly readback: StateUpdateReadback | null
@@ -81,9 +87,10 @@ export function SharedStatePanel({
         : undefined
 
   // React state determines what may render; ref.current is event-only.
-  const working = stage === 'posting' || stage === 'reading'
-  const readyToWrite = validState && !busy && !working &&
-    stage !== 'unreconciled' && stage !== 'failed' &&
+  const working = stage === 'checking-head' || stage === 'posting' || stage === 'reading'
+  const needsReload = stage === 'stale' || stage === 'diverged' ||
+    stage === 'unreconciled' || stage === 'failed'
+  const readyToWrite = validState && !busy && !working && !needsReload &&
     (selection === 'head' || selectedCheckpoint !== undefined) &&
     message.trim().length > 0 && acknowledged
 
@@ -97,6 +104,8 @@ export function SharedStatePanel({
       // A manual re-read establishes fresh displayed persisted state,
       // but cannot by itself establish a previous POST's outcome.
       setReport(null)
+      setAcknowledged(false)
+      setSelection('head')
       setStage('idle')
     } catch (error) {
       setReport({
@@ -113,16 +122,35 @@ export function SharedStatePanel({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!readyToWrite || threadId === null || inFlight.current) return
+    if (!readyToWrite || threadId === null || state === null || inFlight.current) return
     const content = message.trim()
+    const observedAtSubmit = state
     const chosen = selectedCheckpoint
     inFlight.current = true
     onBusyChange(true)
-    setStage('posting')
+    setStage('checking-head')
     setReport(null)
 
     let writtenCheckpointId: string | null = null
+    let postAttempted = false
     try {
+      // Best-effort TOCTOU check. Not atomic with the following POST.
+      // Do not commit a stale view knowingly, even in server-HEAD mode.
+      const now = await client.getThreadState(threadId)
+      const preflight = classifyHeadPreflight(observedAtSubmit, now)
+      if (preflight.kind === 'stale') {
+        setReport({
+          readback: null,
+          writtenCheckpointId: null,
+          error: 'Persisted HEAD changed after the displayed observation. No POST was sent',
+        })
+        setAcknowledged(false)
+        setStage('stale')
+        return
+      }
+
+      setStage('posting')
+      postAttempted = true
       const result = await client.updateThreadState(threadId, {
         values: {
           messages: [{
@@ -141,7 +169,9 @@ export function SharedStatePanel({
       const observed = await onReadState(threadId)
       const readback = classifyStateUpdateReadback(result, observed)
       setReport({ readback, writtenCheckpointId, error: null })
-      setStage('ready')
+      // A different HEAD is not a verified state for this write.
+      // Require a conscious reread before another mutation.
+      setStage(readback.kind === 'matching' ? 'ready' : 'diverged')
       setMessage('')
       setAcknowledged(false)
       // Overview refresh failure must not reclassify an already read-back POST.
@@ -156,9 +186,9 @@ export function SharedStatePanel({
         writtenCheckpointId,
         error: error instanceof Error ? error.message : String(error),
       })
-      // Even a failed POST might have reached the server. Block retries
-      // until a separate read succeeds. A post-POST GET failure is not success.
-      setStage(writtenCheckpointId === null ? 'failed' : 'unreconciled')
+      // If POST was dispatched, even a network error may hide a committed
+      // mutation. Never retry it automatically. A preflight failure has no POST.
+      setStage(postAttempted ? 'unreconciled' : 'failed')
     } finally {
       inFlight.current = false
       onBusyChange(false)
@@ -169,7 +199,7 @@ export function SharedStatePanel({
     <section className="shared-state-panel" aria-label="Shared state laboratory">
       <header className="shared-state-header">
         <div>
-          <span className="eyebrow">Persisted graph state · Lab 2.3E</span>
+          <span className="eyebrow">Persisted graph state · Lab 2.3F</span>
           <h3>Shared-state inspector</h3>
         </div>
         <button type="button" className="refresh-button" onClick={() => { void read() }}
@@ -197,6 +227,7 @@ export function SharedStatePanel({
           Experimental: writes can move the Thread HEAD or create a historical branch.
           A checkpoint selector is not compare-and-swap, an authorization check or an execution lock.
           External Runs and writers are not coordinated by this UI.
+          A pre-POST HEAD check detects some stale views, but is not atomic with POST.
         </p>
         <label htmlFor="state-update-mode">Checkpoint base</label>
         <select id="state-update-mode" value={selection} disabled={!validState || busy}
@@ -210,21 +241,22 @@ export function SharedStatePanel({
         </select>
         <label htmlFor="state-update-message">New human message</label>
         <textarea id="state-update-message" rows={3} value={message}
-          disabled={!validState || busy || stage === 'unreconciled' || stage === 'failed'}
+          disabled={!validState || busy || needsReload}
           placeholder="Adds one new message ID using the messages reducer"
           onChange={(event) => setMessage(event.target.value)}/>
         <label className="shared-state-confirm">
           <input type="checkbox" checked={acknowledged}
-            disabled={!validState || busy || stage === 'unreconciled' || stage === 'failed'}
+            disabled={!validState || busy || needsReload}
             onChange={(event) => setAcknowledged(event.target.checked)}/>
           <span>I understand this POST may change the HEAD and does not prevent concurrent writes.</span>
         </label>
         <button type="submit" className="execute-button" disabled={!readyToWrite}>
-          {stage === 'posting' ? 'Posting…' : stage === 'reading' ? 'Reading…' : 'Append message to graph state'}
+          {stage === 'checking-head' ? 'Checking HEAD…' : stage === 'posting' ? 'Posting…' : stage === 'reading' ? 'Reading…' : 'Append message to graph state'}
         </button>
       </form>
 
       <div className="shared-state-result" aria-live="polite" data-mutation-stage={stage}>
+        {stage === 'checking-head' && <p>Verifying persisted HEAD before POST (best-effort, not CAS)…</p>}
         {stage === 'posting' && <p>POST pending. Persisted state has not been reconciled.</p>}
         {stage === 'reading' && <p>POST returned; reading authoritative ThreadState independently…</p>}
         {report?.readback !== null && report?.readback !== undefined && (
@@ -235,8 +267,14 @@ export function SharedStatePanel({
             {' '}This observation is not a concurrency guarantee.
           </p>
         )}
+        {stage === 'diverged' && (
+          <p role="alert">HEAD diverged after POST. The write may be persisted, but another checkpoint is current. Reload before another edit.</p>
+        )}
         {report?.error && (
-          <p role="alert">Mutation/re-read not confirmed: {report.error}. Reload persisted state before another write.</p>
+          <p role="alert">
+            {stage === 'stale' ? 'Stale view: ' : stage === 'failed' ? 'Preflight failed before POST: ' : 'Mutation/re-read not confirmed: '}
+            {report.error}. Reload persisted state before another write.
+          </p>
         )}
       </div>
     </section>

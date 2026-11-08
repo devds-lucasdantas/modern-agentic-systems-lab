@@ -122,7 +122,7 @@
   - [x] 2.3C Explicit state-update client
   - [x] 2.3D Checkpoint-aware mutation
   - [x] 2.3E Shared-state UI
-  - [ ] 2.3F Concurrency and stale-state protection
+  - [x] 2.3F Concurrency and stale-state protection
   - [ ] 2.3G Shared-state baseline review
 - [ ] 2.4 Interrupts
 - [ ] 2.5 Frontend tools

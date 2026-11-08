@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3F Concurrency and stale-state protection
-    -> investigate simultaneous writers, HEAD drift and failure windows
-    -> design explicit stale-state and multiwriter policy
-    -> never treat historical checkpoint selection as CAS
+2.3G Shared-state baseline review
+    -> review contracts, evidence and regression coverage for 2.3A–2.3F
+    -> record limitations and baseline readiness
+    -> keep server-side CAS, authorization and idempotency outside this UI claim
 ~~~
 
 ## Completed
@@ -2005,14 +2005,89 @@ stale-write rejection or multiuser conflict resolution. These concerns remain
 explicitly outside 2.3E. Reproducible tests and architecture decisions are
 recorded in docs/journal/lab-20-shared-state.md.
 
-## Current sub-block — 2.3F Concurrency and stale-state protection
+## Completed sub-block — 2.3F Concurrency and stale-state protection
 
-Investigate genuine simultaneous writes and HEAD drift between observation,
-POST and persisted readback. Define an honest conflict model, safe UI policy,
-state-transition tests and authorization boundaries. Branch source selection
-is not a concurrency precondition, and successful independent readback of HEAD
-cannot retroactively prove atomic compare-and-swap. Preserve the pinned
-Runtime/reference, existing state projection and Run/SSE behavior.
+### 2.3F-A — Pinned Runtime concurrency discovery
+
+With the real compiled TypeScript AgentServerClient and an isolated pinned
+Runtime, four experiments observed: (1) two simultaneously dispatched writes
+from separate clients both returned success (2/2); (2) a selected historical
+checkpoint was accepted after HEAD had advanced; (3) a POST persisted but
+another writer advanced HEAD before the first writer's separate GET; and
+(4) a simulated lost POST response produced a client network error even though
+that mutation had persisted. No Runs were created and disposable Threads were
+cleaned up. The controlled simultaneous dispatch does not prove the Runtime's
+internal transaction overlap or provide a general atomicity guarantee.
+
+Reproduction:
+
+~~~bash
+python3 scripts/lab-23f-concurrency.py
+~~~
+
+The observed JSON was written to an ephemeral path:
+
+~~~text
+/tmp/masl-23f-observations-20056.json
+~~~
+
+### 2.3F-B — Best-effort frontend stale-state protection
+
+SharedStatePanel now checks the complete observed checkpoint identity against
+an independent current-HEAD GET before attempting a POST. This comparison
+includes thread ID, checkpoint ID, namespace and checkpoint map; a mismatch
+or preflight read failure blocks the attempted mutation. The UI makes no POST
+when an already-stale HEAD is detected, clears acknowledgement and requires
+explicit reload. After POST, a different observed HEAD is reported as diverged
+and blocks further writes until explicit reload. A possible committed POST
+with a lost response is never automatically retried. Manual reload resets the
+confirmation and selector to current HEAD.
+
+The guard is best-effort TOCTOU detection only. A concurrent writer can still
+advance HEAD between preflight GET and POST. Neither the frontend nor the
+pinned Runtime provides verified CAS, locks, multiuser authorization or an
+idempotency-key contract for this endpoint.
+
+Files:
+
+~~~text
+apps/web/src/components/SharedStatePanel.tsx
+apps/web/src/execution/state-mutation-preflight.ts
+apps/web/src/execution/state-mutation-preflight.spec.ts
+apps/web/e2e/shared-state-ui.spec.ts
+scripts/lab-23f-concurrency.py
+scripts/lab-23f-concurrency.mjs
+~~~
+
+Observed validation:
+
+~~~text
+oxlint: 0 warnings and 0 errors (47 files, 116 rules)
+TypeScript and Vite production build: PASS (44 modules)
+11 state-mutation-preflight assertions passed
+Playwright Chromium with pinned Runtime: 4 passed (9.7 s)
+  - explicit historical parent branch and independent readback
+  - failed GET after POST requires explicit reload
+  - stale UI observation before preflight blocks POST
+  - post-POST HEAD divergence blocks next write until reload
+~~~
+
+Two new browser tests initially failed because they called toBeVisible() on
+an empty idle status container. The assertions were corrected to verify its
+`data-mutation-stage=idle` attribute; the rerun passed 4/4. No blanket 2.2
+browser regression run is claimed. The pinned upstream's EOL warning was not
+resolved by upgrading packages; references remain reproducible.
+
+The detailed evidence and limitations are in
+`docs/journal/lab-20-shared-state.md`. The baseline review remains 2.3G.
+
+## Current sub-block — 2.3G Shared-state baseline review
+
+Review the integrated 2.3A–2.3F boundaries, tests, known races, checkpoint
+lineage, error recovery and evidence reproducibility. Do not mark the entire
+2.3 milestone complete until this review has its own gates and documented
+result. A trusted server-side concurrency/authorization protocol is outside
+the scope of the proven frontend guard.
 
 ## Reference environment
 
