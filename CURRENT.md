@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3E Shared-state UI
-    -> render allowlisted persisted shared-state projection
-    -> expose explicit, deliberate user mutation actions
-    -> preserve checkpoint and reconciliation semantics
+2.3F Concurrency and stale-state protection
+    -> investigate simultaneous writers, HEAD drift and failure windows
+    -> design explicit stale-state and multiwriter policy
+    -> never treat historical checkpoint selection as CAS
 ~~~
 
 ## Completed
@@ -1944,14 +1944,75 @@ Full results and architectural interpretation are recorded in:
 docs/journal/lab-20-shared-state.md
 ~~~
 
-## Current sub-block — 2.3E Shared-state UI
+## Completed sub-block — 2.3E Shared-state UI
 
-Introduce user-facing shared-state presentation and deliberate mutation
-controls on top of the explicit 2.3C client and the checkpoint semantics
-established in 2.3D. Reuse the persisted allowlist projection rather than
-copying arbitrary Runtime values into React state. Keep checkpoint identity,
-mutation result and authoritative readback separate. Do not claim built-in
-optimistic concurrency, stale-write protection or multiuser authorization.
+The existing ExecutionSurface now renders a dedicated SharedStatePanel for the
+selected Thread while preserving the established Run/SSE execution surface.
+The panel presents an allowlisted persisted graph projection (checkpoint HEAD,
+parent, next graph position and related summaries) rather than arbitrary
+Runtime state channels. A user can deliberately append a human message to the
+graph messages channel using HEAD, observed checkpoint or parent checkpoint as
+the branch source. Checkpoint-aware edits require an explicit acknowledgement.
+
+Write and readback are separate operations:
+
+~~~text
+explicit UI action
+    -> AgentServerClient.updateThreadState(ThreadId, values/checkpoint/asNode)
+    -> returned mutation CheckpointRef
+    -> independent GET ThreadState (authoritative observed HEAD)
+    -> compare returned checkpoint with observed HEAD
+    -> present confirmed / diverged / unreconciled outcome
+~~~
+
+A failed or ambiguous post-mutation GET is shown as unreconciled, not as a
+verified success or a safe automatic retry. The panel requires an explicit
+reload before further writes after such a failure. The component retains a
+handler-level in-flight guard; rendering uses React state, not ref.current.
+ExecutionSurface assigns an explicit accessible name to its Thread selector.
+
+Implementation:
+
+~~~text
+apps/web/src/components/SharedStatePanel.tsx
+apps/web/src/components/ExecutionSurface.tsx
+apps/web/src/App.css
+apps/web/src/execution/state-update-readback.ts
+apps/web/src/execution/state-update-readback.spec.ts
+apps/web/e2e/shared-state-ui.spec.ts
+~~~
+
+Observed validation on the user's pinned WSL environment:
+
+~~~text
+oxlint: 0 warnings, 0 errors (45 files, 116 rules)
+TypeScript + Vite production build: PASS (43 modules)
+state-update readback unit assertions: 6 passed
+Playwright Chromium with CI=1 and pinned Runtime: 2 passed (6.9 s)
+    - historical parent-checkpoint branch and independent reconciliation
+    - failed GET after POST -> visibly unreconciled -> explicit reload
+~~~
+
+The pre-fix lint run reported 11 react(refs) warnings, resolved by removing
+ref.current from render expressions. Earlier E2E failures were caused by the
+Thread control's missing exact accessible label, resolved with aria-label.
+No new dependencies, model calls or changes to the pinned reference were
+required for the focused 2.3E validation. Earlier 2.2 browser tests were not
+rerun in this block; no full-suite claim is made.
+
+The UI does not provide authorization, CAS, cross-writer locking, automatic
+stale-write rejection or multiuser conflict resolution. These concerns remain
+explicitly outside 2.3E. Reproducible tests and architecture decisions are
+recorded in docs/journal/lab-20-shared-state.md.
+
+## Current sub-block — 2.3F Concurrency and stale-state protection
+
+Investigate genuine simultaneous writes and HEAD drift between observation,
+POST and persisted readback. Define an honest conflict model, safe UI policy,
+state-transition tests and authorization boundaries. Branch source selection
+is not a concurrency precondition, and successful independent readback of HEAD
+cannot retroactively prove atomic compare-and-swap. Preserve the pinned
+Runtime/reference, existing state projection and Run/SSE behavior.
 
 ## Reference environment
 

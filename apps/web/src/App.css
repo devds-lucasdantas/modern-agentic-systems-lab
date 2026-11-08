@@ -797,3 +797,37 @@
     width: 94%;
   }
 }
+
+/* 2.3E — explicit shared-state inspector and controlled mutation */
+.shared-state-panel {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.shared-state-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.shared-state-header h3 { margin: 5px 0 0; font-size: 18px; }
+.shared-state-header button { flex: none; }
+.shared-state-muted { color: var(--text-muted); font-size: 13px; }
+.shared-state-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.shared-state-facts > div { min-width: 0; padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+.shared-state-facts dt { font-size: 10px; color: var(--text-soft); text-transform: uppercase; font-weight: 800; }
+.shared-state-facts dd { margin: 5px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.shared-state-facts code { font-size: 11px; overflow-wrap: anywhere; }
+.shared-state-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.shared-state-form h4 { margin: 0; font-size: 14px; }
+.shared-state-form > label:not(.shared-state-confirm) { color: var(--text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.shared-state-form select, .shared-state-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 9px; background: white; color: var(--text); font: inherit; font-size: 12px; }
+.shared-state-form textarea { resize: vertical; min-height: 76px; }
+.shared-state-form select:disabled, .shared-state-form textarea:disabled { opacity: .55; }
+.shared-state-warning { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); background: #fff7ed; color: #92400e; font-size: 12px; line-height: 1.55; }
+.shared-state-confirm { display: flex; align-items: flex-start; gap: 9px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.shared-state-confirm input { margin-top: 2px; }
+.shared-state-result { color: var(--text-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.shared-state-result[data-mutation-stage="ready"] { color: var(--success); }
+.shared-state-result[data-mutation-stage="failed"], .shared-state-result[data-mutation-stage="unreconciled"] { color: var(--danger); }
+@media (max-width: 680px) {
+  .shared-state-header { flex-direction: column; align-items: flex-start; }
+  .shared-state-facts { grid-template-columns: minmax(0, 1fr); }
+}

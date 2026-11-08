@@ -25,6 +25,10 @@ import {
   MessageList,
 } from './MessageList'
 
+import {
+  SharedStatePanel,
+} from './SharedStatePanel'
+
 const shortId = (
   value: string,
 ): string =>
@@ -34,6 +38,7 @@ const shortId = (
 
 const busyPhases =
   new Set([
+    'loading-state',
     'creating-thread',
     'creating-run',
     'streaming',
@@ -77,6 +82,11 @@ export function ExecutionSurface({
     setText,
   ] = useState('')
 
+  const [
+    mutationBusy,
+    setMutationBusy,
+  ] = useState(false)
+
     const {
       phase,
       runId,
@@ -96,7 +106,7 @@ export function ExecutionSurface({
     ''
 
     const busy =
-      busyPhases.has(phase)
+      busyPhases.has(phase) || mutationBusy
 
     const displayedRunId =
       runId ??
@@ -262,6 +272,7 @@ export function ExecutionSurface({
             </span>
 
             <select
+              aria-label="Thread"
               value={selectedThread}
               onChange={(event) => {
                 void handleThreadChange(
@@ -424,6 +435,17 @@ export function ExecutionSurface({
 
           <MessageList
             messages={messages}
+          />
+
+          <SharedStatePanel
+            key={selectedThread || 'none'}
+            threadId={selectedThread || null}
+            state={state}
+            authority={projectionAuthority}
+            busy={busy}
+            onBusyChange={setMutationBusy}
+            onReadState={loadThreadState}
+            onRuntimeChanged={onRuntimeChanged}
           />
         </div>
       </div>

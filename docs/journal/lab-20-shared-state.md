@@ -962,3 +962,125 @@ The pinned implementation behaved as a checkpoint DAG with branch-selected
 writes that advanced the visible HEAD. Historical state did not disappear.
 Checkpoint lineage, mutation result, current HEAD and persisted readback are
 separate concepts. The frontend must preserve those distinctions.
+
+## 2.3E — Shared-state UI
+
+### Objective and architecture
+
+Expose persisted shared state and deliberate graph-state editing in the existing
+Phase 2 frontend without collapsing a Thread into Run lifecycle or streaming
+messages. Build on the 2.3B allowlisted read projection, the 2.3C typed POST
+client and the historical branching behavior demonstrated in 2.3D.
+
+The SharedStatePanel is mounted from the existing ExecutionSurface and works
+with its selected Thread, without modifying the Run/SSE execution protocol. It
+renders a bounded persisted-state inspection view instead of exposing arbitrary
+Runtime channels, tasks, metadata or checkpoint internals. The new action is
+intentionally restricted to adding a human message to the graph messages
+channel and requires deliberate source selection and acknowledgement.
+
+Source choices include the server's then-current HEAD (no historical selector)
+and explicit previously observed checkpoint or parent checkpoint. Selection of
+an old checkpoint may create a new branch and move HEAD. None of these choices
+is an expected-HEAD CAS precondition. A button state or local acknowledgement
+is not an authorization boundary.
+
+### Mutation, readback and failure semantics
+
+~~~text
+UI action (explicit acknowledgement)
+    -> POST /threads/{id}/state via typed AgentServerClient
+    -> mutation result = CheckpointRef (not persisted ThreadState)
+    -> independent GET /threads/{id}/state
+    -> compare result checkpoint against observed HEAD checkpoint
+    -> matching / diverged / unreconciled projection
+~~~
+
+`state-update-readback.ts` provides a pure comparison helper. A matching
+checkpoint confirms only that the independent GET observed that checkpoint as
+HEAD at read time. A different HEAD does not undo or necessarily invalidate the
+POST. Missing or cross-Thread readbacks cannot be reported as confirmed.
+
+A GET failure after a successful POST is explicitly unreconciled. The panel
+must not falsely claim success, silently resubmit the update or permit another
+write until an explicit reload. The in-flight guard remains in the event path;
+React render reads component state instead of `ref.current`, satisfying the
+React lint rule. The Thread selector received `aria-label="Thread"` to
+provide a stable and testable accessible control name.
+
+### Files changed
+
+~~~text
+apps/web/src/components/SharedStatePanel.tsx
+apps/web/src/components/ExecutionSurface.tsx
+apps/web/src/App.css
+apps/web/src/execution/state-update-readback.ts
+apps/web/src/execution/state-update-readback.spec.ts
+apps/web/e2e/shared-state-ui.spec.ts
+~~~
+
+### Deterministic gates (observed)
+
+From `apps/web`:
+
+~~~bash
+pnpm lint
+pnpm build
+
+pnpm exec vite build \
+  --ssr src/execution/state-update-readback.spec.ts \
+  --outDir /tmp/masl-23e-readback --emptyOutDir
+printf '%s\n' '{"type":"module"}' \
+  > /tmp/masl-23e-readback/package.json
+node /tmp/masl-23e-readback/state-update-readback.spec.js
+~~~
+
+Recorded result:
+
+~~~text
+oxlint: 0 warnings, 0 errors (45 files, 116 rules)
+TypeScript / Vite: PASS (43 production modules)
+6 state-update readback assertions passed
+~~~
+
+The pure tests cover matching POST/readback checkpoint, observed HEAD identity,
+divergent HEAD without false confirmation, independence of POST identity,
+missing checkpoint and rejection of cross-Thread readback.
+
+### Browser E2E against the pinned Runtime (observed)
+
+~~~bash
+cd apps/web
+CI=1 pnpm exec playwright test \
+  e2e/shared-state-ui.spec.ts \
+  --project=chromium --reporter=list
+~~~
+
+Recorded result:
+
+~~~text
+2 passed (6.9s)
+  - explicit parent-checkpoint edit branches, then independently reconciles
+  - failed GET after state POST is visibly unreconciled and requires reload
+~~~
+
+The pinned Agent Server ran at `127.0.0.1:2024` with LangGraph API 0.8.1.
+No dependency upgrade was performed; the upstream EOL warning is not a failure
+of these scoped tests. The earlier E2E run failed because the test's exact
+accessible Thread locator did not match the control. The stable `aria-label`
+fix allowed the two scenarios to pass. An earlier lint iteration generated 11
+React refs warnings, subsequently resolved to zero warnings. The existing
+2.2 browser regression suite was not rerun for this sub-block.
+
+### Architectural boundary and remaining risks
+
+- A successful POST is not authoritative state; GET is a separate observation.
+- A matching GET proves only the HEAD observed at read time, not atomicity.
+- Historical selection is branching, not CAS or automatic stale-write rejection.
+- No Run/model invocation is required for these focused tests.
+- No multiuser authorization, distributed locks, idempotency keys or concurrent
+  race mitigation is implemented by this UI baseline.
+- Race windows (pre-POST, in-flight and POST-to-GET) remain for 2.3F.
+
+The 2.3E UI baseline is complete against its scoped gates. The broader shared
+state milestone remains open for 2.3F and the 2.3G review.
