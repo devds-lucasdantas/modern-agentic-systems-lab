@@ -1,10 +1,12 @@
 import type {
   Assistant,
   AssistantId,
+  CheckpointRef,
   Metadata,
   Run,
   RunId,
   RunStatus,
+  StateValues,
   Thread,
   ThreadId,
   ThreadState,
@@ -15,6 +17,7 @@ import {
   decodeRunDto,
   decodeThreadDto,
   decodeThreadStateDto,
+  decodeThreadStateUpdateResponseDto,
   isJsonObject,
 } from './decode'
 import {
@@ -32,6 +35,7 @@ import {
   mapRun,
   mapThread,
   mapThreadState,
+  mapThreadStateUpdateResponse,
 } from './mappers'
 
 export interface SearchPage<T> {
@@ -46,6 +50,16 @@ export interface SearchOptions {
 
 export interface CreateThreadInput {
   readonly metadata?: Metadata
+}
+
+export interface UpdateThreadStateInput {
+  readonly values?: StateValues | null
+  readonly checkpoint?: CheckpointRef
+  readonly asNode?: string
+}
+
+export interface UpdateThreadStateResult {
+  readonly checkpoint: CheckpointRef
 }
 
 export type MultitaskStrategy =
@@ -572,6 +586,46 @@ export class AgentServerClient {
 
     return mapThreadState(
       decodeThreadStateDto(body),
+      id,
+    )
+  }
+
+  async updateThreadState(
+    id: ThreadId,
+    input: UpdateThreadStateInput,
+  ): Promise<UpdateThreadStateResult> {
+    if (
+      input.checkpoint !== undefined &&
+      input.checkpoint.threadId !== id
+    ) {
+      throw new TypeError(
+        'Checkpoint threadId must match the target Thread',
+      )
+    }
+
+    const checkpoint = input.checkpoint
+
+    const { body } = await this.#json(
+      `/threads/${encodeURIComponent(id)}/state`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          values: input.values,
+          checkpoint: checkpoint === undefined
+            ? undefined
+            : {
+                thread_id: checkpoint.threadId,
+                checkpoint_id: checkpoint.checkpointId,
+                checkpoint_ns: checkpoint.namespace,
+                checkpoint_map: { ...checkpoint.checkpointMap },
+              },
+          as_node: input.asNode,
+        }),
+      },
+    )
+
+    return mapThreadStateUpdateResponse(
+      decodeThreadStateUpdateResponseDto(body),
       id,
     )
   }

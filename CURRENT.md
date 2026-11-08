@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.3C Explicit state-update client
-    -> typed graph-aware state-update requests
-    -> checkpoint response decoding
-    -> no UI mutation controls yet
+2.3D Checkpoint-aware mutation
+    -> investigate checkpoint-selected state updates and branching
+    -> define explicit mutation and re-read policy
+    -> do not assume CAS or stale-write protection
 ~~~
 
 ## Completed
@@ -1845,30 +1845,56 @@ Detailed evidence:
 docs/journal/lab-20-shared-state.md
 ~~~
 
-## Current sub-block — 2.3C Explicit state-update client
+## Completed sub-block — 2.3C Explicit state-update client
 
-Introduce a typed Agent Server client operation for:
-
-~~~text
-POST /threads/{thread_id}/state
-~~~
-
-The operation must preserve:
+The transport layer now provides a typed, explicit write operation:
 
 ~~~text
-values
-checkpoint
-as_node
+AgentServerClient.updateThreadState(threadId, input)
+    -> POST /threads/{thread_id}/state
+    -> decode ThreadStateUpdateResponse
+    -> map returned CheckpointRef
 ~~~
 
-and decode the returned checkpoint identity.
+The input supports values, a selected CheckpointRef and asNode (wire as_node).
+The client validates the supplied checkpoint Thread identity before HTTP,
+preserves the existing fetch/credential/error behavior and decodes a non-empty
+checkpoint ID. The POST result is a checkpoint reference, not a full persisted
+ThreadState projection. An independent GET remains authoritative for state.
 
-Do not infer optimistic concurrency guarantees from a checkpoint selector.
+Validated against the pinned frontend and Runtime:
 
-No new mutation controls should be added to the UI during this sub-block.
+~~~text
+oxlint: 0 warnings, 0 errors
+TypeScript + Vite production build: PASS
+mock HTTP assertions: 20 passed
+real TypeScript client SSR bundle: PASS
+isolated pinned Runtime: ready
+throwaway graph-bound Thread: created
+POST: typed checkpoint returned
+independent GET: checkpoint, message and graph position confirmed
+Run/model invocation: none
+throwaway Thread and isolated Runtime process: cleaned up
+~~~
 
-The client must continue to use GET ThreadState for authoritative
-post-mutation reconciliation.
+Files:
+
+~~~text
+apps/web/src/transport/agent-server/{dto,decode,mappers,client,index}.ts
+apps/web/src/transport/agent-server/state-update-client.spec.ts
+scripts/lab-23c-state-update.{mjs,py}
+~~~
+
+Full reproducible evidence is recorded in docs/journal/lab-20-shared-state.md.
+No React/SSE/useExecution/UI mutation controls were added in this sub-block.
+
+## Current sub-block — 2.3D Checkpoint-aware mutation
+
+Investigate the semantics of checkpoint-selected mutations, lineage and
+branching against the pinned Runtime, before choosing a mutation/re-read policy.
+Checkpoint selection has not been established as compare-and-swap, stale-write
+rejection, concurrency control, multiuser authorization or an execution lock.
+Concurrency and stale-state protection remain reserved for 2.3F.
 
 ## Reference environment
 

@@ -79,3 +79,7 @@ export interface ThreadStateDto {
   readonly checkpoint_id?: string | null
   readonly parent_checkpoint_id?: string | null
 }
+
+export interface ThreadStateUpdateResponseDto {
+  readonly checkpoint: CheckpointConfigDto
+}

@@ -13,6 +13,8 @@ export type {
   StreamDisconnectMode,
   StreamMode,
   StreamRunInput,
+  UpdateThreadStateInput,
+  UpdateThreadStateResult,
 } from './client'
 
 export type {

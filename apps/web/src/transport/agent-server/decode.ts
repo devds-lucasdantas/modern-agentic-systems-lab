@@ -9,6 +9,7 @@ import type {
   StateValuesDto,
   ThreadDto,
   ThreadStateDto,
+  ThreadStateUpdateResponseDto,
 } from './dto'
 
 export const isJsonObject = (
@@ -564,6 +565,26 @@ export const decodeThreadStateDto = (
       'ThreadState',
     ),
   }
+}
+
+export const decodeThreadStateUpdateResponseDto = (
+  value: unknown,
+): ThreadStateUpdateResponseDto => {
+  const path = 'ThreadStateUpdateResponse'
+  const source = object(value, path)
+  const checkpoint = decodeCheckpointConfigDto(
+    requiredObject(source, 'checkpoint', path),
+    `${path}.checkpoint`,
+  )
+
+  if (!checkpoint?.checkpoint_id?.trim()) {
+    throw new AgentServerDecodeError(
+      `${path}.checkpoint.checkpoint_id`,
+      'non-empty string',
+    )
+  }
+
+  return { checkpoint }
 }
 
 export const decodeArray = <T>(

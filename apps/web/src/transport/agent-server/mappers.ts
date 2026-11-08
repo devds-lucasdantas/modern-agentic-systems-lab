@@ -25,6 +25,7 @@ import type {
   RunDto,
   ThreadDto,
   ThreadStateDto,
+  ThreadStateUpdateResponseDto,
 } from './dto'
 import { AgentServerDecodeError } from './errors'
 
@@ -180,3 +181,29 @@ export const mapThreadState = (
   ),
   createdAt: dto.created_at,
 })
+
+export const mapThreadStateUpdateResponse = (
+  dto: ThreadStateUpdateResponseDto,
+  id: ThreadId,
+): { readonly checkpoint: CheckpointRef } => {
+  if (
+    dto.checkpoint.thread_id !== undefined &&
+    dto.checkpoint.thread_id !== id
+  ) {
+    throw new AgentServerDecodeError(
+      'ThreadStateUpdateResponse.checkpoint.thread_id',
+      `matching target Thread ${id}`,
+    )
+  }
+
+  const checkpoint = mapCheckpoint(dto.checkpoint, id)
+
+  if (checkpoint === null) {
+    throw new AgentServerDecodeError(
+      'ThreadStateUpdateResponse.checkpoint.checkpoint_id',
+      'non-empty string',
+    )
+  }
+
+  return { checkpoint }
+}

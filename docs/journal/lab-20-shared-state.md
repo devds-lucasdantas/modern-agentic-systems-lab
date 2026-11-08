@@ -695,8 +695,155 @@ concurrent update handling
 
 ## 2.3C — Explicit state-update client
 
-Pending.
+### Objective and boundary
 
-Introduce a typed REST client operation for graph-aware state updates,
-including request and response decoding, without yet exposing arbitrary
-mutation controls in the UI.
+Add a typed explicit REST write operation for a graph-bound Thread, separate
+from persisted state reads and separate from Run execution or SSE. Do not add
+state-editing controls to React, modify useExecution or install dependencies.
+
+### Transport contract
+
+The public AgentServerClient API now includes:
+
+~~~ts
+interface UpdateThreadStateInput {
+  readonly values?: StateValues | null
+  readonly checkpoint?: CheckpointRef
+  readonly asNode?: string
+}
+
+interface UpdateThreadStateResult {
+  readonly checkpoint: CheckpointRef
+}
+
+updateThreadState(threadId, input): Promise<UpdateThreadStateResult>
+~~~
+
+The method posts to:
+
+~~~text
+POST /threads/{encodeURIComponent(threadId)}/state
+~~~
+
+The wire payload carries values, checkpoint and as_node (mapped from asNode).
+CheckpointRef is serialized to thread_id, checkpoint_id, checkpoint_ns and
+checkpoint_map. Undefined optional fields are omitted by JSON.stringify;
+explicit null values remain present.
+
+The method reuses the AgentServerClient request pipeline, including injectable
+fetchImpl, credential policy, JSON headers and AgentServerHttpError. A supplied
+checkpoint referring to another target Thread is rejected before HTTP. This
+is a consistency check, not an authorization boundary.
+
+### Response decoding and mapping
+
+The response decoder requires a checkpoint object with a non-empty,
+non-whitespace checkpoint_id. The mapper reuses the existing CheckpointRef
+normalization and rejects an explicitly mismatched checkpoint.thread_id;
+when that field is absent, the request Thread is used. Invalid HTTP 200
+payloads raise AgentServerDecodeError. Extra fields observed in the pinned
+Runtime, including configurable and checkpoint_id, are tolerated without
+becoming part of the public typed result.
+
+A successful POST returns only the new checkpoint reference; it neither
+creates a Run nor implicitly performs GET ThreadState or marks frontend
+projection authority as reconciled. A separate GET ThreadState is required
+to inspect the persisted graph values and execution position.
+
+Implementation:
+
+~~~text
+apps/web/src/transport/agent-server/dto.ts
+apps/web/src/transport/agent-server/decode.ts
+apps/web/src/transport/agent-server/mappers.ts
+apps/web/src/transport/agent-server/client.ts
+apps/web/src/transport/agent-server/index.ts
+apps/web/src/transport/agent-server/state-update-client.spec.ts
+scripts/lab-23c-state-update.mjs
+scripts/lab-23c-state-update.py
+~~~
+
+### Deterministic validation (HTTP mock)
+
+From apps/web:
+
+~~~bash
+pnpm lint
+pnpm build
+
+pnpm exec vite build \
+  --ssr src/transport/agent-server/state-update-client.spec.ts \
+  --outDir /tmp/masl-23c-state-update \
+  --emptyOutDir
+
+printf '%s\n' '{"type":"module"}' \
+  > /tmp/masl-23c-state-update/package.json
+
+node /tmp/masl-23c-state-update/state-update-client.spec.js
+~~~
+
+Observed results:
+
+~~~text
+oxlint: 0 warnings and 0 errors (41 files, 116 rules)
+TypeScript + Vite production build: PASS
+SSR test bundle: PASS
+20 state-update client assertions passed
+~~~
+
+The 20 passing assertions covered one POST, encoded Thread URL, method and
+credentials, JSON headers, values/as_node, checkpoint wire identity and map,
+returned typed checkpoint, absence of false reconciliation, optional field
+omission and explicit null, pre-HTTP Thread mismatch, HTTP 400 propagation,
+missing/blank checkpoint ID rejection, mismatched response Thread ID,
+request-Thread fallback, invalid checkpoint object rejection and no implicit
+GET. The fixture also included tolerated extra Runtime response fields.
+
+### Pinned Runtime integration without model execution
+
+From the repository root:
+
+~~~bash
+python3 scripts/lab-23c-state-update.py
+~~~
+
+The harness compiled the real TypeScript client as an SSR bundle, booted the
+pinned Agent Server on an isolated ephemeral loopback port, created a
+throwaway Thread associated with graph_id=deep_agent, performed a typed state
+update and independently fetched the persisted ThreadState.
+
+Observed PASS lines:
+
+~~~text
+isolated pinned Runtime ready
+throwaway graph-bound Thread created
+typed update returned a checkpoint
+separate GET confirmed persisted checkpoint, message and graph position
+no Run or model invocation in this experiment
+throwaway Thread deleted
+isolated Runtime process cleaned up
+~~~
+
+The temporary runtime used port 58181 in the recorded run. This port is an
+observation, not a fixed requirement for reproduction.
+
+### Architectural conclusion and limits
+
+~~~text
+write operation
+    -> POST Thread state update
+    -> returned CheckpointRef (mutation result)
+
+read operation
+    -> GET ThreadState
+    -> authoritative persisted state/position
+~~~
+
+This block proves a functional typed write boundary with independent readback.
+It does NOT prove optimistic concurrency, compare-and-swap, automatic stale
+write rejection, multiuser authorization, or specific branch semantics for
+checkpoint-selected writes. Those are future investigations in 2.3D/2.3F.
+
+No UI mutation controls, streaming changes or Run creation were introduced.
+The existing browser E2E suite was not rerun for this transport-only change;
+no new browser-test result is claimed here.
