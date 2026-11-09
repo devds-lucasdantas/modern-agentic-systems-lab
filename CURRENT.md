@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4C Typed resume Run transport
-    -> implement an explicit, typed resume Run request (not a state POST)
-    -> validate the pinned wire contract and error boundaries model-free
-    -> do not expose human approval buttons until 2.4D
+2.4D Deliberate HITL interface
+    -> expose only reviewed pending human input from persisted Thread state
+    -> require an explicit human response; avoid automatic or hidden resume
+    -> reconcile the new Run and Thread state; retain fail-closed boundaries
 ~~~
 
 ## Completed
@@ -2237,14 +2237,64 @@ unknown/malformed/long/control-character payloads, raw-data non-leakage,
 identity rejection. No Playwright or model-dependent 2.2 regression was run in
 this sub-block. See `docs/journal/lab-21-interrupts.md` for the full contract.
 
-## Current sub-block — 2.4C Typed resume Run transport
+## Completed sub-block — 2.4C Typed resume Run transport
 
-Implement an explicit, typed Run request that carries `Command.resume` through
-the pinned Agent Server contract. Test URL/payload mapping, decoding,
-independent persisted readback and failure surfaces before integrating HITL
-controls. Do not conflate `POST /threads/{thread_id}/state` with resume; do not
-claim checkpoint-conditional CAS, authorization, idempotency or safe
-concurrent approvals.
+`AgentServerClient.createResumeRun(threadId, { assistantId, resumeValue,
+metadata? })` sends one explicit `POST /threads/{thread_id}/runs` containing
+`input={}`, `command={resume: resumeValue}` and
+`multitask_strategy='reject'`. The response is decoded as a typed Run, not as
+persisted ThreadState. The client rejects a Run associated with another Thread
+or with another canonical Assistant ID; it does not fetch ThreadState, retry,
+authorize resume or claim that a successful POST has completed the graph.
+
+`ResumeValue` is a recursively JSON-compatible type, with a runtime validator
+that rejects undefined/non-finite/BigInt/function/symbol values, cycles,
+non-plain objects, sparse arrays, getters/accessors and non-enumerable or
+symbol keys that JSON.stringify could discard. Null is a valid response. An
+HTTP conflict remains a typed `AgentServerHttpError`; malformed or mismatched
+Run responses fail closed; an ambiguous lost POST response is never retried.
+
+The pinned Runtime accepts graph names as assistant selectors, but the returned
+Run may carry a concrete Assistant UUID. An initial 2.4C integration attempt
+correctly rejected that mismatch. The probe was fixed to read the original
+Run's canonical `assistantId` and use it for the resume request; the transport
+keeps its strict identity check. A separate targeted change replaced a sparse
+array literal in the test fixture to satisfy Oxlint without dropping coverage.
+
+Observed on WSL at baseline `5627b35`:
+
+~~~text
+Oxlint: 0 warnings, 0 errors (50 files, 116 rules)
+TypeScript + Vite production build: PASS (44 modules)
+SSR pure test bundle: PASS (13 modules)
+31 pure resume-transport assertions: PASS
+Pinned isolated Runtime + real compiled TS client: 12/12 semantic checks PASS
+Two distinct persisted Runs; new checkpoint at END; Thread idle
+Zero model calls; disposable Thread deleted; isolated Runtime stopped
+~~~
+
+Experiment: `python3 scripts/lab-24c-resume-runtime.py`.
+Evidence: `/tmp/masl-24c-observations-1890.json` (ephemeral PID-based path).
+The experiment first persisted dynamic `interrupt()` data, then created a new
+stateful Run using `Command.resume` and independently read the final Run,
+Thread and ThreadState to confirm `RESUMED:APPROVE_24C`, no remaining interrupt,
+`next=[]`, and a different checkpoint. No silent second POST was observed.
+
+This block is **transport validation**, not a UI implementation or an
+atomic/conflict-proof approval protocol. There is no checkpoint-conditional
+CAS, per-user authorization, server-side idempotency or exactly-once approval;
+no model-dependent streaming/browser regression is claimed. The frontend
+must not infer authorized human action merely from a graph interrupt.
+
+## Current sub-block — 2.4D Deliberate HITL interface
+
+Use the 2.4B read-only projection and 2.4C explicit transport to build a
+reviewed, deliberately initiated human response interaction. The first UI
+iteration must distinguish persisted graph interrupts from breakpoints and
+lifecycle cancellation, require an explicit decision, and reconcile Run and
+ThreadState after submission. Plan stale-resume protection and ambiguous POST
+recovery separately in 2.4E; do not imply production-ready authorization or
+idempotency.
 
 ## Reference environment
 

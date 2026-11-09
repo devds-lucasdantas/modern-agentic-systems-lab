@@ -272,3 +272,122 @@ file was modified. Only the two new TS files are staged for this sub-block.
 
 **2.4B complete within the scoped, model-free pure projection gate.** Next:
 **2.4C — Typed resume Run transport**. The parent milestone 2.4 stays open.
+
+## 2.4C — Typed resume Run transport and Runtime contract validation
+
+### Transport boundary
+
+Files changed in this sub-block:
+
+~~~text
+apps/web/src/transport/agent-server/client.ts
+apps/web/src/transport/agent-server/index.ts
+apps/web/src/transport/agent-server/resume-run-client.spec.ts
+scripts/lab-24c-resume-runtime.mjs
+scripts/lab-24c-resume-runtime.py
+~~~
+
+The new `AgentServerClient.createResumeRun()` accepts a target Thread,
+canonical Assistant identity, explicitly supplied `resumeValue`, and optional
+metadata. It submits one *new* stateful Run (not `POST /state`) with:
+
+~~~json
+{
+  "assistant_id": "<canonical Assistant UUID>",
+  "input": {},
+  "command": {"resume": "APPROVE_24C"},
+  "multitask_strategy": "reject"
+}
+~~~
+
+The request path is `/threads/{thread_id}/runs` with an encoded Thread ID.
+`input` remains empty: a resumed LangGraph `interrupt()` value is not a new
+message or an explicit state mutation. The response is a Run identity, not a
+checkpoint or evidence that the graph has reached END.
+
+The method rejects wrong returned Thread/Assistant identity. Resume JSON is
+validated recursively before the HTTP call, including sparse arrays, cycles,
+getters/accessors, non-JSON primitives, non-finite numbers, and keys that
+`JSON.stringify` could discard. `null` is allowed. No implicit state GET,
+retry or automatic next Run exists. HTTP 409 is retained as a typed error;
+network errors after a possibly persisted POST remain ambiguous.
+
+### Canonical Assistant resolution correction
+
+The first pinned integration attempt reached the Runtime, persisted dynamic
+HITL and one Run, then failed with `AgentServerDecodeError` on
+`Run.assistant_id`: the request selected `masl_24c_hitl` (a Graph name), while
+the Runtime persisted a concrete Assistant UUID. This resolution behavior had
+already been observed and documented in Lab 12; the failure was a mistaken
+test-harness assumption, not proof that the POST failed.
+
+The final `.mjs` probe obtains the canonical Assistant UUID from the initial
+persisted Run, then provides it to `createResumeRun`. **The strict identity
+check in the transport remains enabled.** The targeted Oxlint fix replaces
+only the sparse-array test literal with programmatic construction; the
+negative case still passes. No graph or pinned Runtime code was changed.
+
+### Verification (model-free WSL execution)
+
+~~~text
+Baseline HEAD: 5627b3510edf4cb9b5d7ccbf973cf1f04fe1663e
+pnpm lint: 0 warnings, 0 errors (50 files, 116 rules)
+pnpm build: PASS (44 Vite modules)
+Vite SSR pure test bundle: PASS (13 modules)
+Pure transport spec: 31/31 assertions PASS
+Real compiled TypeScript client + temporary pinned Runtime: PASS
+Semantic integration checks: 12/12 PASS
+Physical Runs: 2
+Initial persisted dynamic interrupt: present
+Resume value in persisted graph: RESUMED:APPROVE_24C
+Final Thread: idle; Run: success; graph: END; interrupts: empty
+Cleanup: disposable Thread deleted; isolated process stopped
+Model calls: none
+~~~
+
+Reproduction:
+
+~~~bash
+cd apps/web
+pnpm lint && pnpm build
+pnpm exec vite build --ssr src/transport/agent-server/resume-run-client.spec.ts \
+  --outDir /tmp/masl-24c-resume-spec --emptyOutDir
+printf '%s\n' '{"type":"module"}' > /tmp/masl-24c-resume-spec/package.json
+node /tmp/masl-24c-resume-spec/resume-run-client.spec.js
+cd ../..
+python3 scripts/lab-24c-resume-runtime.py
+~~~
+
+Runtime observations (local ephemeral artifact):
+
+~~~text
+/tmp/masl-24c-observations-1890.json
+~~~
+
+Observed JSON SHA-256: `67c939e0f6b932ba44c212e464550ef1187a5e5a93ba4a11c7ea1f9bbc5e323f` (local, ephemeral evidence file).
+
+The twelve verified assertions are: `initialInterruptPersisted`,
+`oneResumeRunPost`, `commandResumeSerialized`, `canonicalAssistantReused`,
+`newRunCreated`, `runSucceeded`, `secondRunObserved`,
+`resumeValuePersisted`, `interruptCleared`, `endReached`,
+`noImplicitRetry`, and `noModelCalls`. The graph resumed through a **second**
+persisted Run, and independent REST reads corroborated the new checkpoint and
+final state. PID, UUIDs and assigned local port are observations, not stable
+identity contracts to hard-code in the client.
+
+### Deliberate scope boundaries
+
+- `Run.status=success` is not by itself graph completion or authorization;
+  independently read `ThreadState.next`, interrupts and Thread status.
+- Graph name and concrete Assistant UUID are distinct; the request must use
+  a correctly resolved canonical Assistant ID when strict identity is needed.
+- This client is a low-level explicit transport, not proof that a user is
+  entitled to approve a step. The 2.4D UI must require deliberate action.
+- `multitask_strategy='reject'` is not atomic checkpoint compare-and-swap.
+  The transport has no stale-resume preflight, durable deduplication, or
+  exactly-once execution. The 2.4E safety gate remains open.
+- This run was deterministic, temporary and model-free. It does not claim a
+  full 2.2 browser/model-dependent regression suite or production deployment.
+
+**2.4C COMPLETE within its scoped transport/integration gates.** Next:
+**2.4D — Deliberate HITL interface**. The parent milestone 2.4 remains open.

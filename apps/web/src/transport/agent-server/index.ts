@@ -5,6 +5,8 @@ export {
 export type {
   AgentServerClientOptions,
   CreateRunInput,
+  CreateResumeRunInput,
+  ResumeValue,
   CreateThreadInput,
   ListRunsOptions,
   MultitaskStrategy,

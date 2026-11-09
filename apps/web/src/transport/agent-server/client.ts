@@ -21,6 +21,7 @@ import {
   isJsonObject,
 } from './decode'
 import {
+  AgentServerDecodeError,
   AgentServerHttpError,
 } from './errors'
 import type {
@@ -67,6 +68,21 @@ export type MultitaskStrategy =
   | 'rollback'
   | 'interrupt'
   | 'enqueue'
+
+export type ResumeValue =
+  | null
+  | string
+  | number
+  | boolean
+  | readonly ResumeValue[]
+  | { readonly [key: string]: ResumeValue }
+
+/** Explicit human/runtime response. Does not authorize or preflight resumption. */
+export interface CreateResumeRunInput {
+  readonly assistantId: AssistantId
+  readonly resumeValue: ResumeValue
+  readonly metadata?: Metadata
+}
 
 export interface CreateRunInput {
   readonly assistantId: AssistantId
@@ -208,6 +224,63 @@ const queryString = (
   return query
     ? `?${query}`
     : ''
+}
+
+/** Reject values JSON.stringify would silently drop or rewrite. */
+const assertResumeJson = (value: unknown): void => {
+  const active = new WeakSet<object>()
+
+  const visit = (current: unknown): void => {
+    if (current === null || typeof current === 'string' ||
+      typeof current === 'boolean') return
+    if (typeof current === 'number' && Number.isFinite(current)) return
+    if (typeof current !== 'object') {
+      throw new TypeError('resumeValue must contain only JSON values')
+    }
+    if (active.has(current)) {
+      throw new TypeError('resumeValue must not contain cycles')
+    }
+    if (!Array.isArray(current)) {
+      const prototype = Object.getPrototypeOf(current) as unknown
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new TypeError('resumeValue must use plain JSON objects')
+      }
+    }
+    active.add(current)
+    if (Array.isArray(current)) {
+      for (const key of Reflect.ownKeys(current)) {
+        if (key === 'length') continue
+        if (typeof key !== 'string' || !Number.isInteger(Number(key)) ||
+          Number(key) < 0 || String(Number(key)) !== key ||
+          Number(key) >= current.length) {
+          throw new TypeError('resumeValue arrays must not contain extra keys')
+        }
+      }
+      for (let i = 0; i < current.length; i += 1) {
+        if (!Object.hasOwn(current, i)) {
+          throw new TypeError('resumeValue must not contain sparse arrays')
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, String(i))
+        if (!descriptor || !('value' in descriptor)) {
+          throw new TypeError('resumeValue must not contain accessors')
+        }
+        visit(descriptor.value)
+      }
+    } else {
+      for (const key of Reflect.ownKeys(current)) {
+        if (typeof key !== 'string') {
+          throw new TypeError('resumeValue must not contain symbol keys')
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, key)
+        if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) {
+          throw new TypeError('resumeValue must contain only enumerable data fields')
+        }
+        visit(descriptor.value)
+      }
+    }
+    active.delete(current)
+  }
+  visit(value)
 }
 
 export class AgentServerClient {
@@ -427,6 +500,44 @@ export class AgentServerClient {
     return mapRun(
       decodeRunDto(body),
     )
+  }
+
+  /**
+   * Creates a distinct stateful Run carrying Command.resume.
+   * Does not inspect ThreadState, deduplicate, retry, or confirm graph END.
+   * A lost POST response is ambiguous: the caller must reconcile manually.
+   */
+  async createResumeRun(
+    id: ThreadId,
+    input: CreateResumeRunInput,
+  ): Promise<Run> {
+    assertResumeJson(input.resumeValue)
+
+    const { body } = await this.#json(
+      `/threads/${encodeURIComponent(id)}/runs`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          assistant_id: input.assistantId,
+          input: {},
+          command: { resume: input.resumeValue },
+          metadata: input.metadata,
+          multitask_strategy: 'reject',
+        }),
+      },
+    )
+    const run = mapRun(decodeRunDto(body))
+    if (run.threadId !== id) {
+      throw new AgentServerDecodeError(
+        'Run.thread_id', `matching target Thread ${id}`,
+      )
+    }
+    if (run.assistantId !== input.assistantId) {
+      throw new AgentServerDecodeError(
+        'Run.assistant_id', 'matching requested Assistant',
+      )
+    }
+    return run
   }
 
   async openRunStream(
