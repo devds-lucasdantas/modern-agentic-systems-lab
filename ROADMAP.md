@@ -125,6 +125,12 @@
   - [x] 2.3F Concurrency and stale-state protection
   - [x] 2.3G Shared-state baseline review
 - [ ] 2.4 Interrupts
+  - [x] 2.4A Pinned interrupt and resume contract discovery
+  - [ ] 2.4B Persisted interrupt projection and classification
+  - [ ] 2.4C Typed resume Run transport
+  - [ ] 2.4D Deliberate HITL interface
+  - [ ] 2.4E Stale-resume and failure safety
+  - [ ] 2.4F Interrupts baseline review
 - [ ] 2.5 Frontend tools
 - [ ] 2.6 AG-UI
 - [ ] 2.7 Generative UI patterns

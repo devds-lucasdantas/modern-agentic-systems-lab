@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4 Interrupts
-    -> discover interrupt and resume contracts on the pinned Runtime
-    -> distinguish persisted graph interrupts from UI interaction
-    -> preserve the completed 2.3 shared-state baseline
+2.4B Persisted interrupt projection and classification
+    -> distinguish resumable dynamic HITL payloads from execution breakpoints
+    -> allowlist displayed interrupt data and preserve checkpoint identity
+    -> keep Run lifecycle, Thread position and human response separate
 ~~~
 
 ## Completed
@@ -2137,6 +2137,69 @@ Begin interrupt/HITL contract discovery against the pinned Runtime. Identify
 interrupt identity, persistence, resume boundaries, and lifecycle semantics
 before implementing any frontend controls. Preserve the completed shared-state
 and SSE behavior; do not assume future authorization or concurrency contracts.
+
+## Completed sub-block — 2.4A Pinned interrupt and resume discovery
+
+A model-free, temporary LangGraph project exercised the pinned Runtime using
+`interrupt()` and `Command.resume`, plus a separate `interrupt_before` graph
+breakpoint. The project and server were created in temporary directories;
+no changes were made to the pinned workshop reference or production graph.
+
+Observed dynamic graph/HITL pause:
+
+~~~text
+Thread.status             interrupted
+initial Run.status        success
+ThreadState.next          [approval]
+ThreadState.interrupts    populated with kind=masl_24a_hitl
+ThreadState.tasks         approval with matching interrupt payload
+checkpoint               present
+~~~
+
+Explicit resume through a second stateful Run with `command.resume=APPROVE_24A`
+was accepted. The graph stored `RESUMED:APPROVE_24A`, cleared the interrupts,
+reached END (`next=[]`), and left the Thread `idle`. Two distinct successful
+Runs were observed for one logical pause/resume workflow.
+
+The independent `interrupt_before=[checkpoint_only]` experiment observed
+`Thread.status=interrupted`, a successful Run, a persisted checkpoint and
+`next=[checkpoint_only]`, but **no** dynamic interrupt payload. Thus neither
+a successful Run nor a Thread's `interrupted` status alone identifies an
+approval request.
+
+OpenAPI includes `Command.resume`, and the `Interrupt` schema requires
+`value` but does not require `id`. The exact named schema `RunCreate` was
+absent in the discovery output; this does not imply Run creation is absent,
+since the stateful `runs/wait` request succeeded in the same experiment.
+
+Reproduction:
+
+~~~bash
+python3 scripts/lab-24a-interrupt-contracts.py
+~~~
+
+Initial verified observation (ephemeral local artifact):
+
+~~~text
+/tmp/masl-24a-observations-19344.json
+~~~
+
+The six recorded semantic checks were true: four for HITL persistence/resume
+and two for breakpoint positioning/no HITL payload. Both disposable Threads
+were deleted, and the isolated Runtime process was terminated. No model calls
+were involved; no frontend resume UI or client transport was added here.
+
+Details, experimental boundaries and next-layer design requirements are in
+`docs/journal/lab-21-interrupts.md`.
+
+## Current sub-block — 2.4B Persisted interrupt projection and classification
+
+Inspect the existing decoded ThreadState interrupt structures, including any
+nested task interrupt data, and establish an allowlisted view for genuine
+pending human input. Do not equate execution breakpoints, lifecycle
+cancellation and graph HITL. Do not expose arbitrary interrupt payloads by
+default, treat optional interrupt IDs as mandatory, or implement resume before
+its typed transport and stale-state safety policy are established.
 
 ## Reference environment
 
