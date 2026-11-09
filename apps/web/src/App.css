@@ -831,3 +831,25 @@
   .shared-state-header { flex-direction: column; align-items: flex-start; }
   .shared-state-facts { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 2.4D — reviewed, deterministic human-response laboratory */
+.hitl-panel { margin-top: 22px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.hitl-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.hitl-header h3 { margin: 5px 0 0; font-size: 18px; }
+.hitl-header button { flex: none; }
+.hitl-muted { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.hitl-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.hitl-facts > div { min-width: 0; padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+.hitl-facts dt { color: var(--text-soft); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.hitl-facts dd { margin: 5px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.hitl-question { padding: 12px; border-left: 3px solid var(--accent); background: var(--surface-muted); font-size: 13px; }
+.hitl-form { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); padding-top: 16px; }
+.hitl-form > label:not(.hitl-confirm) { color: var(--text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.hitl-form select { width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 9px; background: white; color: var(--text); font-size: 12px; }
+.hitl-confirm { display: flex; gap: 9px; align-items: flex-start; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.hitl-confirm input { margin-top: 2px; }
+.hitl-result { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.hitl-result[data-hitl-stage="confirmed"] { color: var(--success); }
+.hitl-result[data-hitl-stage="unreconciled"], .hitl-result[data-hitl-stage="stale"] { color: var(--danger); }
+.hitl-warning { padding: 10px 12px; border-left: 3px solid var(--warning); background: #fff7ed; color: #92400e; font-size: 12px; }
+@media (max-width: 680px) { .hitl-header { flex-direction: column; align-items: flex-start; } .hitl-facts { grid-template-columns: 1fr; } }

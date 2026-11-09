@@ -391,3 +391,100 @@ identity contracts to hard-code in the client.
 
 **2.4C COMPLETE within its scoped transport/integration gates.** Next:
 **2.4D — Deliberate HITL interface**. The parent milestone 2.4 remains open.
+
+## 2.4D — Deliberate HITL interface and real Chromium gate
+
+### Integration scope and files
+
+This sub-block added six files and updated three existing files:
+
+~~~text
+apps/web/src/execution/hitl-action.ts
+apps/web/src/execution/hitl-action.spec.ts
+apps/web/src/components/InterruptPanel.tsx
+apps/web/e2e/hitl-ui.spec.ts
+apps/web/playwright.hitl.config.ts
+scripts/lab-24d-hitl-browser.py
+apps/web/src/components/ExecutionSurface.tsx
+apps/web/src/components/AppShell.tsx
+apps/web/src/App.css
+~~~
+
+The known deterministic `masl_24a_hitl` payload is eligible only when it has
+one persisted interrupt with ID, a checkpoint and `next=['approval']`. Unknown
+interrupt values, missing identity, multiple interrupts, malformed prompts,
+breakpoints or unreconciled/live observations are not actionable. Only the
+2.4B sanitized `question` crosses the UI boundary; raw interrupt data does
+not become visible or automatically authorize a resume.
+
+The UI uses an explicit `APPROVE_24D`/`REJECT_24D` choice and a separately
+acknowledged checkbox. These are deterministic test inputs: the graph
+**records** `RESUMED:<value>` and does not implement authorization, business
+approval branches or rejection enforcement. The panel retrieves the single
+prior successful Run to resolve the canonical Assistant UUID and checks its
+`graphId` before invoking `createResumeRun`. A best-effort preflight compares
+the full checkpoint identity and the observed interrupt prompt/ID. Any
+mismatch prevents the POST. After one POST the UI reads the new Run's terminal
+status and GETs persisted ThreadState independently before indicating END.
+Lost responses and failed readbacks never cause automatic POST retry.
+
+### Gate evidence and scoped corrections
+
+Observed on WSL at HEAD `16a0e07247f3f8c94933c82b4f28f452d556c0df`:
+
+~~~text
+pnpm lint: 0 warnings, 0 errors (55 files, 116 rules)
+pnpm build: PASS (47 client modules)
+Vite SSR action spec: PASS (9 modules)
+HITL action gate assertions: 26/26 PASS
+python3 scripts/lab-24d-hitl-browser.py: 3 Chromium E2E PASS
+Runtime: pinned isolated deterministic server ready and cleaned up
+No model calls
+~~~
+
+Browser test names and verified outcomes:
+
+1. Deliberate approval creates one resume Run; independent persisted state
+   reconciliation confirms `END`.
+2. An execution breakpoint never becomes an actionable human approval.
+3. A changed HEAD detected by preflight blocks resume without any Run POST.
+
+The initial browser run could not start Vite because `pnpm run dev -- --host`
+forwarded `--` inappropriately; the reviewed config now invokes `pnpm exec
+vite --host ...`. The subsequent test revealed two HITL regions in the DOM.
+The `InterruptPanel` and `SharedStatePanel` had identical sibling React keys;
+prefixes `hitl:` and `shared:` fixed reconciliation without relaxing the
+Playwright uniqueness assertion. A first locator matched duplicated headings;
+a later stale-state assertion matched both the status and warning prose.
+Those were replaced by explicit semantic locators; all three scenarios then
+passed in Chromium. The client/guard contract stayed unchanged.
+
+Final, separately preserved Chromium run log (PID/port are disposable):
+
+~~~text
+/tmp/masl-24d-e2e-final.log
+~~~
+
+Evidence SHA-256: `eaa862d35253b1c066640ce864a3c461ef258cfbee261a1c4f4a13634f3365ba`. The final run contains exactly three
+passing tests, the model-free browser gate marker and Runtime cleanup.
+Reproduction: `python3 scripts/lab-24d-hitl-browser.py` from repository root.
+
+### Deliberate limitations and next sub-block
+
+- **Not production authorization:** local pinned dev Runtime reports
+  `auth=noop`. A checkbox does not establish who may approve.
+- **Not atomic CAS:** another writer can advance HEAD between the preflight
+  GET and the resume POST. There is no server-side checkpoint-conditional
+  resume guarantee in this implementation.
+- **Not idempotent:** duplicate or lost-response cases are not proven safe;
+  the current UI prevents its own automatic retry and requires inspection.
+- **Not generalized:** only one deterministic `masl_24a_hitl` interrupt is
+  recognized. Multi-interrupt/subgraph/task-level semantics are out of scope.
+- **Not all regressions:** the 2.2 model-dependent full suite was not run;
+  this specific validation used the temporary pinned model-free Runtime.
+- **Pinned EOL warning remains:** `langgraph-api 0.8.1` reports EOL in the
+  local development Runtime; no dependency updates or production readiness
+  are claimed here.
+
+**2.4D complete within its scoped UI and Chromium gates.** The parent 2.4
+milestone remains open; next: **2.4E — Stale-resume and failure safety**.

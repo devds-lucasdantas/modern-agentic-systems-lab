@@ -29,6 +29,10 @@ import {
   SharedStatePanel,
 } from './SharedStatePanel'
 
+import {
+  InterruptPanel,
+} from './InterruptPanel'
+
 const shortId = (
   value: string,
 ): string =>
@@ -437,8 +441,19 @@ export function ExecutionSurface({
             messages={messages}
           />
 
+          <InterruptPanel
+            key={`hitl:${selectedThread || 'none'}`}
+            threadId={selectedThread || null}
+            state={state}
+            authority={projectionAuthority}
+            busy={busy}
+            onBusyChange={setMutationBusy}
+            onReadState={loadThreadState}
+            onRuntimeChanged={onRuntimeChanged}
+          />
+
           <SharedStatePanel
-            key={selectedThread || 'none'}
+            key={`shared:${selectedThread || 'none'}`}
             threadId={selectedThread || null}
             state={state}
             authority={projectionAuthority}

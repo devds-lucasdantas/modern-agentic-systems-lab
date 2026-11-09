@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4D Deliberate HITL interface
-    -> expose only reviewed pending human input from persisted Thread state
-    -> require an explicit human response; avoid automatic or hidden resume
-    -> reconcile the new Run and Thread state; retain fail-closed boundaries
+2.4E Stale-resume and failure safety
+    -> investigate duplicate, stale and concurrent resume attempts
+    -> distinguish lost POST response from a definitively rejected Run
+    -> validate stronger server-side guarantees before enabling general HITL
 ~~~
 
 ## Completed
@@ -2286,15 +2286,56 @@ CAS, per-user authorization, server-side idempotency or exactly-once approval;
 no model-dependent streaming/browser regression is claimed. The frontend
 must not infer authorized human action merely from a graph interrupt.
 
-## Current sub-block — 2.4D Deliberate HITL interface
+## Completed sub-block — 2.4D Deliberate HITL interface
 
-Use the 2.4B read-only projection and 2.4C explicit transport to build a
-reviewed, deliberately initiated human response interaction. The first UI
-iteration must distinguish persisted graph interrupts from breakpoints and
-lifecycle cancellation, require an explicit decision, and reconcile Run and
-ThreadState after submission. Plan stale-resume protection and ambiguous POST
-recovery separately in 2.4E; do not imply production-ready authorization or
-idempotency.
+The 2.4D frontend integrates the read-only 2.4B interrupt projection with the
+explicit 2.4C `createResumeRun` client. The new `InterruptPanel` is mounted
+once per selected Thread with unique React sibling keys for the HITL and
+shared-state panels. It shows only the reviewed `masl_24a_hitl` question; an
+unknown graph interrupt or a breakpoint never becomes an approval action.
+
+To resume the single deterministic lab interrupt, the user must deliberately
+choose `APPROVE_24D` or `REJECT_24D` and acknowledge the absence of atomic
+approval/authorization semantics. The panel checks that exactly one prior
+successful Run belongs to the Thread, resolves its canonical Assistant UUID,
+verifies the reviewed graph ID and performs a best-effort persisted HEAD
+preflight. A mismatched checkpoint, interrupt identity or question blocks the
+POST. One explicit typed Run POST uses `Command.resume` and
+`multitask_strategy=reject`; the UI polls the new Run via GET and independently
+reads persisted ThreadState to confirm graph END and no remaining interrupts.
+No automatic POST retry is performed; stale or ambiguous outcomes require
+explicit inspection and reload.
+
+WSL validation against commit `16a0e07`:
+
+~~~text
+Oxlint: 0 warnings, 0 errors (55 files, 116 rules)
+TypeScript + Vite production build: PASS (47 transformed modules)
+Pure HITL action guard: 26/26 assertions PASS
+Model-free Chromium E2E: 3/3 PASS, one worker
+Pinned deterministic Runtime: launched and cleaned up
+~~~
+
+The scoped Chromium scenarios validated: (1) deliberate response creates one
+resume Run and independently observes END; (2) execution breakpoint does not
+offer HITL action; (3) HEAD advancement in preflight blocks resume without a
+POST. The 2.4D build required targeted Vite CLI invocation, unambiguous
+Playwright locators, unique React sibling keys and a stage-specific stale
+result assertion. These fixes are included in the verified nine source files.
+The exact browser gate log is recorded in the Lab 21 journal.
+
+This is a **deterministic, model-free development test**, not a production
+approval system or a full 2.2 model-dependent browser regression. The
+preflight GET is not atomic with the POST; the Runtime's local dev auth is
+noop. No backend authorization, cross-writer lock, idempotency token,
+exactly-once guarantee, or generic HITL approval schema was implemented.
+
+## Current sub-block — 2.4E Stale-resume and failure safety
+
+Establish the real duplicate/stale POST behavior of the pinned Runtime, test
+ambiguous lost responses and concurrent writers, and distinguish best-effort
+frontend interlocks from server-enforced guarantees. Do not claim robust
+multiuser approval until those boundaries are actually validated.
 
 ## Reference environment
 

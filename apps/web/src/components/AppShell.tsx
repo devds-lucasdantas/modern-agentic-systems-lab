@@ -199,11 +199,11 @@ export function AppShell() {
           </span>
 
           <strong>
-            2.3
+            2.4
           </strong>
 
           <span>
-            Shared state
+            Interrupts
           </span>
         </div>
       </aside>

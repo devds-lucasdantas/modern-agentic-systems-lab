@@ -128,7 +128,7 @@
   - [x] 2.4A Pinned interrupt and resume contract discovery
   - [x] 2.4B Persisted interrupt projection and classification
   - [x] 2.4C Typed resume Run transport
-  - [ ] 2.4D Deliberate HITL interface
+  - [x] 2.4D Deliberate HITL interface
   - [ ] 2.4E Stale-resume and failure safety
   - [ ] 2.4F Interrupts baseline review
 - [ ] 2.5 Frontend tools
