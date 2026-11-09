@@ -126,7 +126,7 @@
   - [x] 2.3G Shared-state baseline review
 - [ ] 2.4 Interrupts
   - [x] 2.4A Pinned interrupt and resume contract discovery
-  - [ ] 2.4B Persisted interrupt projection and classification
+  - [x] 2.4B Persisted interrupt projection and classification
   - [ ] 2.4C Typed resume Run transport
   - [ ] 2.4D Deliberate HITL interface
   - [ ] 2.4E Stale-resume and failure safety

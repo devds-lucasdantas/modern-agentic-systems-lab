@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4B Persisted interrupt projection and classification
-    -> distinguish resumable dynamic HITL payloads from execution breakpoints
-    -> allowlist displayed interrupt data and preserve checkpoint identity
-    -> keep Run lifecycle, Thread position and human response separate
+2.4C Typed resume Run transport
+    -> implement an explicit, typed resume Run request (not a state POST)
+    -> validate the pinned wire contract and error boundaries model-free
+    -> do not expose human approval buttons until 2.4D
 ~~~
 
 ## Completed
@@ -2192,14 +2192,59 @@ were involved; no frontend resume UI or client transport was added here.
 Details, experimental boundaries and next-layer design requirements are in
 `docs/journal/lab-21-interrupts.md`.
 
-## Current sub-block — 2.4B Persisted interrupt projection and classification
+## Completed sub-block — 2.4B Persisted interrupt projection and classification
 
-Inspect the existing decoded ThreadState interrupt structures, including any
-nested task interrupt data, and establish an allowlisted view for genuine
-pending human input. Do not equate execution breakpoints, lifecycle
-cancellation and graph HITL. Do not expose arbitrary interrupt payloads by
-default, treat optional interrupt IDs as mandatory, or implement resume before
-its typed transport and stale-state safety policy are established.
+A new pure TypeScript boundary (`interrupt-projection.ts`) projects an
+explicit read-only summary from decoded, persisted `ThreadState`. A separate
+optional Thread.status is observed only after same-Thread identity is checked;
+it is not proof of HITL or of an atomic current snapshot. A dynamic graph
+interrupt requires a persisted checkpoint and nonempty top-level
+`ThreadState.interrupts`. A paused Thread with no dynamic payload is classified
+as `interrupted-without-payload`, not assumed to require human approval.
+Unknown Thread status with `next` nodes is `position-pending`; missing or
+contradictory checkpoint evidence is `indeterminate`. A checkpoint without next nodes or interrupts is
+`end` only when no separate interrupted Thread status was observed.
+
+The allowlist recognizes **only** the deterministic 2.4A experiment's
+`kind=masl_24a_hitl` and valid string `question` (trimmed, <=240 characters,
+control characters rejected). Unknown or malformed interrupt values remain
+`opaque`, and optional IDs remain nullable. Only 20 interrupt summaries are
+shown, with excess count reported. Raw payloads, state channels, metadata,
+checkpoint namespace/map and task details are not forwarded. The output holds
+only the checkpoint ID for display correlation; the full CheckpointRef remains
+in the source ThreadState for future guarded resume design.
+
+The implementation is a pure, **unwired** projection: there is no UI control,
+resume transport, new Run, model call or runtime mutation in 2.4B. Existing
+domain/transport mappers and shared-state UI were intentionally unchanged.
+Task-level nested interrupts are not separately decoded into this projection;
+only the top-level interrupt collection is classified. Unknown payloads are
+not presented as approval instructions or authorization decisions.
+
+Verified on WSL after the targeted Oxlint fix:
+
+~~~text
+Oxlint: 0 warnings, 0 errors (49 files, 116 rules)
+TypeScript + Vite production build: PASS (44 modules)
+Vite SSR pure test bundle: PASS (7 modules)
+30 interrupt-projection assertions passed
+~~~
+
+The test suite covers empty/END/pending/breakpoint situations, dynamic HITL
+and nullable IDs, checkpoint correlation, known-schema sanitization,
+unknown/malformed/long/control-character payloads, raw-data non-leakage,
+20-item display cap, inconsistent checkpoint evidence and cross-Thread
+identity rejection. No Playwright or model-dependent 2.2 regression was run in
+this sub-block. See `docs/journal/lab-21-interrupts.md` for the full contract.
+
+## Current sub-block — 2.4C Typed resume Run transport
+
+Implement an explicit, typed Run request that carries `Command.resume` through
+the pinned Agent Server contract. Test URL/payload mapping, decoding,
+independent persisted readback and failure surfaces before integrating HITL
+controls. Do not conflate `POST /threads/{thread_id}/state` with resume; do not
+claim checkpoint-conditional CAS, authorization, idempotency or safe
+concurrent approvals.
 
 ## Reference environment
 

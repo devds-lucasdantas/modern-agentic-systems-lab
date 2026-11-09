@@ -164,3 +164,111 @@ mocked HTTP responses.
 - **2.4E:** Investigate stale resume, duplicate submissions, failure recovery,
   and reconcile Run versus Thread state.
 - **2.4F:** Review the scoped interrupt/HITL baseline with reproducible gates.
+
+## 2.4B — Persisted interrupt projection and classification
+
+### Scope and source boundary
+
+The 2.4A observation established that a dynamic `interrupt()` may leave
+`Thread.status=interrupted`, `Run.status=success`, a pending graph node and a
+populated top-level `ThreadState.interrupts` collection. An execution breakpoint
+can also leave Thread.status `interrupted` with a pending node but **without**
+a dynamic HITL payload. Neither Thread status nor Run status nor next-node
+position alone is an approval prompt.
+
+The 2.4B implementation adds only:
+
+~~~text
+apps/web/src/execution/interrupt-projection.ts
+apps/web/src/execution/interrupt-projection.spec.ts
+~~~
+
+The existing transport mapper already decodes top-level `ThreadState.interrupts`
+into `GraphInterrupt` with `value: unknown` and nullable `id`. In the current
+domain model `RuntimeTaskSummary` contains only id, name and error; this block
+does not separately promote nested task interruptions or assume their equality
+with top-level interrupts in future runtime versions.
+
+### Classification contract
+
+`projectPersistedInterrupts(state, threadOrNull)` is synchronous, read-only,
+and performs no IO. A supplied Thread status must belong to the same Thread ID
+as `ThreadState`, otherwise projection throws. It emits exactly one `situation`:
+
+| Situation | Interpretation |
+|---|---|
+| `uninitialized` | No checkpoint and no conflicting evidence |
+| `graph-interrupt` | Persisted checkpoint and at least one top-level graph interrupt |
+| `interrupted-without-payload` | Thread status interrupted with checkpoint but no top-level interrupt payload; not automatically HITL |
+| `position-pending` | Persisted checkpoint and pending nodes, without dynamic interrupt or a separately observed interrupted status |
+| `end` | Persisted checkpoint, no top-level interrupts, no pending nodes, and no separately observed interrupted status |
+| `indeterminate` | Missing checkpoint with interrupts, next nodes or interrupted status; fail closed |
+
+The output also includes provenance `authority='persisted'`, Thread ID,
+checkpoint ID (display correlation only), separately observed status or null,
+number of pending nodes, total interrupt count, displayed interrupt summaries
+and count omitted by the cap. This does not represent full checkpoint identity
+or a trusted resume precondition.
+
+### Explicit payload allowlist
+
+Interrupt values are untrusted and opaque by default. Only payloads with
+`kind='masl_24a_hitl'` and a nonempty string `question`, trimmed to at most
+240 characters and free of control characters U+0000–U+001F or U+007F, can
+project that question as text. This allows only the known deterministic lab
+probe; it does not opt in real-world approval formats. Every other payload
+becomes `kind='opaque'`, with `question=null`. Interrupt IDs can be null.
+At most 20 projected items are displayed, without publishing raw
+`Interrupt.value`, `ThreadState.values`, metadata, task details, checkpoint
+namespace, or checkpoint map. These are read-only summaries, not actions.
+
+The original implementation's regular expression for control characters
+triggered Oxlint `eslint(no-control-regex)` warning. A targeted patch replaced
+it with a semantically equivalent Unicode code-point predicate without
+suppressing lint. All test assertions still passed after the change.
+
+### Evidence and validations
+
+Observed on WSL against the exact repository baseline at
+`abece5d54645f0a4b839fdf656cc07c4908ae633`:
+
+~~~text
+pnpm lint: 0 warnings, 0 errors (49 files, 116 rules)
+pnpm build: TypeScript + Vite PASS (44 transformed modules)
+SSR test bundling: PASS (7 modules)
+node interrupt-projection.spec.js: 30/30 assertions PASS
+~~~
+
+Reproduction (from `apps/web`):
+
+~~~bash
+pnpm lint && pnpm build
+pnpm exec vite build --ssr src/execution/interrupt-projection.spec.ts \
+  --outDir /tmp/masl-24b-projection --emptyOutDir
+printf '%s\n' '{"type":"module"}' > /tmp/masl-24b-projection/package.json
+node /tmp/masl-24b-projection/interrupt-projection.spec.js
+~~~
+
+Pure assertions cover six classification states, nullable interrupt identity,
+checkpoint/provenance correlation, allowlist behavior, arbitrary data
+non-exposure, defensive display cap, malformed shapes and cross-Thread inputs.
+The code was typechecked and bundled with the repository's installed toolchain;
+no pinned Runtime, model call, run, browser integration or existing source
+file was modified. Only the two new TS files are staged for this sub-block.
+
+### Explicit limitations and next gate
+
+- **No automatic approval inference:** `interrupted-without-payload` may be a
+  breakpoint or another interruption mechanism; `graph-interrupt` does not
+  itself authorize a resume.
+- **No arbitrary payload display:** unknown application-specific HITL schemas
+  remain opaque until explicitly reviewed and tested.
+- **No secure resume precondition:** display checkpoint ID is not a full
+  `CheckpointRef`, not an atomic CAS condition and not an authorization check.
+- **No task-level expansion:** only the decoded top-level persisted interrupt
+  collection is projected in this baseline.
+- **No UI integration yet:** this projector remains pure and deliberately
+  unused in visual controls until resume transport and guard policy are ready.
+
+**2.4B complete within the scoped, model-free pure projection gate.** Next:
+**2.4C — Typed resume Run transport**. The parent milestone 2.4 stays open.
