@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4F Interrupts baseline review
-    -> audit 2.4A–2.4E contracts and evidence
-    -> verify remaining risks and reference-environment compatibility
-    -> close the 2.4 milestone only after scoped review gates
+2.5 Frontend tools
+    -> discover pinned tool-execution event and payload contracts
+    -> define a read-only representation and explicit action boundaries
+    -> validate behavior incrementally before adding tool controls
 ~~~
 
 ## Completed
@@ -2372,11 +2372,30 @@ reproducible lab safety boundary, not production-ready approval infrastructure.
 The exact evidence hashes, reproducibility commands and test distinctions are
 recorded in `docs/journal/lab-21-interrupts.md`.
 
-## Current sub-block — 2.4F Interrupts baseline review
+## Completed sub-block — 2.4F Interrupts baseline review
 
-Review the combined 2.4A–2.4E contracts, evidence and remaining risk boundaries.
-Do not generalize authorization, cross-client safety, exactly-once execution or
-atomic checkpoint preconditions from this model-free development baseline.
+The full scoped 2.4A–2.4E deterministic, model-free baseline passed **11/11**
+integrated audit gates at commit `c6f676ad4ace1e5cf3f0cdd696aa1783f2836a8f`. The reviewed auditor
+`scripts/lab-24f-review.py` is preserved in the 2.4F commit. Each gate's
+output and its Runtime shutdown evidence were checked against recorded SHA-256
+values. All reviewed tests, including 2.4D and 2.4E Chromium probes, passed.
+
+Evidence: `/tmp/masl-24f-review-9qiqi7vo/review.json` (SHA-256 `d3308e5dd324e5a197272536dabc3307f0a503ffea9670d49f2e92e10a7d5fbf`),
+and `/tmp/masl-24f-review-9qiqi7vo/review.md` (SHA-256 `d19b7c55ebe6126507b1c742a4fef03b44d477d2edf7ea1fcf6ac0aeb855b881`).
+These `/tmp` evidence paths are local and ephemeral, not portable fixtures.
+The historical 2.4E exact-HEAD assertion was adapted **in memory only** after
+verifying the original blob and Git ancestry. The tracked source was not edited.
+
+**Scoped completion, not production approval:** dev auth is `noop`; the
+frontend preflight is not atomic CAS; the attempt marker is not server-backed
+idempotency; the component interlock is not durable across reloads or clients;
+and this review does not cover full model-dependent 2.2/2.3 suites.
+
+## Current sub-block — 2.5 Frontend tools
+
+Begin contract discovery for tool-execution events, tool-call payloads and
+read-only UI representation. No 2.5 implementation or Runtime behavior has
+yet been validated or claimed by the 2.4F review.
 
 ## Reference environment
 

@@ -574,3 +574,65 @@ shut down without a persistence traceback.
 
 **2.4E complete within scoped discovery, pure policy and browser gates.**
 Next: **2.4F — Interrupts baseline review**. Parent milestone 2.4 remains open.
+
+## 2.4F — Scoped baseline review (11/11 PASS)
+
+Audit performed against the exact published 2.4E baseline
+`c6f676ad4ace1e5cf3f0cdd696aa1783f2836a8f`. The reviewer was the sole untracked file during the review;
+postflight status contained no unexpected changes. Review evidence is
+**machine-generated, local and ephemeral** rather than embedded into Git.
+
+- JSON: `/tmp/masl-24f-review-9qiqi7vo/review.json`
+- SHA-256: `d3308e5dd324e5a197272536dabc3307f0a503ffea9670d49f2e92e10a7d5fbf`
+- Markdown: `/tmp/masl-24f-review-9qiqi7vo/review.md`
+- SHA-256: `d19b7c55ebe6126507b1c742a4fef03b44d477d2edf7ea1fcf6ac0aeb855b881`
+- Reviewed auditor SHA-256: `868666d40e444c467cfbb199c2c069b1e64076457adce396c7ac519660c5b4ee`
+
+| Audited gate | Result | Gate log SHA-256 |
+|---|---|---|
+| 2.4 lint | PASS | `6012e2eed883b4df860c97433d164c0ddad0b0561f74a7cdd026b04bae5178b9` |
+| 2.4 production build | PASS | `20ec21ec300ab18045e303233fc43ae67bfe4528011be7ff81d568afa061fa5f` |
+| 2.4A runtime contracts | PASS | `e234de36fb29f421f982dbac1841e781e2c49e5601bbed868425999e0ca53087` |
+| 2.4B persisted projection | PASS | `d3956b2d62eab886be00adde03fd1b14d2bee5faff1992eef83d45eedf2d8326` |
+| 2.4C resume transport pure | PASS | `245793215cceeec31a4b6e14236961a197188b984ae68651f1474d5cf7de422f` |
+| 2.4C runtime transport | PASS | `5200a5c6c553f5120c4b109cfccddbd940747e2bb2b5aa06729af759d8e63c50` |
+| 2.4D HITL eligibility | PASS | `2519675903194c098cc6c4a7e425f7d00fa7c5b45f8f6a1c3cac62fd5e38c0ce` |
+| 2.4D chromium | PASS | `bf70ccfa51e4b224793990b2952069f190fca7c7043bcb434c9d9a762bc57d42` |
+| 2.4E concurrency and failure discovery | PASS | `2f88315b5ab5c395fe150aa172abdfbf0378ad91f655cdb82439a6c07269ccb4` |
+| 2.4E recovery policy | PASS | `ea35460d979edf9f65f69b055feb04d5e2598bacb8a71ecf37f10e603c4fb7b7` |
+| 2.4E chromium recovery | PASS | `d6bcf43bdec80b69a76af25528b33ff37c3b85f623c33f5d4c4dc9f9a834a726` |
+
+All gate logs, five categories of pinned Runtime log and the 2.4E discovery
+observation JSON were inspected by the scoped finalizer with SHA-256 checks.
+The 2.4E script's historical pre-commit HEAD assertion was replaced **only
+in memory** during replay, after verifying source Git blob
+`c548b34278e2817343b054a1e266f799733ff8b4` and commit ancestry. Neither
+Git HEAD nor the historical tracked script was spoofed or changed.
+
+### What the completed baseline actually proves
+
+- A dynamic `interrupt()` differs from a breakpoint without an HITL payload;
+  persisted Run success by itself does not prove END.
+- Only an allowlisted deterministic question yields a deliberate approval UI;
+  malformed or unknown requests fail closed.
+- Explicit `Command.resume` creates a separate Run with
+  `multitask_strategy=reject` and typed transport identity checks.
+- Stale local checkpoint observations are blocked on best-effort preflight.
+- Lost POST responses remain ambiguous; a successful server-side write can
+  be reconciled with GET using a metadata correlation marker and no blind retry.
+- A duplicate post-END resume was accepted in discovery; concurrent attempts
+  yielded a 409 in the observed schedule. Neither result implies exactly-once.
+
+### Explicitly out of scope
+
+- Authorization / approver identity: local Runtime uses `auth=noop`.
+- Atomic checkpoint-conditional resume / server-side CAS.
+- Server-side idempotency, deduplication and durable attempt ledger.
+- Interlocks surviving reloads, remounts, other tabs or other clients.
+- Generic nested/multi-interrupt and model-dependent 2.2/2.3 E2E coverage.
+- Production audit of the pinned EOL `langgraph-api 0.8.1` runtime.
+
+**Decision:** milestone **2.4 Interrupts is complete for the reproducible,
+model-free laboratory scope only**. The limitations above remain open
+architectural risks, not completed enterprise guarantees. Next: 2.5 Frontend
+tools; no 2.5 claims are included in this review.
