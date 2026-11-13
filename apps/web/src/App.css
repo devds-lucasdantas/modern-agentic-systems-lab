@@ -853,3 +853,22 @@
 .hitl-result[data-hitl-stage="unreconciled"], .hitl-result[data-hitl-stage="stale"] { color: var(--danger); }
 .hitl-warning { padding: 10px 12px; border-left: 3px solid var(--warning); background: #fff7ed; color: #92400e; font-size: 12px; }
 @media (max-width: 680px) { .hitl-header { flex-direction: column; align-items: flex-start; } .hitl-facts { grid-template-columns: 1fr; } }
+
+/* 2.5C — read-only persisted tool-observation panel */
+.tool-observations-panel { margin-top: 22px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.tool-observations-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tool-observations-header h3 { margin: 5px 0 0; font-size: 18px; }
+.tool-observations-authority { font-size: 11px; font-weight: 800; color: var(--text-soft); text-transform: uppercase; }
+.tool-observations-muted { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.tool-observations-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.tool-observations-facts > div { min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+.tool-observations-facts dt { font-size: 10px; font-weight: 800; color: var(--text-soft); text-transform: uppercase; }
+.tool-observations-facts dd { margin: 5px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.tool-observations-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.tool-observations-call { display: grid; gap: 5px; min-width: 0; padding: 12px; border: 1px solid var(--border); background: var(--surface-muted); border-radius: 9px; }
+.tool-observations-name { font-size: 13px; overflow-wrap: anywhere; }
+.tool-observations-id { font-size: 11px; overflow-wrap: anywhere; }
+.tool-observations-status { font-size: 12px; font-weight: 700; }
+.tool-observations-caution { font-size: 12px; line-height: 1.5; padding: 10px 12px; border-left: 3px solid var(--warning); background: #fff7ed; color: #92400e; }
+.tool-observations-footnote { margin-top: 14px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+@media (max-width: 680px) { .tool-observations-header { flex-direction: column; align-items: flex-start; } .tool-observations-facts { grid-template-columns: 1fr; } }

@@ -33,6 +33,10 @@ import {
   InterruptPanel,
 } from './InterruptPanel'
 
+import {
+  ToolObservationsPanel,
+} from './ToolObservationsPanel'
+
 const shortId = (
   value: string,
 ): string =>
@@ -439,6 +443,12 @@ export function ExecutionSurface({
 
           <MessageList
             messages={messages}
+          />
+
+          <ToolObservationsPanel
+            threadId={selectedThread || null}
+            state={state}
+            authority={projectionAuthority}
           />
 
           <InterruptPanel

@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.5 Frontend tools
-    -> discover pinned tool-execution event and payload contracts
-    -> define a read-only representation and explicit action boundaries
-    -> validate behavior incrementally before adding tool controls
+2.5D Streaming and confidentiality boundaries
+    -> distinguish Agent Server SSE from tool lifecycle protocol events
+    -> review raw MessageList exposure alongside the sanitized tool panel
+    -> preserve read-only boundaries until further contracts are validated
 ~~~
 
 ## Completed
@@ -2391,11 +2391,45 @@ frontend preflight is not atomic CAS; the attempt marker is not server-backed
 idempotency; the component interlock is not durable across reloads or clients;
 and this review does not cover full model-dependent 2.2/2.3 suites.
 
-## Current sub-block — 2.5 Frontend tools
+## Completed sub-blocks — 2.5A–2.5C Frontend tools
 
-Begin contract discovery for tool-execution events, tool-call payloads and
-read-only UI representation. No 2.5 implementation or Runtime behavior has
-yet been validated or claimed by the 2.4F review.
+**2.5A — Pinned tool contract discovery.** A synthetic `AIMessage` invoked a real
+LangGraph `ToolNode` without an external model. The pinned Agent Server
+persisted one tool call and one matching `ToolMessage` by `tool_call_id` at
+independently reconciled graph END. The observed SSE families were
+`messages/complete` (2), `messages/metadata` (2), `metadata` (1),
+`updates` (2), and `values` (3), totaling 10 SSE records. No distinct
+protocol `tools` lifecycle event was observed. These are local dev Runtime
+observations, not guarantees about all deployments.
+
+**2.5B — Pure persisted tool projection.** The read-only projector correlates
+validated tool-call IDs with persisted ToolMessages without including raw
+arguments, results, arbitrary metadata, or malformed entries. Duplicate,
+orphan, missing-checkpoint, incomplete and capped-display cases fail closed.
+42 pure assertions and a structural cross-check against the recorded 2.5A
+observation passed.
+
+**2.5C — Browser UI.** The separate `ToolObservationsPanel` renders only the
+persisted, same-Thread summary, not live SSE predictions. Three isolated
+Chromium tests passed: a real correlated ToolNode Run, Thread switching
+without stale call data, and an orphan/conflicting result marked incomplete.
+The panel does not create Runs or offer tool invocation actions. Lint and
+TypeScript/Vite production build passed.
+
+**Limitations:** this is a deterministic, model-free, local development
+baseline. `MessageList` still renders raw tool-message contents outside the
+sanitized tool panel; its data-exposure boundary must be reviewed in 2.5D.
+The `messages/complete` event is discovered but not yet promoted to a known
+stream-event family by the frontend. Neither a `ToolMessage` nor END proves
+external side-effect success, authorization, or exactly-once tool execution.
+See `docs/journal/lab-22-frontend-tools.md` for reproducibility and evidence.
+
+## Current sub-block — 2.5D Streaming and confidentiality boundaries
+
+Assess what the pinned Agent Server actually emits and what the general
+`MessageList` shows. Keep raw payloads and tool actions out of the sanitized
+panel, and do not infer `tool-started`/`tool-finished` from message records.
+The parent 2.5 milestone remains open pending the 2.5D/2.5E reviews.
 
 ## Reference environment
 

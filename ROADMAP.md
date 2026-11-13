@@ -132,6 +132,11 @@
   - [x] 2.4E Stale-resume and failure safety
   - [x] 2.4F Interrupts baseline review
 - [ ] 2.5 Frontend tools
+  - [x] 2.5A Pinned ToolNode and Agent Server tool-call contract discovery
+  - [x] 2.5B Read-only persisted tool-call/result projection
+  - [x] 2.5C Persisted tool observations UI
+  - [ ] 2.5D Streaming and confidentiality boundaries
+  - [ ] 2.5E Frontend tools baseline review
 - [ ] 2.6 AG-UI
 - [ ] 2.7 Generative UI patterns
 
