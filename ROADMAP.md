@@ -129,7 +129,7 @@
   - [x] 2.4B Persisted interrupt projection and classification
   - [x] 2.4C Typed resume Run transport
   - [x] 2.4D Deliberate HITL interface
-  - [ ] 2.4E Stale-resume and failure safety
+  - [x] 2.4E Stale-resume and failure safety
   - [ ] 2.4F Interrupts baseline review
 - [ ] 2.5 Frontend tools
 - [ ] 2.6 AG-UI

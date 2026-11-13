@@ -488,3 +488,89 @@ Reproduction: `python3 scripts/lab-24d-hitl-browser.py` from repository root.
 
 **2.4D complete within its scoped UI and Chromium gates.** The parent 2.4
 milestone remains open; next: **2.4E — Stale-resume and failure safety**.
+
+## 2.4E — Stale-resume and failure safety (complete in scoped lab gates)
+
+### Four pinned Runtime discovery probes
+
+Reproduced using `python3 scripts/lab-24e-failure-probes.py`. Three model-free
+graphs, disposable Threads and isolated ports; no external model calls.
+
+1. A successful resume Run can finish while graph `next` still contains a
+   second dynamic interrupt. A Run success is not graph END.
+2. A second resume POST **after END was accepted**; Runs increased from 2 to 3.
+   The pinned server did not provide resume idempotency.
+3. Two concurrent `multitask_strategy=reject` writes produced one accepted
+   outcome and one HTTP 409. This rejects overlapping active tasks in that
+   schedule, not already-finished duplicates, and is not checkpoint CAS.
+4. A real accepted resume POST with its response lost caused a client error,
+   while independent GET proved a persisted Run. Unknown POST outcomes cannot
+   safely trigger another POST.
+
+Discovery log: `/tmp/masl-24e-discovery-final.log` (SHA-256 `1eaa8103e7ee2d23d920c71568934031737ee3ef5fd63d3d3923419d5ee3d353`).
+Observations JSON: `/tmp/masl-24e-observations-2623.json` (SHA-256 `9b9af30f4ee864a0561106dfceb8a5580b9b7a7b123ff9b3b5be47bffbf2b2f3`).
+The discovery runner originally deleted its temporary working directory before
+Runtime exit, triggering a shutdown `FileNotFoundError`; the final script
+closes the Runtime before deleting that workspace. The final Runtime log had
+no such error.
+
+### 2.4E-A — Pure recovery policy
+
+`apps/web/src/execution/resume-recovery.ts` defines read-only attempt
+reconciliation. The correlation marker in `Run.metadata` is observational,
+never an idempotency guarantee. The classifier rejects uncorrelated or duplicate
+Runs, missing/partial history, unrelated Assistant/Thread, non-terminal Run,
+new persisted interrupts, and inconsistent checkpoint state. Every outcome
+returns `safeToRetry=false`; only a uniquely correlated success with independent
+persisted Thread confirmation can establish `confirmed-end`.
+
+`resume-recovery.spec.ts`: 31 assertions PASS.
+Policy log: `/tmp/masl-24e-policy-final.log` (SHA-256 `8dee2c1a4701f011e33cb1d43bcce98a92785a9c4ca5286f719279b99e4124a9`).
+
+### 2.4E-B — Deliberate UI recovery and Chromium tests
+
+`InterruptPanel` installs an in-component interlock before the POST and adds
+`masl_resume_attempt_id` metadata to the one resume request. A lost response,
+HTTP 409, or failed recovery read keeps the attempt blocked. Manual inspection
+performs GETs for Run history, Thread status and persisted ThreadState; it
+never retries a resume POST. A correlated Run success still requires independent
+Thread and checkpoint END confirmation.
+
+`python3 scripts/lab-24e-recovery-browser.py`: 3 Chromium PASS:
+
+1. A real accepted POST with deliberately lost browser response is reconciled
+   via manual GET to END; exactly one POST was dispatched.
+2. An intercepted 409 remains a conflict and a read-only inspection does not
+   retry; note this browser case **simulates** the 409, while the discovery
+   probe above observed a real concurrent HTTP 409.
+3. A simulated 503 during recovery retains ambiguity until a later successful
+   read; no second resume POST.
+
+2.4E-B Chromium log: `/tmp/masl-24e-b-final.log` (SHA-256 `064afec81e6d66678b4e54fa0f42538e1f344dfd46d3c58011b21037f55a5562`).
+`python3 scripts/lab-24d-hitl-browser.py`: the 3 original 2.4D Chromium
+cases PASS after the 2.4E UI integration.
+Regression log: `/tmp/masl-24d-regression-final.log` (SHA-256 `2366f114ff734e74ce31cc26770989e5ffc79ae9f83b98a4e7b2474f15e39e55`).
+
+`pnpm lint`: 0 warnings/errors. `pnpm build`: PASS. TypeScript SSR policy
+assertions: 31 PASS. The Runtime in each isolated browser/discovery runner
+shut down without a persistence traceback.
+
+### Explicit safety boundaries for 2.4F review
+
+- **Not server-side deduplication:** `masl_resume_attempt_id` is metadata,
+  not a request idempotency key. No exactly-once behavior is implied.
+- **Not atomic checkpoint CAS:** concurrent writers can race between frontend
+  preflight and POST; `multitask_strategy=reject` is only a concurrency policy.
+- **Not durable across browser reload:** the attempt record lives in the
+  React component. Unmount/reload or a second client loses this local lock.
+  The pre-POST initial Run count check can catch an already persisted extra
+  Run but cannot atomically prevent a delayed or unobserved competing write.
+- **Not a universal HITL console:** only a reviewed deterministic graph is
+  actionable, without general multi-interrupt or subgraph semantics.
+- **Not production authorization:** the pinned Runtime has `auth=noop`, is
+  in-memory development infrastructure and reports `langgraph-api 0.8.1` EOL.
+- **Scope of evidence:** model-free tests and isolated browser probes; not
+  complete model-dependent 2.2 regression or distributed production tests.
+
+**2.4E complete within scoped discovery, pure policy and browser gates.**
+Next: **2.4F — Interrupts baseline review**. Parent milestone 2.4 remains open.

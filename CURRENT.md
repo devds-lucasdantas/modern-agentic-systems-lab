@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.4E Stale-resume and failure safety
-    -> investigate duplicate, stale and concurrent resume attempts
-    -> distinguish lost POST response from a definitively rejected Run
-    -> validate stronger server-side guarantees before enabling general HITL
+2.4F Interrupts baseline review
+    -> audit 2.4A–2.4E contracts and evidence
+    -> verify remaining risks and reference-environment compatibility
+    -> close the 2.4 milestone only after scoped review gates
 ~~~
 
 ## Completed
@@ -2330,12 +2330,53 @@ preflight GET is not atomic with the POST; the Runtime's local dev auth is
 noop. No backend authorization, cross-writer lock, idempotency token,
 exactly-once guarantee, or generic HITL approval schema was implemented.
 
-## Current sub-block — 2.4E Stale-resume and failure safety
+## Completed sub-block — 2.4E Stale-resume and failure safety
 
-Establish the real duplicate/stale POST behavior of the pinned Runtime, test
-ambiguous lost responses and concurrent writers, and distinguish best-effort
-frontend interlocks from server-enforced guarantees. Do not claim robust
-multiuser approval until those boundaries are actually validated.
+The pinned, temporary model-free Runtime was probed using three deterministic
+graphs and disposable Threads. Four discovery scenarios established:
+
+- A successful resume Run can leave a second persisted graph interrupt; Run
+  status `success` alone does not establish graph END.
+- A duplicate resume after graph END was accepted by the pinned Runtime and
+  increased the Run count from two to three. No deduplication can be assumed.
+- Two simultaneous `multitask_strategy=reject` attempts yielded one accepted
+  Run and one HTTP 409 in the observed schedule; reject is not atomic CAS.
+- When a real POST committed but its response was hidden, the client saw an
+  error; independent readback revealed the server-side Run. Never retry POST
+  automatically after an ambiguous transport failure.
+
+2.4E-A adds a pure read-only recovery classifier and 31 scoped assertions:
+correlate only a matching attempt marker, canonical Assistant, Run ancestry,
+Thread and persisted checkpoint. Unknown/missing results, extra Runs, partial
+pagination and new interrupts fail closed; `safeToRetry` is always false.
+
+2.4E-B integrates that classifier into `InterruptPanel`: the deliberate POST
+carries a `masl_resume_attempt_id` metadata marker and is locally interlocked
+before dispatch. After 409, response loss or readback failure, the panel offers
+"Inspect submitted attempt (read only)" using GET operations. Correlated END
+can be confirmed; absent/incomplete evidence cannot enable another POST.
+The three dedicated Chromium recovery tests passed, and the three original
+2.4D Chromium tests passed unchanged. Lint, build, 31 pure tests and clean
+Runtime shutdown were also observed. Discovery runner cleanup now stops the
+Runtime before deleting its temporary workspace.
+
+Deliberate limitations: the marker is correlation metadata, **not** a server
+idempotency key; the in-component interlock does not survive full remount,
+reload, other tabs, browsers or clients. Server-enforced authorization,
+checkpoint-conditional CAS, idempotency/deduplication and durable attempt
+journaling are NOT implemented or proven. A 409 is a conflict observation,
+not a guarantee that a different writer did nothing. The pinned dev Runtime
+uses `auth=noop` and `langgraph-api 0.8.1` is End of Life. This is a
+reproducible lab safety boundary, not production-ready approval infrastructure.
+
+The exact evidence hashes, reproducibility commands and test distinctions are
+recorded in `docs/journal/lab-21-interrupts.md`.
+
+## Current sub-block — 2.4F Interrupts baseline review
+
+Review the combined 2.4A–2.4E contracts, evidence and remaining risk boundaries.
+Do not generalize authorization, cross-client safety, exactly-once execution or
+atomic checkpoint preconditions from this model-free development baseline.
 
 ## Reference environment
 
