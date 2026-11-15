@@ -80,5 +80,83 @@ Evidence log SHA-256 values:
 - 2.5A-C used deterministic, model-free gates. The broader model-dependent
   2.2/2.3 test suites were not included.
 
-**2.5A–2.5C complete within the scoped gates. The parent 2.5 remains open.**
-Next: **2.5D — Streaming and confidentiality boundaries**; then 2.5E baseline review.
+**2.5A–2.5C complete within the scoped gates.** The 2.5D closure and updated
+limitations appear below; the parent milestone remains OPEN for 2.5E.
+
+## 2.5D — Streaming and confidentiality boundaries (scoped completion)
+
+On baseline `f0e9622c803f4890a3a2194610f8d9dfb5210308`, after 2.5A–C had been committed, the existing Agent
+Server decoder was extended to recognize the observed `messages/complete`
+family. The stream projector intentionally ignores this completion event:
+it does **not** replace `values`, imply graph END, create a tool lifecycle
+channel, or establish persisted ThreadState authority. Previously unknown
+families remain unknown; malformed JSON remains non-authoritative.
+
+The generic `MessageList` now uses a separate **display-only projection**:
+- every `ToolMessage` has its raw text/data/name replaced by one explanatory
+  placeholder;
+- non-text message blocks for other roles are masked;
+- ordinary user/assistant/system textual blocks, message identities, counts
+  and order are preserved;
+- raw domain messages and ThreadState remain unchanged.
+
+This is a presentation-level boundary, **not** application-wide DLP or a
+transport/server redaction guarantee. Text free-form output may still echo
+secrets, and payloads still exist in memory/Runtime/other consumers. The
+sanitized 2.5C tool panel still does not authorize or execute tool actions.
+
+### Verified model-free gates
+
+- Oxlint: zero warnings and zero errors.
+- Production TypeScript/Vite build: PASS.
+- Pure display/stream boundary assertions: **33/33 PASS**.
+- Chromium with pinned disposable LangGraph Runtime: **6/6 PASS**, comprising
+  three 2.5D scenarios (persisted `ToolMessage` concealment, injected opaque
+  payload/name concealment while preserving ordinary text, and streamed Run
+  reconciliation) and the original three 2.5C regression scenarios.
+- The first browser attempt failed at a *test locator*, not a confirmed
+  functional failure. The helper's ambiguous strict locator was corrected;
+  the full **6/6 rerun** passed. Only the test file changed in that hotfix.
+- Runtime stopped cleanly before temporary workspace cleanup. No external
+  model calls, repository Git writes or pinned reference changes.
+
+Evidence capture directory: `/tmp/masl-25d-final-wQvNRn17`. The Chromium log is copied from the
+successful post-fix run; the lint/build and 33 pure tests are rerun by the
+2.5D capture helper. Evidence log hashes:
+
+| Gate | SHA-256 |
+|---|---|
+| `build.log` | `9344ad9a5d19f37c9c11d7735bc2c7ecd1f89723690d7bf53e948f4f213d83a6` |
+| `chromium.log` | `f068273b671067087187cea851183438ca3eaa05ee90127699eb2ee915af2305` |
+| `lint.log` | `695f3e38d7794e408fcc663c8ee3ad626b64a968a8acba3a51a372182964c0ac` |
+| `pure-compile.log` | `519da242d4139adf051a7893e76026c1cefe397b5c21723951d41500d7cf7777` |
+| `pure.log` | `2ad066c562889a3d6e7ed93c4460217ac788f47963f5985666bc54f5972bd848` |
+
+Original 2.5D Runtime log: `/tmp/masl-25d-runtime-13440.log` (SHA-256 `64cd1eafbb9196cad13b6a76447b49336512c3486ad2ef038806b69615e122f2`).
+
+Exact eight implementation payload SHA-256 values (including the test-only
+Chromium locator fix):
+
+| Path | SHA-256 |
+|---|---|
+| `apps/web/e2e/tool-boundaries-ui.spec.ts` | `2cd88366ce9ad61ed18b4667f721f8d15a3e6a4905fd8c057591d2a111b0953c` |
+| `apps/web/playwright.tool-boundaries.config.ts` | `3bce00fad61536a550b21903a6b5d8b76331a30bc88f71ab7998d50a00cef06c` |
+| `apps/web/src/components/MessageList.tsx` | `f83675f8bd50cabbe2bb73c97f3787f0bc7349f6279191d12ec0739c8a9af3d3` |
+| `apps/web/src/execution/message-display.spec.ts` | `a5981480b45f823c4c9b5bae6c631afeebede50413d3024d01b04dd6c54ff5cf` |
+| `apps/web/src/execution/message-display.ts` | `780dc6440e6e884de0993581423c69ec7068afb966f72dc45d288e7ae630ef27` |
+| `apps/web/src/execution/stream-projector.ts` | `d54229d3ee2fc22088efce43c3f53680ddd73d2d5cc7dc7bef5eeffb528cbdd7` |
+| `apps/web/src/transport/agent-server/stream-events.ts` | `75d1097358de0fb5d8e464052b250023034243404e8f34d5b8d54d07a211f391` |
+| `scripts/lab-25d-tool-browser.py` | `990cb35f6a3c3dd05cde57623855d365606dbb0f4d26c883aaf8bc1736ca41ac` |
+
+### Scope and deferred guarantees
+
+This checkpoint does not establish server authorization, idempotency,
+checkpoint CAS, external side-effect success, exactly-once tools, multi-client
+locks or a general confidentiality policy. The Runtime is a pinned local dev
+instance (`auth=noop`, `langgraph-api 0.8.1` EOL). Broader model-dependent
+2.2/2.3 end-to-end suites are not included. Historical runners 2.5A/2.5C/2.5D
+retain exact pre-commit guards; executing them after this checkpoint requires
+an explicit new review-compatible replay rather than bypassing their guards.
+
+**2.5D complete within the scoped validation. Parent 2.5 remains OPEN.**
+Next: **2.5E — Frontend tools baseline review** of 2.5A–2.5D.

@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.5D Streaming and confidentiality boundaries
-    -> distinguish Agent Server SSE from tool lifecycle protocol events
-    -> review raw MessageList exposure alongside the sanitized tool panel
-    -> preserve read-only boundaries until further contracts are validated
+2.5E Frontend tools baseline review
+    -> audit 2.5A–2.5D contracts, tests and supporting evidence
+    -> review display-only redaction and persistence boundaries
+    -> close 2.5 only after an explicit scoped review gate
 ~~~
 
 ## Completed
@@ -2424,12 +2424,33 @@ stream-event family by the frontend. Neither a `ToolMessage` nor END proves
 external side-effect success, authorization, or exactly-once tool execution.
 See `docs/journal/lab-22-frontend-tools.md` for reproducibility and evidence.
 
-## Current sub-block — 2.5D Streaming and confidentiality boundaries
+## Completed sub-block — 2.5D Streaming and confidentiality boundaries
 
-Assess what the pinned Agent Server actually emits and what the general
-`MessageList` shows. Keep raw payloads and tool actions out of the sanitized
-panel, and do not infer `tool-started`/`tool-finished` from message records.
-The parent 2.5 milestone remains open pending the 2.5D/2.5E reviews.
+The pinned Agent Server `messages/complete` SSE event is explicitly decoded,
+but does not change live message projection or claim persisted authority. It
+must not be conflated with a separate `tools` execution-lifecycle stream.
+
+The generic `MessageList` now consumes a display-only projection. It conceals
+all `ToolMessage` content and names, and conceals non-text message blocks while
+retaining ordinary user/assistant/system text and message order. The raw
+Runtime messages and ThreadState are not mutated. This is not general data
+loss prevention: a model may echo secrets in free-form text, and transport,
+local memory, logs and other consumers are outside this rendering boundary.
+
+The 2.5D model-free validation passed Oxlint, TypeScript/Vite build, 33 pure
+assertions and 6 Chromium scenarios (3 new confidentiality/streaming scenarios
+plus all 3 existing 2.5C regression scenarios). The first Chromium attempt
+revealed an ambiguous Playwright helper locator; a test-only fix was applied
+and the full 6/6 rerun passed. `scripts/lab-25d-tool-browser.py` leaves
+tracked files and the pinned workshop unchanged. The exact hashes and scoped
+evidence are recorded in `docs/journal/lab-22-frontend-tools.md`.
+
+## Current sub-block — 2.5E Frontend tools baseline review
+
+Audit 2.5A–2.5D together, with explicit evidence, regression checks and
+remaining trust boundaries. Do not assert production-grade confidentiality,
+authorization, atomicity or idempotency from this model-free local Runtime.
+The parent 2.5 milestone stays OPEN until 2.5E completes its own review.
 
 ## Reference environment
 

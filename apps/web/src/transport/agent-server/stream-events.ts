@@ -9,6 +9,7 @@ export type KnownAgentServerStreamEvent =
   | 'updates'
   | 'messages/metadata'
   | 'messages/partial'
+  | 'messages/complete'
 
 const knownEvents:
 ReadonlySet<string> =
@@ -19,6 +20,7 @@ ReadonlySet<string> =
     'updates',
     'messages/metadata',
     'messages/partial',
+    'messages/complete',
   ])
 
 const isKnownAgentServerStreamEvent = (

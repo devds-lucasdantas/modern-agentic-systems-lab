@@ -186,6 +186,15 @@ export const projectStreamEvent = (
      *
      * None of those currently changes semantic live projection.
      */
+    /*
+     * The pinned Agent Server emitted messages/complete for ToolNode Runs.
+     * A complete message is NOT a full state snapshot, an authoritative
+     * persisted ToolMessage, or a tools-lifecycle event. Do not promote
+     * its payload into the provisional message projection.
+     */
+    case 'messages/complete':
+      return current
+
     case 'updates':
     case 'messages/metadata':
     case 'metadata':

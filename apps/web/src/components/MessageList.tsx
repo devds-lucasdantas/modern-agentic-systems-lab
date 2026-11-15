@@ -1,35 +1,18 @@
-import type {
-  Message,
-  MessageContentBlock,
-} from '../domain'
+import type { Message } from '../domain'
+import { projectMessagesForDisplay } from '../execution/message-display'
 
-const blockText = (
-  block: MessageContentBlock,
-): string => {
-  if (block.kind === 'text') {
-    return block.text
-  }
-
-  try {
-    return JSON.stringify(
-      block.data,
-      null,
-      2,
-    )
-  } catch {
-    return String(
-      block.data,
-    )
-  }
-}
-
+/**
+ * Display boundary only: tool contents and structured blocks are withheld.
+ * Human/model-authored plain text is NOT automatically secret-free.
+ */
 export function MessageList({
   messages,
 }: {
-  readonly messages:
-    readonly Message[]
+  readonly messages: readonly Message[]
 }) {
-  if (messages.length === 0) {
+  const display = projectMessagesForDisplay(messages)
+
+  if (display.length === 0) {
     return (
       <div className="message-empty">
         No persisted messages in this Thread.
@@ -39,42 +22,24 @@ export function MessageList({
 
   return (
     <div className="message-list">
-      {messages.map(
-        (message, index) => (
-          <article
-            className="message"
-            data-role={message.role}
-            key={
-              message.id ??
-              `${message.role}-${index}`
-            }
-          >
-            <header>
-              <strong>
-                {message.role}
-              </strong>
-
-              {message.name !== null && (
-                <span>
-                  {message.name}
-                </span>
-              )}
-            </header>
-
-            <div className="message-content">
-              {message.content.map(
-                (block, blockIndex) => (
-                  <pre
-                    key={blockIndex}
-                  >
-                    {blockText(block)}
-                  </pre>
-                ),
-              )}
-            </div>
-          </article>
-        ),
-      )}
+      {display.map((message, index) => (
+        <article
+          className="message"
+          data-role={message.role}
+          key={message.id ?? `${message.role}-${index}`}
+        >
+          <header>
+            <strong>{message.role}</strong>
+          </header>
+          <div className="message-content">
+            {message.blocks.map((block, blockIndex) => (
+              <pre key={blockIndex} data-content-redacted={block.redacted ? 'true' : 'false'}>
+                {block.text}
+              </pre>
+            ))}
+          </div>
+        </article>
+      ))}
     </div>
   )
 }
