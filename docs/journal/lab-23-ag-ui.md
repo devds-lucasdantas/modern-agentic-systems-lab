@@ -130,3 +130,73 @@ side-effect safety, multi-client coordination or application-wide DLP.
 **2.6B PASSED its scoped evidence gate. Parent 2.6 remains OPEN.**
 Next: **2.6C — AG-UI streaming and lifecycle contract discovery**, using
 pinned source contracts before considering an adapter.
+
+## 2.6C — AG-UI HTTP/SSE and explicit lifecycle (scoped completion)
+
+On MASL baseline `b363c24f2163d3ceebad44004074ad2c790841e9`, the isolated, model-free 2.6C review verified
+HTTP POST/SSE framing, JSON `type` discriminators independent of SSE `event:`
+fields, explicit RUN_STARTED/RUN_FINISHED/RUN_ERROR control, sequential runs,
+late RUN_ERROR, truncated EOF, and basic explicit message/tool/step triads.
+Run finish `outcome` values (implicit success, success, interrupt, cancelled)
+were **reported but not recursively schema-validated**. Tests also exercised
+the existing generic Agent Server SSE parser *solely for byte framing*; this
+did not convert it into an AG-UI transport or authorize reuse of Agent Server
+semantic event names.
+
+### Pinned specification and verified tests
+
+- Official AG-UI 1.0 schema commit: `2330368a2a74573902858867072406638ba3073d`.
+- Schema Git blob: `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`; SHA-256: `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`.
+- Six normative specification files pinned by blob SHA (see table below).
+- **60/60** pure HTTP/SSE and lifecycle assertions: PASS.
+- Oxlint, TypeScript/Vite production build and SSR test compilation: PASS.
+- Exact reviewed HEAD and `origin/main`: `b363c24f2163d3ceebad44004074ad2c790841e9`; pinned LangGraph
+  reference: `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+- No changes to tracked sources during review, no AG-UI adapter, HTTP Runtime,
+  model calls, Tool Run POST or external side effects.
+
+Evidence directory (outside Git): `~/masl-evidence/masl-26c-agui-b363c24`
+(original WSL location `/home/delta/masl-evidence/masl-26c-agui-b363c24`). Logs and reports are SHA-256 pinned:
+
+| Artifact | SHA-256 |
+|---|---|
+| `review.json` | `b98e0681037e3067e7a5e516205b47a986bbab8b6bd95f2dd10d2fe5ee601c2c` |
+| `review.md` | `d9044aa6073b5ed9e4ee7a4258f1e891a95fc68065dfb93196c8de85e8888cad` |
+| `lint.log` | `0221a48fbd2d5313032f7469861ac6b75adcf88631bce94685817e8b9d3ec493` |
+| `build.log` | `85877c286dd1b89b81d5bfa40b57def79bc2e30698baa3cbf74953c7043f9e06` |
+| `compile.log` | `498b1a0b7b340951ab3dac1d7cac90b9e0a29ca32636a6e7b154bd31a19f8493` |
+| `pure.log` | `636665170a1d2e66ab9bc236eebbd47fa529d3382a59a2db2d49e414dcc8eaf9` |
+
+Reviewed 2.6C implementation/test payload hashes:
+
+| Source | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/stream-boundary.ts` | `c9b4dbfc8f4bb44ebca95d5a44a6520d260276239899c614211e68bbc8e34db2` |
+| `apps/web/src/ag-ui/stream-boundary.spec.ts` | `080d7398fcddf37bd9542a476d1118d1ede5911a794320a8fc832f67e0c6d2e3` |
+| `scripts/lab-26c-stream-review.py` | `a9e437f50e3d3279d45f0633739cb237ab569350588fe65cbda2cd26566acf42` |
+
+Pinned normative prose document Git blobs (same AG-UI upstream commit):
+
+| Source | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/transports/http-sse.mdx` | `993b465d9e6a849fa3a616eb599c16671fccafcb` |
+| `docs/spec/1.0/basic/transports/index.mdx` | `99734a94fe3a570d645d30fb07d4a550a80c217e` |
+| `docs/spec/1.0/events/lifecycle.mdx` | `20c1adf5b98da77349c10f5218b1c80be91448e5` |
+| `docs/spec/1.0/basic/patterns/streaming.mdx` | `f0c2c4c2a30b473c446cfc3ddd91945dfe171a3d` |
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/versioning.mdx` | `860f82956864d5fcf29cb7d1e2993e315f03ff59` |
+
+### Explicit limitations and next block
+
+This is **partial contract review**, not a production AG-UI consumer or full
+protocol conformance. The 2.6C checker does not expand `*_CHUNK`, implement
+subagent streams, validate all nested JSON Schema shapes/outcomes, perform
+unknown-field enforcement/stripping, carry out actual HTTP network exchange,
+map Agent Server SSE to AG-UI, or establish authorization, tool execution,
+state persistence, idempotency, exactly-once or multi-client safety. The
+current Agent Server REST/SSE frontend stays unchanged. AG-UI HTTP/SSE does
+not use `Last-Event-ID` as a protocol resumption guarantee, and a broken Run
+without a terminal event is **truncated**, never synthesized as successful.
+
+**2.6C PASSED the scoped review; parent 2.6 remains OPEN.** Next:
+**2.6D — AG-UI chunk expansion and consumer enforcement boundaries**.

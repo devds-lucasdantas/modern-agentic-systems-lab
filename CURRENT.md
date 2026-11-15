@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6C AG-UI streaming and lifecycle contract discovery
-    -> inspect pinned AG-UI event framing, lifecycle and stream ordering
-    -> distinguish normative guarantees from local trace diagnostics
-    -> preserve the Agent Server REST/SSE frontend; no speculative adapter
+2.6D AG-UI chunk expansion and consumer enforcement boundaries
+    -> expand streaming chunks before verification without inventing identities
+    -> distinguish unknown additions, invalid known fields and incomplete streams
+    -> preserve Agent Server REST/SSE until an independent adapter is reviewed
 ~~~
 
 ## Completed
@@ -2495,12 +2495,30 @@ There is no Agent Server SSE adapter, frontend wiring, Run/Tool execution,
 model use or production authorization guarantee. The current Agent Server
 REST/SSE application remains unchanged. See `docs/journal/lab-23-ag-ui.md`.
 
-## Current sub-block — 2.6C AG-UI streaming and lifecycle contract discovery
+## Completed sub-block — 2.6C AG-UI streaming and lifecycle contract discovery
 
-Next examine the pinned AG-UI 1.0 transport and event ordering contracts, then
-separately design testable integration boundaries. Do not promote Agent Server
-SSE records into AG-UI run/tool events or treat local trace diagnostics as
-protocol conformance. Parent 2.6 stays OPEN.
+The isolated 2.6C checker exercised AG-UI HTTP POST/SSE framing using the
+existing generic SSE parser solely as a byte-framing utility, not as an AG-UI
+adapter. The model-free review passed lint, production TypeScript/Vite build,
+SSR test compilation and 60 pure assertions. It checked explicit run/step,
+message and tool-call boundaries, sequential replayed runs, late RUN_ERROR,
+truncation versus termination, and reported success/interrupt/cancelled outcomes.
+The pinned AG-UI 1.0 schema and six normative prose document blob IDs were
+recorded in the review. Evidence and individual hashes are in
+`docs/journal/lab-23-ag-ui.md`.
+
+This is a **scoped checker**, not a complete AG-UI consumer or conformance
+claim. CHUNK expansion, subagent lifecycle, nested schema enforcement,
+unknown-extension stripping, tool authorization, Runtime integration and
+actual HTTP exchange remain unverified. The existing Agent Server frontend
+and its REST/SSE transport have not been changed.
+
+## Current sub-block — 2.6D AG-UI chunk expansion and consumer enforcement boundaries
+
+Next implement a separately testable AG-UI consumer-side compatibility and
+validation boundary for `*_CHUNK`, known malformed values versus unknown
+additions, and order-of-processing. Keep the pinned Agent Server transport
+operational; do not assume its SSE events are AG-UI events. Parent 2.6 OPEN.
 
 ## Reference environment
 
