@@ -645,3 +645,90 @@ not changed. The independent evidence demands above remain unmet.
 Next proposed review: **2.6I AG-UI independent conformance evidence and adapter decision gates** — independently verify the first
 executable contracts and explicit adapter decision gates before any
 production or milestone-closeout claim.
+
+## 2.6I — Independent strict schema oracle and adapter decision gates (scoped completion)
+
+On published baseline `6d31049241736aad0724872511e053e9161f50ac`, 2.6I executed **40 selected fixtures**
+against the exact official AG-UI 1.0 Draft 2020-12 JSON Schema with an
+independent Python `jsonschema==4.25.1` validation engine. All **40/40**
+strict-schema decisions matched the fixture expectations. This is
+**selected executable schema evidence**, not complete AG-UI 1.0 protocol
+or compatibility conformance, and no standard was amended.
+
+### Frozen inputs and scope
+
+- MASL baseline `6d31049241736aad0724872511e053e9161f50ac`; pinned workshop `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+- Official AG-UI upstream `2330368a2a74573902858867072406638ba3073d`; schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`
+  and Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`.
+- `python-jsonschema` 4.25.1 ran in a separate process using a wrapper
+  in an isolated external virtual environment. The runner pin remains
+  unmodified; the wrapper avoids `Path.resolve()` escaping its virtualenv.
+- The 40 fixture objects were exported from the TypeScript test bundle
+  and independently evaluated against actual frozen schema bytes.
+- This verifies **raw strict JSON Schema acceptance/rejection only**.
+  In particular, a future `PartSource.type` rejected by the schema does
+  not settle G1: `processing.mdx` and `run-input.mdx` retain incompatible
+  compatibility guidance; no normative ruling was obtained.
+- The `contentEncoding: base64` schema annotation does not prove byte
+  decoding, URL safety, media rendering or provider-handle validity.
+- The suite does **not** cover all 31 event branches or all 98 `$defs`,
+  nor operational middleware, replay, reconnect, protobuf or security.
+
+### WSL audit: physical evidence and scope boundaries
+
+- Original audit directory outside Git:
+  `~/masl-evidence/masl-26i-agui-6d31049-20261115T205152Z`.
+- **175/175** TypeScript pure assertions PASS and all four local web
+  gates PASS: lint, production build, SSR compile, pure execution.
+- Independent Python Draft 2020-12 schema oracle: **40/40** fixtures PASS.
+- The eight artifacts below were produced by the original WSL run;
+  this finalizer rehashes them, inspects the report and fixtures, and
+  does **not** rerun the oracle or a production runtime.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `7be12f4e643cbaee2401c57c57fd19040842bd2f9e142dfde79a8d855b07e9e4` |
+| `review.md` | `7d68d578662a16c07f1ee69c7afc70a46662232b34ef0e3c277e8484ef7e5ffe` |
+| `lint.log` | `87e14ae1c508b68d2d6254e8cd66d58dfec3ac02e969cb459965a3b6ca5cc8fb` |
+| `build.log` | `1a9b228922f028b2f191f54cb40d42ef5232c4f1cb1b2466f169af2818a42bd2` |
+| `compile.log` | `2b99213b7faee2de97d70542a153f88f41395e3f34ffd1099b0bf1af1a5832f3` |
+| `pure.log` | `a9d4ce3a483ece3070d5e5539a575f5257420b345bcd01a4e0180a641b5bf7c8` |
+| `schema-oracle.log` | `90b48138770af307e63ca60769d54d39a2858e985192a9483b93b758befc9802` |
+| `fixtures.json` | `95ec6129e2c290d0779bd6d6c5cc27d92b3efc689bac35082ebff9fd3a74292d` |
+
+| 2.6I source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/independent-evidence.ts` | `9156483fc7dff287a80bc82155f3d49250f2ac6484cca983287c90beeb482d26` |
+| `apps/web/src/ag-ui/independent-evidence.spec.ts` | `bd7c518d0f9213bbfa330a24e3910ae95a8ea2a85bd56cd2cbc3d4379c6a59c5` |
+| `scripts/lab-26i-independent-review.py` | `89e2004f00feb96bdc0b45896a7321b8273f802b9315b54399c22acd6aa34b3a` |
+
+Source-reviewed official AG-UI 1.0 prose pins:
+
+| Upstream document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/run-input.mdx` | `96dabc92854f8bffa423450edff54f83585c4cbf` |
+| `docs/spec/1.0/basic/versioning.mdx` | `860f82956864d5fcf29cb7d1e2993e315f03ff59` |
+| `docs/spec/1.0/basic/transports/http-sse.mdx` | `993b465d9e6a849fa3a616eb599c16671fccafcb` |
+
+### Gap disposition and next gate
+
+| Area | 2.6I result | Remaining requirement |
+|---|---|---|
+| G1 | Strict schema examples only | Upstream authoritative `PartSource` ruling |
+| G3 | Selected 40 fixtures independently verified | Complete recursive 31-event / 98-definition coverage |
+| G5 | No pipeline executable | Integration-grade ordered middleware/enforcement/expansion/verification tests |
+| G9 | Adapter not implemented, not ready | Separate mapping ADR and independently gated Agent Server E2E |
+| G7/G8 | Not independently reviewed | Security/media and durable/concurrent state review |
+| Other G2/G4/G6 | Unchanged OPEN | Registry, transport equivalence and versioning/downgrade evidence |
+
+G1–G9 remain **OPEN**; the Agent Server → AG-UI adapter remains
+**BLOCKED**, and parent milestone **2.6 AG-UI remains OPEN**. The
+existing Agent Server REST/SSE frontend and pinned workshop reference
+were unchanged. No network run, model, tool, transport bridge,
+independent security assessment or deployment was performed.
+
+**2.6I selected oracle PASS; G1–G9 OPEN, adapter BLOCKED, parent 2.6 OPEN.**
+Next proposed sub-block: **2.6J AG-UI executable pipeline and transport boundary evidence** — develop scoped executable
+pipeline/transport evidence with negative cases, not an operational
+adapter or milestone closure by assertion.

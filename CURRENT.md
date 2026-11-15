@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6I AG-UI independent conformance evidence and adapter decision gates
-    -> validate independently selected executable AG-UI contracts and gap evidence
-    -> require protocol, security and adapter decision gates before integration
-    -> preserve REST/SSE frontend; leave parent 2.6 and G1-G9 OPEN
+2.6J AG-UI executable pipeline and transport boundary evidence
+    -> build selected executable stage/transport evidence with negative cases
+    -> keep security, normative and adapter dependencies explicitly BLOCKED
+    -> preserve the Agent Server frontend; G1-G9 and parent 2.6 remain OPEN
 ~~~
 
 ## Completed
@@ -2600,12 +2600,28 @@ not independently verified artifacts. Adapter readiness is **BLOCKED**;
 no real adapter, network transport, Runtime/model/tool actions, independent
 security review, or production integration was tested. Parent 2.6 stays OPEN.
 
-## Current sub-block — 2.6I AG-UI independent conformance evidence and adapter decision gates
+## Completed sub-block — 2.6I AG-UI independent conformance evidence and adapter decision gates
 
-Prioritize independently reproducible evidence for G1/G3/G5/G9 decision
-gates, while documenting G7/G8 security prerequisites and other open gaps.
-Do not integrate Agent Server or close the parent milestone without verified
-cross-boundary contracts and separate review approvals.
+Against published baseline `6d31049241736aad0724872511e053e9161f50ac`, an independent Python
+`jsonschema==4.25.1` Draft 2020-12 validator checked **40/40 selected strict
+schema fixtures**, in addition to **175/175** model-free TypeScript assertions
+and four local WSL gates (lint, build, SSR compilation, pure execution).
+All eight original evidence files are pinned with SHA-256 in Lab 23:
+`~/masl-evidence/masl-26i-agui-6d31049-20261115T205152Z`.
+
+This is **selected raw JSON Schema evidence**, not 31-event/98-definition
+coverage or AG-UI semantic conformance. G1 `PartSource` remains normatively
+unresolved: strict schema rejection alone does not settle processing policy.
+G1–G9 are **OPEN**, adapter readiness is **BLOCKED**, and parent 2.6
+remains **OPEN**. There was no middleware/Agent Server integration, security
+sign-off, actual transport, model/tool call or operational deployment.
+
+## Current sub-block — 2.6J AG-UI executable pipeline and transport boundary evidence
+
+Develop independently runnable, scoped processing-stage and JSON/SSE boundary
+evidence with negative cases, while maintaining all G1–G9 decision gates.
+Do not connect the Agent Server frontend or declare protocol/adapter readiness
+without separate conformance, interoperability and security review.
 
 ## Reference environment
 
