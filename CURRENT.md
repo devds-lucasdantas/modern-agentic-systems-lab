@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6L AG-UI authorization and durable replay contract evidence
-    -> define and verify selected authenticated-principal vs declared-ID boundaries
-    -> specify durable checkpoint/replay contracts and fail-closed cases
-    -> keep G1-G9/2.6 OPEN; no operational adapter without separate review
+2.6M AG-UI trusted identity and transactional replay boundary design
+    -> specify trusted principal and thread ACL injection at a server-owned boundary
+    -> design transactional checkpoint/CAS, receipt integrity and race experiments
+    -> retain G1-G9/2.6 OPEN and adapter BLOCKED pending independent evidence
 ~~~
 
 ## Completed
@@ -2646,13 +2646,26 @@ transport replay/Last-Event-ID, authorization, persistent checkpoints, CAS,
 security sign-off and Agent Server bridge were not implemented or verified.
 G1–G9 **OPEN**; adapter **BLOCKED**; parent 2.6 **OPEN**.
 
-## Current sub-block — 2.6L AG-UI authorization and durable replay contract evidence
+## Completed sub-block — 2.6L AG-UI authorization and durable replay contract evidence
 
-Develop bounded, independently executable authorization and durable replay
-contract experiments with explicit negative cases and untrusted identifiers.
-Keep the existing Agent Server frontend isolated; no transport integration,
-security or production-readiness claims without external authentication and
-persistence evidence, normative decisions and independent review.
+On published baseline `cc12712dea7ac92d121137a8f781419cdb32b531`, **394/394** pure assertions, 13/13 critical
+contract cases and four WSL gates PASS. The 2.6L test combines a synthetic
+server-context/ACL decision with the published 2.6K recovery review and a pure
+checkpoint revision/CAS *proposal*. Exact source and six evidence SHA-256 hashes
+are preserved in Lab 23: `~/masl-evidence/masl-26l-agui-cc12712-20261115T232741Z`.
+
+Neither the context nor the checkpoint projection is authenticated. No durable
+storage, transactional CAS, computed commitment hash, external ACL, HTTP
+resume, Agent Server bridge or real security verification occurred. G1–G9
+remain **OPEN**, adapter **BLOCKED**, parent milestone 2.6 **OPEN**.
+
+## Current sub-block — 2.6M AG-UI trusted identity and transactional replay boundary design
+
+Prepare an isolated design and reproducible experiment for a trusted identity
+boundary and transactional replay store; require negative cross-client race,
+credential/ACL, idempotency and integrity evidence before proposing integration.
+Do not modify the existing Agent Server frontend, announce protocol conformance,
+or close G1–G9 or 2.6 by assertion.
 
 ## Reference environment
 

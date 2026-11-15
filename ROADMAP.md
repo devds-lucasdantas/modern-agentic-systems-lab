@@ -149,7 +149,8 @@
   - [x] 2.6I AG-UI independent conformance evidence and adapter decision gates
   - [x] 2.6J AG-UI executable pipeline and transport boundary evidence
   - [x] 2.6K AG-UI replay, failure recovery and adapter security gates
-  - [ ] 2.6L AG-UI authorization and durable replay contract evidence
+  - [x] 2.6L AG-UI authorization and durable replay contract evidence
+  - [ ] 2.6M AG-UI trusted identity and transactional replay boundary design
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

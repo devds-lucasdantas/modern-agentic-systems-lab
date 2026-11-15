@@ -893,3 +893,75 @@ it cannot authorize the Agent Server → AG-UI adapter or production deployment.
 Next proposed: **2.6L AG-UI authorization and durable replay contract evidence** — verify scoped authorization and
 persistence/replay contract requirements, with negative evidence and separate
 review gates, before considering a real adapter.
+
+## 2.6L — Synthetic authorization and durable replay contract evidence (scoped completion)
+
+On published 2.6K baseline `cc12712dea7ac92d121137a8f781419cdb32b531`, the local isolated verifier composes
+2.6L planning decisions with the existing 2.6K recovery contract. In the WSL
+original run, **394/394** pure TypeScript assertions and four gates (lint,
+production build, SSR compile, pure execution) PASS. **13/13** critical test
+markers were present. This is deliberately **synthetic contract evidence**:
+no authenticated user, database, transport resumption or real transaction.
+
+### Selected executable review and explicit limits
+
+- A **synthetic test context**, not a verified identity, declares principal ID,
+  tenant ID, thread allow-list and policy epoch. User-declared tenant references,
+  unexpected privilege fields and forbidden threads are rejected by the local
+  reviewer; this is **not** an external ACL lookup, authentication, tenant
+  isolation proof, or production authorization decision.
+- Each synthetic replay intent is checked against the already published 2.6K
+  pure recovery contract before a checkpoint plan can be returned. Incomplete
+  attempts, unsupported partial resume and mismatched run identities fail
+  closed. The 2.6K review remains volatile, selected, non-operational.
+- In-memory checkpoint **projections** contain tenant/epoch/revision and
+  receipt metadata. Duplicate keys, changed principal, changed declared
+  commitments and stale revisions are negative tests. Commit and replay-check
+  return *proposals*, not persisted effects. A caller-supplied 64-hex
+  commitment is structurally checked but **not calculated or verified** from
+  event bytes, so it is not trustworthy cryptographic evidence.
+- Two independent planners can both propose the same next revision against
+  an identical snapshot. Only a truly transactional backend with CAS and
+  an authenticated reload can arbitrate that race. **Neither CAS atomicity nor
+  idempotency across processes is implemented or proven here.**
+- All-or-nothing applies solely to a **pure return value**; no database,
+  application sink, actual HTTP request, token exchange, secrets, media/DLP
+  handling, multi-client deployment, Agent Server bridge, runtime/model/tool
+  invocation or independent security sign-off occurred.
+- Open dependencies: G1 unknown `PartSource` interpretation remains unresolved;
+  G3 full recursive schema, G5 compatibility/middleware, G7 media/security,
+  G8 durable shared state and G9 adapter interoperability remain unverified.
+  The parent 2.6 milestone and **all G1–G9 remain OPEN**. Adapter **BLOCKED**.
+
+### Original WSL audit evidence (outside Git)
+
+- Passed WSL audit: `~/masl-evidence/masl-26l-agui-cc12712-20261115T232741Z`. The finalizer verifies
+  the physical six-file SHA-256 and metadata; it **does not rerun the audit**.
+- Frozen upstream `2330368a2a74573902858867072406638ba3073d`, AG-UI 1.0 schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`, and reference workshop `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+- There were no 2.6L post-install code patches: the source and runner hashes
+  below are the original pinned package payload hashes, verified in the WSL.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `764c7faf1d1bcb5449145b401d4e854d4ac936c4bb80635db1684d4988daf621` |
+| `review.md` | `60bb76458e9f835fad98a89ad129ffb028dcd5f8c2158e11e5f7fa890758891f` |
+| `lint.log` | `bb4711b9e654f68d54172e1603721659a5ccab06a8dd8e8804e04eeb32744221` |
+| `build.log` | `1fe9cf5d891666e89a9e940c5597f8a1ca2252c006c753fe7eded97f1c78f4ae` |
+| `compile.log` | `ee4a6973f2196130b170ed27f44530539c0a51af888c27d0c569090fddbadcc4` |
+| `pure.log` | `52bf6a4d4c18d0c5e4d57d7fb859a3a603052d12dfdf70adc582f6ce3febbdcb` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/authorized-durable-replay.ts` | `55456eeea1d3919aafca051f31af799c3db4321761fca4a046cfc132ca7f28be` |
+| `apps/web/src/ag-ui/authorized-durable-replay.spec.ts` | `01eeeee752cac2dd2abb132dc93cbfa21b55a34496016202492ceb908ce30466` |
+| `scripts/lab-26l-authorized-replay-review.py` | `33ba710f417b86e2fc3bfd9baae1c623994256af86a1c3772b640ad3ba36e6b1` |
+
+### Remaining decisions and next scope
+
+**2.6L selected synthetic contracts PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+This sub-block does not grant authorization, production, persistence or AG-UI
+protocol-conformance readiness. Next proposed: **2.6M AG-UI trusted identity and transactional replay boundary design** — plan
+an isolated, independently verified trusted identity source and transactional
+checkpoint boundary while retaining the existing Agent Server frontend and
+normative/security blockers until separately resolved.
