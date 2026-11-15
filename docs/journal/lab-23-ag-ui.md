@@ -200,3 +200,73 @@ without a terminal event is **truncated**, never synthesized as successful.
 
 **2.6C PASSED the scoped review; parent 2.6 remains OPEN.** Next:
 **2.6D — AG-UI chunk expansion and consumer enforcement boundaries**.
+
+## 2.6D — Chunk expansion and top-level enforcement (scoped completion)
+
+On exact MASL baseline `aafea9da50c8b062b2f349aeb22489d24aa65575`, the model-free 2.6D review checked the
+canonical consumer processing boundary of the pinned official AG-UI 1.0
+specification. The isolated `chunk-enforcement.ts` recognizes and expands
+`TEXT_MESSAGE_CHUNK`, `TOOL_CALL_CHUNK`, `REASONING_MESSAGE_CHUNK` into explicit
+open/content/close event sequences; reviews lane ownership, identifiers and
+conflicting repeats; and distinguishes unknown protocol additions from known
+malformed fields. It rejects selected verified explicit lifecycle violations
+without returning a partial accepted stream. It never imports the module into
+the existing Agent Server frontend or creates Runs, tool calls or model traffic.
+
+### Review evidence and provenance
+
+- **123/123** pure checks, lint, production build, and SSR test compilation: PASS.
+- Official AG-UI commit: `2330368a2a74573902858867072406638ba3073d`, schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`, schema
+  SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`; 31 normative event variants.
+- Nine published baseline Git blobs and pinned LangGraph reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`
+  unchanged. Source tree remained clean apart from exactly three untracked 2.6D
+  payloads during review.
+- Evidence retained outside Git in `~/masl-evidence/masl-26d-agui-aafea9d`
+  (WSL path: `/home/delta/masl-evidence/masl-26d-agui-aafea9d`). Report hashes were recorded during the passing run.
+
+| Evidence | SHA-256 |
+|---|---|
+| `review.json` | `12f3cc43c95bc6e360f4c7a6e3ee0c5aede60978498a6c1af13e8a0f12681f1a` |
+| `review.md` | `103e2ade8f4bbcb26aa52bdbbb9c2dd73cd00b2633b76783c1ddd8114047f787` |
+| `lint.log` | `0b913046bc397a598d2deed2c53228f38ddffcfc8471518fe2729b75d60b965d` |
+| `build.log` | `3be8e935d84ff221d62d64e743a1c751c1dcc4aa30f839eafef7f515428af65c` |
+| `compile.log` | `c7e0aefe07a40a8fdfd4096c99767db3396bf45fd1ee438091fa665cfd9f1c03` |
+| `pure.log` | `187c916dbd32ca6dc24dbbb2a5c16f11692a47410685eb51b11815b11a318e5f` |
+
+Final source/test/reviewer payload SHA-256 values:
+
+| File | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/chunk-enforcement.ts` | `7e5050c9c4483228e4895fd221f3762be419b7a3ac7c627c6d044c52c75fab67` |
+| `apps/web/src/ag-ui/chunk-enforcement.spec.ts` | `d28233167f075b4a68ffc05868655ac3680d034823bb942f8bd88a013f403718` |
+| `scripts/lab-26d-chunk-review.py` | `67762c56fab39501035f3ee508de94a089743ed16dfaab7bbb61ed26d2c8e3c8` |
+
+Normative upstream AG-UI 1.0 prose, pinned at the same commit:
+
+| Source | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/patterns/streaming.mdx` | `f0c2c4c2a30b473c446cfc3ddd91945dfe171a3d` |
+| `docs/spec/1.0/events/text-messages.mdx` | `28a917958cf102d5aff63b586a4f82e31696ca9c` |
+| `docs/spec/1.0/events/tool-calls.mdx` | `62e550f96bcc7699edf62cbb9bd4fc194c49044e` |
+| `docs/spec/1.0/events/reasoning.mdx` | `c43eb098993ee633a1447e2079347efa1e38dfec` |
+| `docs/spec/1.0/events/subagents.mdx` | `eafcbcc93d11c7bcc1ea5e5ee16cea3e24056a3a` |
+| `docs/spec/1.0/events/lifecycle.mdx` | `20c1adf5b98da77349c10f5218b1c80be91448e5` |
+
+### Boundaries not established
+
+The checker implements **top-level envelope enforcement only**, not full
+recursive JSON Schema compliance. It does not completely enforce subagent
+lifecycle or attribution, recursively validate `RunAgentInput`, outcomes,
+ContentPart/media, or apply RFC 6902 JSON Patch and application state. Its
+canonical ordering is scoped: there is no generic middleware, compatibility
+or downgrade pipeline. Passing synthetic events do not establish auth,
+persistence, real tool execution, side effects, idempotency, exactly-once,
+multi-client locks or application-wide DLP. No AG-UI adapter, HTTP exchange,
+model call, runtime integration or frontend import was made. The existing
+Agent Server REST/SSE implementation remains untouched. There is no
+unverified conversion from Agent Server `messages/complete` to AG-UI tool
+lifecycle, and truncation is never presented as successful completion.
+
+**2.6D PASSED the scoped evidence gate; parent 2.6 remains OPEN.** Next:
+**2.6E — AG-UI nested schemas, state and subagent lifecycle discovery**.

@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6D AG-UI chunk expansion and consumer enforcement boundaries
-    -> expand streaming chunks before verification without inventing identities
-    -> distinguish unknown additions, invalid known fields and incomplete streams
-    -> preserve Agent Server REST/SSE until an independent adapter is reviewed
+2.6E AG-UI nested schemas, state and subagent lifecycle discovery
+    -> discover recursive input, output, state and subagent constraints in pinned 1.0
+    -> distinguish structural verification from state mutation and actual tool effects
+    -> retain independent read-only validation; no Agent Server integration
 ~~~
 
 ## Completed
@@ -2513,12 +2513,31 @@ unknown-extension stripping, tool authorization, Runtime integration and
 actual HTTP exchange remain unverified. The existing Agent Server frontend
 and its REST/SSE transport have not been changed.
 
-## Current sub-block — 2.6D AG-UI chunk expansion and consumer enforcement boundaries
+## Completed sub-block — 2.6D AG-UI chunk expansion and consumer enforcement boundaries
 
-Next implement a separately testable AG-UI consumer-side compatibility and
-validation boundary for `*_CHUNK`, known malformed values versus unknown
-additions, and order-of-processing. Keep the pinned Agent Server transport
-operational; do not assume its SSE events are AG-UI events. Parent 2.6 OPEN.
+On reviewed baseline `aafea9d`, 2.6D added isolated, read-only chunk expansion
+and top-level consumer-enforcement checks for the pinned AG-UI 1.0 contracts.
+The four review gates passed: lint, production TypeScript/Vite build, test
+compilation and **123/123 pure assertions**. Three `*_CHUNK` families were
+expanded into explicit events, with lane and identifier checks. The review
+also distinguished unknown extensions from malformed known fields, and
+rejected selected verified lifecycle violations without returning partial
+validated output. Evidence and exact hashes are recorded in
+`docs/journal/lab-23-ag-ui.md`.
+
+**Scope limitation:** this is not complete AG-UI schema conformance or an
+application-connected consumer. Nested JSON Schema definitions, outcome and
+ContentPart structures, state/JSON Patch application, full subagent lifecycle,
+and a generic middleware/downgrade chain remain unverified. No HTTP Run,
+model call, tool action, Agent Server adapter or frontend integration occurred.
+The existing Agent Server REST/SSE frontend and the 2.5 baseline are intact.
+
+## Current sub-block — 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
+
+Discover and test remaining nested structural, state and subagent boundaries
+separately against the pinned official schema and prose. Do not turn any
+synthetic sequence into proof of Runtime authorization, durable state or tool
+side effects. The parent 2.6 AG-UI milestone remains OPEN.
 
 ## Reference environment
 
