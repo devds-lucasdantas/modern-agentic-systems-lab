@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6B Typed AG-UI event grammar and validation
-    -> validate pinned AG-UI 1.0 event structures and discriminated unions
-    -> test identity, ordering and lifecycle constraints without inventing Runtime semantics
-    -> keep Agent Server REST/SSE and the 2.5 baseline unchanged
+2.6C AG-UI streaming and lifecycle contract discovery
+    -> inspect pinned AG-UI event framing, lifecycle and stream ordering
+    -> distinguish normative guarantees from local trace diagnostics
+    -> preserve the Agent Server REST/SSE frontend; no speculative adapter
 ~~~
 
 ## Completed
@@ -2478,12 +2478,29 @@ The discovery compares Agent Server SSE with AG-UI as **different protocols**:
 No adapter, AG-UI runtime, model call or new Run was created. The previous
 Agent Server REST/SSE frontend is unchanged. See `docs/journal/lab-23-ag-ui.md`.
 
-## Current sub-block — 2.6B Typed AG-UI event grammar and validation
+## Completed sub-block — 2.6B Typed AG-UI event grammar and validation
 
-Next, derive a separate version-pinned, read-only AG-UI validator with negative
-cases for malformed events, identity conflicts and lifecycle ordering. Do not
-install an adapter or convert Agent Server SSE into AG-UI before independent
-contract and regression gates exist. Parent milestone 2.6 remains OPEN.
+`scripts/lab-26b-grammar-review.py` verified an isolated, typed AG-UI 1.0
+envelope checker against the frozen upstream JSON Schema. The manifest covers
+all 31 event variants, required and optional property names, primary field
+kinds, BaseEvent composition and subagent attribution. The scoped review passed
+184 pure grammar/trace assertions, lint, TypeScript/Vite production build and
+SSR test compilation. The corrected `SUBAGENT_FINISHED.result` is optional,
+but must not be null when present.
+
+Trace sequencing diagnostics are **local review policy**, not normative AG-UI
+lifecycle validation. Recursive message/media structures, all JSON Patch
+constraints, nested outcomes and RunAgentInput are not fully validated.
+There is no Agent Server SSE adapter, frontend wiring, Run/Tool execution,
+model use or production authorization guarantee. The current Agent Server
+REST/SSE application remains unchanged. See `docs/journal/lab-23-ag-ui.md`.
+
+## Current sub-block — 2.6C AG-UI streaming and lifecycle contract discovery
+
+Next examine the pinned AG-UI 1.0 transport and event ordering contracts, then
+separately design testable integration boundaries. Do not promote Agent Server
+SSE records into AG-UI run/tool events or treat local trace diagnostics as
+protocol conformance. Parent 2.6 stays OPEN.
 
 ## Reference environment
 

@@ -69,3 +69,64 @@ or adapters were used. Historical 2.5A logs were **not** revalidated in 2.6A.
 **2.6A PASSED its scoped evidence gate. Parent 2.6 remains OPEN.**
 Next: **2.6B — Typed AG-UI event grammar and validation**, pinned to the
 same upstream schema, with negative tests and no automatic protocol translation.
+
+## 2.6B — Typed AG-UI 1.0 envelope grammar (scoped completion)
+
+On baseline `140fdfbb25f14d1305bf51a7c1b990723ed5045f`, an isolated read-only TypeScript checker and a
+separate local trace diagnostic suite were reviewed using the pinned official
+AG-UI 1.0 Draft 2020-12 schema at upstream commit `2330368a2a74573902858867072406638ba3073d`.
+The exact upstream Git blob was `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`).
+
+The structural manifest matches all **31/31** discriminator variants, their
+required fields, property names and primary field kinds, BaseEvent composition
+and subagent attribution. The only initial discovery mismatch was fixed before
+this passing run: `SUBAGENT_FINISHED.result` may be omitted, but must not be
+`null` if present. The source and reviewer were held untracked until this
+review completed; prior 2.6A sources were left untouched.
+
+### Verified gates
+
+- Oxlint: PASS.
+- Production TypeScript/Vite build: PASS.
+- Grammar test SSR compilation: PASS.
+- **184/184** pure envelope/trace assertions: PASS.
+- Frozen AG-UI schema SHA-256, Git blob, and exact 31-event field manifest: PASS.
+- Tracked worktree unchanged during review. No Runtime, model calls or Agent
+  Server adapter were used.
+
+The evidence is retained outside the repository under
+`~/masl-evidence/masl-26b-agui-140fdfb` (original WSL location `/home/delta/masl-evidence/masl-26b-agui-140fdfb`).
+The original report and four gate logs are independently hash-pinned:
+
+| Evidence | SHA-256 |
+|---|---|
+| `review.json` | `aab979dbe6e8fa9d8faf6429fe9362b278d912fb3500a6d9e9f4dff31e9a17b7` |
+| `review.md` | `ba522e4699bdc09d6d68ffbfd4e723947dac354ab4c7c164cec418ac71a31758` |
+| `lint.log` | `e7c1e79ef6e35c90265e7911ae9c1632f94d26030aec838bf410b0c33825df72` |
+| `build.log` | `9f64e8dcd78889004af40e765bc214d8f5d378a640a46c3ffdf2de31d9f154e8` |
+| `compile.log` | `fc07768201bb61f83c40b584affada58068efd9dd42005808743bf81566d15a9` |
+| `pure.log` | `d793e6edd5b05255f7df135ab92a32b953b2a8b29b06b357b0df3531f42e86de` |
+
+Final implementation and test payload SHA-256 values:
+
+| Source | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/event-grammar.ts` | `987b8e64e87d8b551ae80e6d085d4c30a6d781f7f7ae7a08a25c8211e2147ff3` |
+| `apps/web/src/ag-ui/event-grammar.spec.ts` | `45fdc034dee8199fb2b2bc3c91d3ee5592d778ce36050a57d522941726ad3450` |
+| `scripts/lab-26b-grammar-review.py` | `8c0b449e602e1242c5b415dc761a5dee1ecbdde6cab78928d580a5662397ec08` |
+
+### Boundaries that remain unproven
+
+This is **envelope** validation, not full JSON Schema conformance. Recursive
+message and media structures, JSON Patch application, nested outcome variants
+and RunAgentInput are not fully validated by the TypeScript checker. The local
+single-run sequence diagnostics are *not normative AG-UI ordering rules* and
+cannot prove tool execution, external effects, persistence or graph END.
+No Agent Server SSE-to-AG-UI translation was created. Existing Agent Server
+REST/SSE components and message-redaction policy remained untouched. No claims
+are made about production authorization, idempotency, exactly-once execution,
+side-effect safety, multi-client coordination or application-wide DLP.
+
+**2.6B PASSED its scoped evidence gate. Parent 2.6 remains OPEN.**
+Next: **2.6C — AG-UI streaming and lifecycle contract discovery**, using
+pinned source contracts before considering an adapter.
