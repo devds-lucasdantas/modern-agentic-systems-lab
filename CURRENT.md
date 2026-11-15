@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.5E Frontend tools baseline review
-    -> audit 2.5A–2.5D contracts, tests and supporting evidence
-    -> review display-only redaction and persistence boundaries
-    -> close 2.5 only after an explicit scoped review gate
+2.6 AG-UI
+    -> inventory the actual AG-UI and Agent Server interoperability boundary
+    -> verify transport, event grammar, lifecycle, persistence and authorization assumptions
+    -> design an incremental, version-pinned integration before implementation
 ~~~
 
 ## Completed
@@ -2445,12 +2445,30 @@ and the full 6/6 rerun passed. `scripts/lab-25d-tool-browser.py` leaves
 tracked files and the pinned workshop unchanged. The exact hashes and scoped
 evidence are recorded in `docs/journal/lab-22-frontend-tools.md`.
 
-## Current sub-block — 2.5E Frontend tools baseline review
+## Completed sub-block — 2.5E Frontend tools baseline review
 
-Audit 2.5A–2.5D together, with explicit evidence, regression checks and
-remaining trust boundaries. Do not assert production-grade confidentiality,
-authorization, atomicity or idempotency from this model-free local Runtime.
-The parent 2.5 milestone stays OPEN until 2.5E completes its own review.
+The 2.5E nine-gate review passed at the exact published 2.5D HEAD
+`8747c78832a74064e1abdf96aa3b8e99bef6a313`: Oxlint, TypeScript/Vite,
+42 pure tool-projection assertions, 33 display/stream-boundary assertions,
+2.5A structural observation correlation and 6 pinned Runtime Chromium tests.
+The synthetic ToolNode 2.5A experiment was reproduced with its original
+tracked graph and a reviewed-HEAD-only guard replacement **in memory**;
+original ephemeral `/tmp` logs were unavailable and were not verified.
+The reproducible review report and its nine log hashes are recorded in Lab 22.
+
+**2.5 Frontend tools is complete only within this audited, model-free scope.**
+ToolMessage correlation is not an authorization, exactly-once or external-effect
+guarantee. The display-only redaction is not application-wide DLP; free-form
+text and other data consumers remain outside it. The pinned development Runtime
+uses `auth=noop` and an EOL Agent Server version. The broader model-dependent
+2.2/2.3 suites and multi-client safety were not rerun in the 2.5E audit.
+
+## Current sub-block — 2.6 AG-UI
+
+Begin with protocol/version discovery and a contract inventory. Do not infer
+that the pinned Agent Server `messages/complete` event is an AG-UI tool lifecycle
+event. Keep the current Agent Server REST/SSE frontend operational until a
+separately validated adapter and regression plan is available.
 
 ## Reference environment
 

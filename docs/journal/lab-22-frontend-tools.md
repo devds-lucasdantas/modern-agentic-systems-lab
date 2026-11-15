@@ -158,5 +158,65 @@ instance (`auth=noop`, `langgraph-api 0.8.1` EOL). Broader model-dependent
 retain exact pre-commit guards; executing them after this checkpoint requires
 an explicit new review-compatible replay rather than bypassing their guards.
 
-**2.5D complete within the scoped validation. Parent 2.5 remains OPEN.**
-Next: **2.5E — Frontend tools baseline review** of 2.5A–2.5D.
+**2.5D complete within the scoped validation.** The 2.5E closure below
+supersedes the earlier OPEN status of the parent milestone.
+
+## 2.5E — Frontend tools baseline review (scoped closure)
+
+The nine-gate review on **Git HEAD `8747c78832a74064e1abdf96aa3b8e99bef6a313`** passed. It reran Oxlint and
+the TypeScript/Vite production build, **42** pure tool-projection assertions,
+**33** display/stream-boundary assertions, cross-checking a reproduced 2.5A
+observation, and **6** Chromium cases against the pinned deterministic ToolNode
+Runtime (3 original 2.5C cases and 3 additional 2.5D cases). There were no
+model calls or repository writes during the review. The 2.5E auditor was the
+only untracked file. The independent review reported a clean postflight.
+
+### Evidence and provenance
+
+- Review JSON: `/tmp/masl-25e-review-1saqiw7b/review.json` (SHA-256 `4a067eccb0e8ccdd8e5c8ed2fe0f28b50536f4d33c482cc14acbd90648fe11f9`).
+- Review Markdown: `/tmp/masl-25e-review-1saqiw7b/review.md` (SHA-256 `3f6ca9a05c709dd74db1a06d4df1911eeae8e7b09d836bc122586e46926381e6`).
+- Reviewed auditor: `scripts/lab-25e-review.py` (SHA-256 `4e791890c7726a59b44d2aa5132d0a480172e49c62f340fb437cf6eb37e4676e`).
+- 2.5A historical JSON and Runtime log were **missing**, not restored,
+  verified or assigned fabricated hashes. Historical reference values remain
+  `ce9446be9408f694f5d8b1bb5fa3fd2d1408280e849f1136d03c386315b08a0c` (JSON) and `940a67eb13550448dd282d3960523debd1b73837f9b43aa7abdf7d7cb0c03910` (Runtime log).
+- 2.5A was reproduced from the **tracked original source** with only its old
+  worktree preflight replaced **in memory** to match the reviewed HEAD. The
+  synthetic `AIMessage` called a real `ToolNode`; one ToolMessage correlated
+  at graph END, with ten SSE records and no external model calls.
+- Reproduction manifest: `/tmp/masl-25e-25a-replay-18230.json`
+  (SHA-256 `4e97bdccb986808078929fd8927272082e098c4be26047d067fb6ca7c9bd993e`). Reproduced observation SHA-256 `a73ccdde2416d244641eac891f9ab367626930f2976f71b65158862e7d9d10e5`;
+  reproduced Runtime log SHA-256 `555cc5ca4592a2bf099a08014d26144e07010be22d432640860a9a9d77102766`.
+- 2.5E Runtime log: `/tmp/masl-25e-runtime-18947.log` (SHA-256 `e5759398f6f2f06ec09a85e11f5c27bf641d062c51f1b0727a020f23eef6f0b0`).
+
+| Gate | Result | SHA-256 of evidence log |
+|---|---|---|
+| 2.5 lint | PASS | `7034c1c853feadf78de02a705aab5e138bb1bc5a15c4f37f37b10a961744dfa1` |
+| 2.5 production build | PASS | `e0d40d1caf45952106e0cf600b982191e2a11793c923cc23828a2b92e61427d4` |
+| 2.5B pure compilation | PASS | `280dd9e109dbd4a74e57a3570f19f06b3f256937f362ff9c3e9b157ef8e308d5` |
+| 2.5B 42 pure assertions | PASS | `ffa2a9c3ee46f6fac2a80f65bc09e8e0a91dbfb6a403e6fbe44802aca201850c` |
+| 2.5D pure compilation | PASS | `cf51de2028c22667ccee5042eecf107e57c1c3b759da9e660b632be97151d16e` |
+| 2.5D 33 pure assertions | PASS | `d7ef30d8c0d3346eaf55149bdbefaac7c864659c74c4771001a597319b1b5c5c` |
+| 2.5B projector compilation | PASS | `2e69faa208fba568e0a26d0c93d9dc4c3a7436561a765fada04977014bc5d382` |
+| 2.5A observation cross-check | PASS | `cd58df4dbb0c580f85e530266cfac09aa491ed8c65f635287aebf69b10120d0a` |
+| 2.5C and 2.5D Chromium | PASS | `01aba59f98e667df15a1fc79262ddcf1a4226c7fa460fc4de853e991fc0bdbbd` |
+
+These machine-local `/tmp` evidence paths are ephemeral; the hashes and
+review method are retained here, but the original logs are **not** embedded
+in the repository. Historical 2.5A source guards remain unchanged.
+
+### Scope retained after closure
+
+- Tool calls were synthetic and model-free; correlated messages do not prove
+  external side effects, user authorization, idempotency or exactly-once tools.
+- The generic MessageList now conceals ToolMessages and structured blocks at
+  **display time only**; raw state, transport and arbitrary free-form text are
+  not application-wide DLP.
+- `messages/complete` was observed as Agent Server SSE and is not an AG-UI
+  tool lifecycle event, graph END, or authoritative persisted state.
+- The pinned dev Runtime uses `auth=noop` and `langgraph-api 0.8.1` EOL.
+  Server-side CAS, multi-client locks and production authorization were not
+  established. The model-dependent 2.2/2.3 full suites were not rerun.
+
+**2.5A–2.5E passed their explicitly scoped gates; the parent 2.5 Frontend
+tools milestone is CLOSED within those boundaries.** Next: **2.6 AG-UI**,
+starting with pinned protocol and integration-boundary discovery.
