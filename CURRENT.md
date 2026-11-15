@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6 AG-UI
-    -> inventory the actual AG-UI and Agent Server interoperability boundary
-    -> verify transport, event grammar, lifecycle, persistence and authorization assumptions
-    -> design an incremental, version-pinned integration before implementation
+2.6B Typed AG-UI event grammar and validation
+    -> validate pinned AG-UI 1.0 event structures and discriminated unions
+    -> test identity, ordering and lifecycle constraints without inventing Runtime semantics
+    -> keep Agent Server REST/SSE and the 2.5 baseline unchanged
 ~~~
 
 ## Completed
@@ -2463,12 +2463,27 @@ text and other data consumers remain outside it. The pinned development Runtime
 uses `auth=noop` and an EOL Agent Server version. The broader model-dependent
 2.2/2.3 suites and multi-client safety were not rerun in the 2.5E audit.
 
-## Current sub-block — 2.6 AG-UI
+## Completed sub-block — 2.6A Pinned AG-UI 1.0 contract discovery
 
-Begin with protocol/version discovery and a contract inventory. Do not infer
-that the pinned Agent Server `messages/complete` event is an AG-UI tool lifecycle
-event. Keep the current Agent Server REST/SSE frontend operational until a
-separately validated adapter and regression plan is available.
+The official AG-UI 1.0 JSON Schema was fetched at upstream commit
+`2330368a2a74573902858867072406638ba3073d` and checked against the
+pinned Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`.
+The schema contains 31 event discriminators across 8 inventoried families;
+all 31 event-union references and selected required fields were verified.
+The evidence is preserved outside the repository under `~/masl-evidence/`.
+
+The discovery compares Agent Server SSE with AG-UI as **different protocols**:
+`messages/complete` is not `TOOL_CALL_END`, node `updates` are not JSON Patch
+`STATE_DELTA`, and persisted ToolMessages do not prove tool execution lifecycle.
+No adapter, AG-UI runtime, model call or new Run was created. The previous
+Agent Server REST/SSE frontend is unchanged. See `docs/journal/lab-23-ag-ui.md`.
+
+## Current sub-block — 2.6B Typed AG-UI event grammar and validation
+
+Next, derive a separate version-pinned, read-only AG-UI validator with negative
+cases for malformed events, identity conflicts and lifecycle ordering. Do not
+install an adapter or convert Agent Server SSE into AG-UI before independent
+contract and regression gates exist. Parent milestone 2.6 remains OPEN.
 
 ## Reference environment
 

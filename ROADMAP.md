@@ -138,6 +138,8 @@
   - [x] 2.5D Streaming and confidentiality boundaries
   - [x] 2.5E Frontend tools baseline review
 - [ ] 2.6 AG-UI
+  - [x] 2.6A Pinned AG-UI 1.0 contract and boundary discovery
+  - [ ] 2.6B Typed AG-UI event grammar and validation
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE
