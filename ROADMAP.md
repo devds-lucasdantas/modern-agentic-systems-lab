@@ -147,7 +147,8 @@
   - [x] 2.6G AG-UI compatibility, processing and remaining conformance-gap review
   - [x] 2.6H AG-UI normative gap decisions and adapter-readiness review
   - [x] 2.6I AG-UI independent conformance evidence and adapter decision gates
-  - [ ] 2.6J AG-UI executable pipeline and transport boundary evidence
+  - [x] 2.6J AG-UI executable pipeline and transport boundary evidence
+  - [ ] 2.6K AG-UI replay, failure recovery and adapter security gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

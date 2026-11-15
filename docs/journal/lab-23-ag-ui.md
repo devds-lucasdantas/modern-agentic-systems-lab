@@ -732,3 +732,85 @@ independent security assessment or deployment was performed.
 Next proposed sub-block: **2.6J AG-UI executable pipeline and transport boundary evidence** — develop scoped executable
 pipeline/transport evidence with negative cases, not an operational
 adapter or milestone closure by assertion.
+
+## 2.6J — Executable pipeline and JSON/SSE transport boundary (scoped completion)
+
+On published 2.6I baseline `46cc13b7bf4a76203e3a670297ade6b032a50240`, the selected model-free test composed
+JSON/SSE UTF-8 byte framing with the existing 2.6D envelope enforcement and
+chunk expansion plus 2.6C lifecycle review. **121/121** pure assertions and
+four WSL gates passed (lint, production build, SSR compilation, pure execution).
+This is a local pure pipeline, **not** an HTTP transport, Agent Server adapter,
+recursive AG-UI conformance validator or operational frontend connection.
+
+### Executable scope and negative evidence
+
+- Selected HTTP POST/JSON + SSE response header checks use synthetic metadata,
+  with **no real HTTP request**, authorization, networking or resumption.
+- Input arrives as UTF-8 byte chunks; JSON/SSE framing covers fragmentation,
+  multi-`data:` lines, CRLF, comments, ignored SSE event/id/retry fields,
+  bounded sizes and event counts, and deliberately rejects truncated frames.
+- Compatibility is **identity**. Middleware is **read-only observation**;
+  no retired-shape registry, arbitrary middleware or value-repair code exists.
+- Actual code imports 2.6D `enforceAndExpandAgUiStream` and delegates lifecycle
+  checks to 2.6C. The lab tests selected `TEXT_MESSAGE_CHUNK` expansion,
+  dropping unknown events, stripping unknown properties and fatal known fields.
+- Application exposure is a pure all-or-nothing **return value**, never an
+  application callback or real sink. No half-accepted batch is published.
+- Malformed JSON/UTF-8, open/unclosed event frames, illegal HTTP headers,
+  lifecycle violations, post-terminal data, open connections and terminal-free
+  runs are tested against the scoped policy.
+- The selected consumer may accept a late `RUN_ERROR` as a terminal failure;
+  this is **not** a successful execution. Other unreviewed lifecycle warnings
+  remain warnings: an accepted selected batch is **not** full conformance.
+- No end-to-end replay, reconnection, protobuf/multiple bindings, media access,
+  confidentiality/DLP, persistent state, multi-client isolation, model/tools,
+  real Agent Server transport or security sign-off was performed.
+
+### Original WSL audit and corrected runner pin
+
+- Original audit: `~/masl-evidence/masl-26j-agui-46cc13b-20261115T222923Z` (outside Git).
+- **121/121** selected pure assertions, four WSL gates PASS, nine critical
+  test labels present. The initial auditor falsely blocked on a reversed
+  label string; the one-line correction changes **only** the runner's required
+  label, not TypeScript source or the pure test output. The corrected SHA-256
+  is recorded below and required by this finalizer.
+- Frozen upstream AG-UI commit `2330368a2a74573902858867072406638ba3073d`; schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`; schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`; 31 event branches.
+- Pinned workshop HEAD `3d3287cf1e51250934c11aff182d90ccfaf0e66d` (local changes retained).
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `d0e0cf2e1e6777c6293f52cb4443f02bd1fafc81f9ea73deb620b3c5a7dbbd99` |
+| `review.md` | `acab9f36d83146582353d330c9feab4bd5cedc2dace16a324278d572dca0ca0f` |
+| `lint.log` | `9616b6f759371ad3d78101a6e389d3cb380c007973f7e13d3c0330b48621d265` |
+| `build.log` | `cb7f3757b079c2c6baeabe4402e11ff4a5e95c09f8873e6788dd14f2a7604bbc` |
+| `compile.log` | `8fddd12b327d5b23d30ed19c3e90e2bc6d1bfa3ca863dc98c8b21e16fdbac21b` |
+| `pure.log` | `ab3b4ec16d197feef11d533484c42dbb1a3199cdd884ac45d962243248f01fe3` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/pipeline-transport.ts` | `6236eec1d191b0c6b6b531a54593b7e9047f5780e43918877e49b78595c4a296` |
+| `apps/web/src/ag-ui/pipeline-transport.spec.ts` | `85a06c11194c0f5b055d5ec5e6004c10951a4424f5de83a31f4a4893097a3618` |
+| `scripts/lab-26j-pipeline-review.py` | `cb05fab602809d3f6cd91b33033e575234e16498eaa47c9c51795c1a397e5671` |
+
+Previously source-reviewed upstream normative Git blobs:
+
+| Upstream document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/transports/http-sse.mdx` | `993b465d9e6a849fa3a616eb599c16671fccafcb` |
+| `docs/spec/1.0/events/lifecycle.mdx` | `20c1adf5b98da77349c10f5218b1c80be91448e5` |
+
+### Remaining gaps and next laboratory
+
+G1–G9 remain **OPEN**. In particular, G1 unknown `PartSource` is normatively
+unresolved; G3 lacks complete recursive schema coverage; G5 lacks a full
+compatibility/middleware implementation and independent operational replay;
+G7/G8 require independent media/security/state validation; G9 requires a
+separate Agent Server adapter ADR, semantics mapping and e2e authorization.
+The selected executable pipeline cannot close any of these gates by itself.
+
+**2.6J selected pipeline PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+Next proposed sub-block: **2.6K AG-UI replay, failure recovery and adapter security gates** — explore scoped replay,
+failure/recovery decisions and remaining adapter-security prerequisites,
+without changing the existing REST/SSE frontend or authorizing production.

@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6J AG-UI executable pipeline and transport boundary evidence
-    -> build selected executable stage/transport evidence with negative cases
-    -> keep security, normative and adapter dependencies explicitly BLOCKED
-    -> preserve the Agent Server frontend; G1-G9 and parent 2.6 remain OPEN
+2.6K AG-UI replay, failure recovery and adapter security gates
+    -> review selected replay/truncation/reconnection failure contracts
+    -> preserve G1-G9 OPEN and require independent G7/G8 security evidence
+    -> no Agent Server adapter or production claims without separate gates
 ~~~
 
 ## Completed
@@ -2616,12 +2616,27 @@ G1–G9 are **OPEN**, adapter readiness is **BLOCKED**, and parent 2.6
 remains **OPEN**. There was no middleware/Agent Server integration, security
 sign-off, actual transport, model/tool call or operational deployment.
 
-## Current sub-block — 2.6J AG-UI executable pipeline and transport boundary evidence
+## Completed sub-block — 2.6J AG-UI executable pipeline and transport boundary evidence
 
-Develop independently runnable, scoped processing-stage and JSON/SSE boundary
-evidence with negative cases, while maintaining all G1–G9 decision gates.
-Do not connect the Agent Server frontend or declare protocol/adapter readiness
-without separate conformance, interoperability and security review.
+On published baseline `46cc13b7bf4a76203e3a670297ade6b032a50240`, the selected executable local pipeline
+composed UTF-8 JSON/SSE framing with the pre-existing 2.6D enforcement/chunk
+expansion and 2.6C lifecycle review. **121/121** model-free pure assertions
+and all four WSL gates (lint, build, SSR compile, pure execution) PASS.
+The corrected single-label runner and all six original audit hashes are pinned
+in Lab 23: `~/masl-evidence/masl-26j-agui-46cc13b-20261115T222923Z`.
+
+These tests are neither an operational HTTP/Agent Server transport nor full
+AG-UI recursive conformance, generic middleware, security sign-off or replay
+proof. Compatibility is identity; middleware is observational; the application
+boundary returns a pure batch only after selected verification. G1–G9 remain
+**OPEN**, the adapter is **BLOCKED**, and parent milestone 2.6 remains **OPEN**.
+
+## Current sub-block — 2.6K AG-UI replay, failure recovery and adapter security gates
+
+Review selected replay, truncated-stream handling and failure recovery
+boundaries, explicitly documenting security and adapter dependencies. Do not
+connect the existing Agent Server REST/SSE frontend or claim full protocol,
+security, persistence or production readiness from selected synthetic cases.
 
 ## Reference environment
 
