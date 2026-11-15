@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6K AG-UI replay, failure recovery and adapter security gates
-    -> review selected replay/truncation/reconnection failure contracts
-    -> preserve G1-G9 OPEN and require independent G7/G8 security evidence
-    -> no Agent Server adapter or production claims without separate gates
+2.6L AG-UI authorization and durable replay contract evidence
+    -> define and verify selected authenticated-principal vs declared-ID boundaries
+    -> specify durable checkpoint/replay contracts and fail-closed cases
+    -> keep G1-G9/2.6 OPEN; no operational adapter without separate review
 ~~~
 
 ## Completed
@@ -2631,12 +2631,28 @@ proof. Compatibility is identity; middleware is observational; the application
 boundary returns a pure batch only after selected verification. G1–G9 remain
 **OPEN**, the adapter is **BLOCKED**, and parent milestone 2.6 remains **OPEN**.
 
-## Current sub-block — 2.6K AG-UI replay, failure recovery and adapter security gates
+## Completed sub-block — 2.6K AG-UI replay, failure recovery and adapter security gates
 
-Review selected replay, truncated-stream handling and failure recovery
-boundaries, explicitly documenting security and adapter dependencies. Do not
-connect the existing Agent Server REST/SSE frontend or claim full protocol,
-security, persistence or production readiness from selected synthetic cases.
+Against published baseline `6a3d89c1b87b9024f2205209650f5f0d5a5d395a`, **248/248** selected pure assertions,
+ten critical tests and four WSL gates PASS. The isolated 2.6K reuses the
+published 2.6J pipeline for incomplete observations, full restarts, duplicate
+suppression and fail-closed conflicts. The corrected test/runner hashes and
+all six original audit hashes are pinned in Lab 23:
+`~/masl-evidence/masl-26k-agui-6a3d89c-20261115T230412Z`.
+
+This is **volatile in-call evidence** only: declared tenant references are not
+authenticated, local comparisons are not durable idempotency, and partial
+transport replay/Last-Event-ID, authorization, persistent checkpoints, CAS,
+security sign-off and Agent Server bridge were not implemented or verified.
+G1–G9 **OPEN**; adapter **BLOCKED**; parent 2.6 **OPEN**.
+
+## Current sub-block — 2.6L AG-UI authorization and durable replay contract evidence
+
+Develop bounded, independently executable authorization and durable replay
+contract experiments with explicit negative cases and untrusted identifiers.
+Keep the existing Agent Server frontend isolated; no transport integration,
+security or production-readiness claims without external authentication and
+persistence evidence, normative decisions and independent review.
 
 ## Reference environment
 

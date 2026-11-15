@@ -814,3 +814,82 @@ The selected executable pipeline cannot close any of these gates by itself.
 Next proposed sub-block: **2.6K AG-UI replay, failure recovery and adapter security gates** — explore scoped replay,
 failure/recovery decisions and remaining adapter-security prerequisites,
 without changing the existing REST/SSE frontend or authorizing production.
+
+## 2.6K — Selected volatile replay/failure-recovery and adapter security gates (scoped completion)
+
+Against published 2.6J baseline `6a3d89c1b87b9024f2205209650f5f0d5a5d395a`, the selected no-network
+in-call replay/recovery review composes the published 2.6J JSON/SSE pipeline.
+**248/248** pure TypeScript assertions and four WSL gates (lint, production
+build, SSR compile and pure execution) PASS; ten critical labels were present.
+This is **volatile, selected test evidence**. It is not a resumable HTTP
+transport, authenticated adapter, persistent idempotency or a security audit.
+
+### What was executed and what remains unproven
+
+- Bounded synthetic attempts declare tenant/thread/run/attempt identifiers,
+  contiguous ordinals and exactly one complete success per selected run.
+  These references are **untrusted strings**, not authenticated principals.
+- An aborted, incomplete observation is discarded and can be followed by
+  a complete **full restart** in the same declared scope. There is **no
+  partial resume** or use of `Last-Event-ID` as a trusted resume credential.
+- Locally identical batches are suppressed by an **in-call JSON-string
+  equality sentinel**, not a cryptographic fingerprint, durable checkpoint,
+  distributed deduplication key or cross-process idempotency store.
+- In-call conflicts, duplicated attempt IDs, skipped ordinals, late
+  `RUN_ERROR`, malformed known data, cross-declared-tenant collisions and
+  unreviewed selected lifecycle cases are negative tests. The test refusing
+  a late `RUN_ERROR` was corrected to expect the **actual blocking code**
+  `not-single-successful-run`, without changing `replay-recovery.ts`.
+- The review returns identifiers only on a successful **pure atomic batch**;
+  neither event bytes nor a real application callback/sink are released.
+  This does not prove any atomic database transaction or actual delivery.
+- G1–G9, the parent 2.6 milestone and Agent Server adapter still require
+  independent normative/conformance decisions, authenticated authorization,
+  tenant isolation, durable checkpoints/CAS and a separate security review.
+  G7/G8/G9 remain **OPEN**: no DLP, media, persistence or deployment proof.
+- Existing workshop files, real Agent Server REST/SSE frontend, Runtime,
+  tools/models, network and production integrations were not modified or run.
+
+### Original WSL audit (outside Git) and corrected payload pins
+
+- Passed audit: `~/masl-evidence/masl-26k-agui-6a3d89c-20261115T230412Z`. The failed earlier
+  attempt is not a passing artifact. This finalizer verifies the physical
+  six-file evidence hashes and audit metadata rather than rerunning tests.
+- The earlier test expected `unreviewed-selected-lifecycle`, while the
+  published pipeline produced `not-single-successful-run`. The correction
+  updates **only** that test expectation and its SHA constant in the runner.
+  The original `replay-recovery.ts` bytes remain unchanged.
+- Pinned AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`; 31 event variants. Workshop pin `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `a7d2b9c995666dd8b353bc4784f846098262eb30cef7cb3c19af95fa3699d872` |
+| `review.md` | `c788c7f7d8362e01c590cdc65d6035cde8d3571dd8cc6479206cca2543a39d03` |
+| `lint.log` | `d0da49794c2b78a31a123487b0f32bfb145935a360559d4bc78a1aeb278c57a0` |
+| `build.log` | `1a9b228922f028b2f191f54cb40d42ef5232c4f1cb1b2466f169af2818a42bd2` |
+| `compile.log` | `d8b7084e1b537a1719ac45af5c29d978b48c5877e2e9d926f7a180d72f615b18` |
+| `pure.log` | `0d4480d12bb3d64aa91e25ace4bed3878ed8c61f8ca7b5e3c81004a895731c5c` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/replay-recovery.ts` | `2e85493df530076637902da6d242bf1e10601f5a4e5985c45e725e1e2f677c39` |
+| `apps/web/src/ag-ui/replay-recovery.spec.ts` | `6e9cdb81eeef2b465779b001dec89f13e2193426c6d35fad414cf62538b64734` |
+| `scripts/lab-26k-recovery-review.py` | `bb6f2f1bc795d744b4f98fc0d074bde909d00a5f404b6e7f58297d6520b824c7` |
+
+Previously source-reviewed official AG-UI prose Git blobs:
+
+| Upstream document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/transports/http-sse.mdx` | `993b465d9e6a849fa3a616eb599c16671fccafcb` |
+| `docs/spec/1.0/events/lifecycle.mdx` | `20c1adf5b98da77349c10f5218b1c80be91448e5` |
+
+### Remaining gates and next sub-block
+
+**2.6K selected replay/recovery PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The result documents selected local behavior and security prerequisites;
+it cannot authorize the Agent Server → AG-UI adapter or production deployment.
+Next proposed: **2.6L AG-UI authorization and durable replay contract evidence** — verify scoped authorization and
+persistence/replay contract requirements, with negative evidence and separate
+review gates, before considering a real adapter.

@@ -148,7 +148,8 @@
   - [x] 2.6H AG-UI normative gap decisions and adapter-readiness review
   - [x] 2.6I AG-UI independent conformance evidence and adapter decision gates
   - [x] 2.6J AG-UI executable pipeline and transport boundary evidence
-  - [ ] 2.6K AG-UI replay, failure recovery and adapter security gates
+  - [x] 2.6K AG-UI replay, failure recovery and adapter security gates
+  - [ ] 2.6L AG-UI authorization and durable replay contract evidence
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE
