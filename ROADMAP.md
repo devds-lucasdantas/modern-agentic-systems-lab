@@ -142,7 +142,8 @@
   - [x] 2.6B Typed AG-UI event grammar and validation
   - [x] 2.6C AG-UI streaming and lifecycle contract discovery
   - [x] 2.6D AG-UI chunk expansion and consumer enforcement boundaries
-  - [ ] 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
+  - [x] 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
+  - [ ] 2.6F AG-UI ContentPart/media and ownership boundary discovery
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

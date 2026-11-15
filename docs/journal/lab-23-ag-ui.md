@@ -270,3 +270,99 @@ lifecycle, and truncation is never presented as successful completion.
 
 **2.6D PASSED the scoped evidence gate; parent 2.6 remains OPEN.** Next:
 **2.6E — AG-UI nested schemas, state and subagent lifecycle discovery**.
+
+## 2.6E — Nested schemas, state and subagent lifecycle (scoped completion)
+
+On exact published MASL baseline `f8f6a1a5618c4d9155c16b10e4b3294baa9956a9`, the isolated, model-free
+2.6E checker reviewed **selected** nested AG-UI 1.0 definitions and
+synthetic state/subagent behavior. It neither imported AG-UI into the
+Agent Server frontend nor issued an HTTP Run or tool operation.
+
+### Frozen contract and scope
+
+- Official AG-UI 1.0 upstream commit: `2330368a2a74573902858867072406638ba3073d`.
+- Pinned `spec/1.0/schema.json`: Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`;
+  SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`; 31 event variants across 8 inventoried families.
+- Selected `RunFinishedOutcome`: success, interruption and cancellation,
+  with known-invalid forms rejected and unknown future variants handled
+  conservatively (never assumed to mean success).
+- Selected `SubagentFinishedOutcome`: success and suspension, with
+  structural and execution-identifier constraints in reviewed cases.
+- Selected `RunAgentInput`: required and optional nested fields and
+  malformed combinations. This is not full recursive schema conformance.
+- RFC 6902 JSON Patch: `add`, `remove`, `replace`, `move`, `copy`, `test`;
+  reviewed path/JSON Pointer and allowed-operation structure.
+- `STATE_SNAPSHOT` replaces the complete current synthetic state, rather
+  than merging a partial object. `STATE_DELTA` applies a patch to state.
+- Subagent announcements, nesting, invocation identity, suspension,
+  termination and selected sequence relations. Subagents share the Run
+  state; private, independently isolated state was **not** established.
+
+### JSON Patch failure atomicity and negative cases
+
+The in-memory patch helper distinguishes malformed patch structure,
+well-formed operations whose application fails, and fully applied patches.
+If an operation fails, the preceding complete state must remain intact;
+the checker must not expose partially mutated state. A later complete
+snapshot can recover after a rejected delta. These are synthetic, local
+state semantics, **not** a durability or multi-client transaction proof.
+
+Negative coverage includes malformed nested outcomes/inputs, invalid
+JSON Pointer paths or patch operation shapes, failed `test`/application,
+state-transition errors and selected subagent identity/sequence errors.
+Unknown outcome variants are not silently coerced to success.
+
+### Reviewed implementation and evidence
+
+- **130/130** model-free pure assertions: PASS.
+- Four gates: Oxlint, TypeScript/Vite production build, SSR test compile,
+  pure test execution: PASS. Evidence was produced in WSL and is checked
+  here through the WSL-reproduced artifacts, not a new execution.
+- Nine published baseline Git blobs, three exact new source hashes and
+  pinned workshop commit were checked by the rerun 2.6E reviewer.
+- This closeout uses the **2026-11-15 18:50:57 UTC rerun**, because the
+  first 2.6E audit artifacts reported in the handoff were unavailable.
+  The historical files/hashes were **not reverified** or overwritten.
+- Reproduced evidence directory (outside Git):
+  `~/masl-evidence/masl-26e-agui-f8f6a1a-rerun-20261115T185057Z`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `681173f8180db33a98b5bb4f504df33899ecf5f4b8da829489a5ed7036ca2f5e` |
+| `review.md` | `44196cb2f4d5566bcc665ff4a7879954648c3265742eb2b608656743fa558442` |
+| `lint.log` | `32c9899abf50f2507105b1d9bb9c5343b9229e0c43995073bee5a99a55ccde1e` |
+| `build.log` | `3be8e935d84ff221d62d64e743a1c751c1dcc4aa30f839eafef7f515428af65c` |
+| `compile.log` | `3f9f40ec86b59952ccb900508c0d5ea96ffa97c5f53169cb19be27431b846ef2` |
+| `pure.log` | `1d6906671ac3279f1687d0c3a3c5b92e0f94102efefead5280fe956ca91afea1` |
+
+| 2.6E source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/nested-state.ts` | `e449efcfceddd3eb698947343e6f93cd5660d66c27b6e246000787e809f3f6be` |
+| `apps/web/src/ag-ui/nested-state.spec.ts` | `2217f8defa0311c32bb6c2ba3bd830401ced2b3d53c4b6a293dbbc6f558c4562` |
+| `scripts/lab-26e-nested-review.py` | `cd5a89bd93ecc964ce295f9d931ad38c4c14bfe91f50b6bd355b5be37b2c83de` |
+
+Seven previously source-verified AG-UI 1.0 normative prose pins:
+
+| Pinned upstream source | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/patterns/streaming.mdx` | `f0c2c4c2a30b473c446cfc3ddd91945dfe171a3d` |
+| `docs/spec/1.0/events/text-messages.mdx` | `28a917958cf102d5aff63b586a4f82e31696ca9c` |
+| `docs/spec/1.0/events/tool-calls.mdx` | `62e550f96bcc7699edf62cbb9bd4fc194c49044e` |
+| `docs/spec/1.0/events/reasoning.mdx` | `c43eb098993ee633a1447e2079347efa1e38dfec` |
+| `docs/spec/1.0/events/subagents.mdx` | `eafcbcc93d11c7bcc1ea5e5ee16cea3e24056a3a` |
+| `docs/spec/1.0/events/lifecycle.mdx` | `20c1adf5b98da77349c10f5218b1c80be91448e5` |
+
+### Limits and next boundary
+
+This is **scoped** nested/state/subagent review, not full AG-UI 1.0
+conformance. Full `ContentPart`/multimodal/media recursion, all ownership
+rules, all outcome variants, persistence, authorization, distributed
+transactions, multi-client isolation, exactly-once/idempotency, tool
+execution, external effects, and generic middleware/downgrade behavior
+were not verified. No Agent Server AG-UI adapter or operational transport
+was implemented. The existing REST/SSE frontend remains unchanged.
+
+**2.6E PASSED the scoped evidence gate; parent 2.6 AG-UI remains OPEN.**
+Next proposed review: **2.6F — ContentPart/media and ownership boundary**
+discovery, with negative/extension tests before any transport adapter.

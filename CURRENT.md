@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6E AG-UI nested schemas, state and subagent lifecycle discovery
-    -> discover recursive input, output, state and subagent constraints in pinned 1.0
-    -> distinguish structural verification from state mutation and actual tool effects
-    -> retain independent read-only validation; no Agent Server integration
+2.6F AG-UI ContentPart/media and ownership boundary discovery
+    -> inventory remaining pinned 1.0 content/media and event ownership constraints
+    -> test selected negative and extension cases without claiming full conformance
+    -> keep Agent Server REST/SSE frontend and AG-UI implementations separate
 ~~~
 
 ## Completed
@@ -2532,12 +2532,33 @@ and a generic middleware/downgrade chain remain unverified. No HTTP Run,
 model call, tool action, Agent Server adapter or frontend integration occurred.
 The existing Agent Server REST/SSE frontend and the 2.5 baseline are intact.
 
-## Current sub-block — 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
+## Completed sub-block — 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
 
-Discover and test remaining nested structural, state and subagent boundaries
-separately against the pinned official schema and prose. Do not turn any
-synthetic sequence into proof of Runtime authorization, durable state or tool
-side effects. The parent 2.6 AG-UI milestone remains OPEN.
+Reviewed exact published baseline `f8f6a1a5618c4d9155c16b10e4b3294baa9956a9` with pinned AG-UI 1.0 schema
+(`c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`, SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`) and isolated 2.6E source,
+test and reviewer payloads. **130/130 model-free pure assertions and all four
+gates passed**: lint, production build, SSR compile and pure execution.
+Verified rerun evidence (2026-11-15 18:50:57 UTC):
+`~/masl-evidence/masl-26e-agui-f8f6a1a-rerun-20261115T185057Z`; `review.json`, `review.md` and
+all four logs are SHA-256 pinned in Lab 23. The six historical first-run
+artifacts were unavailable and were not independently reverified.
+
+Selected `RunFinishedOutcome`, `SubagentFinishedOutcome` and `RunAgentInput`
+shapes, six RFC 6902 JSON Patch operations, atomic synthetic patch failure,
+`STATE_SNAPSHOT` replacement versus `STATE_DELTA` application, and selected
+subagent identity/lifecycle checks were audited. Subagents share Run state.
+No full recursive media/schema conformance, durable state, authorization,
+real tools, multi-client isolation, generic downgrade/middleware, operational
+AG-UI transport or Agent Server adapter was established. The existing Agent
+Server frontend and pinned workshop are unchanged. Parent 2.6 remains OPEN.
+
+## Current sub-block — 2.6F AG-UI ContentPart/media and ownership boundary discovery
+
+Review remaining pinned 1.0 `ContentPart`/multimodal/media structures and
+ownership/attribution boundaries with explicit negative and forward-extension
+cases. Keep structural conformance, event semantics, safe projection and
+operational integration distinct. Do not implement an Agent Server adapter
+or claim production guarantees without independent evidence.
 
 ## Reference environment
 
