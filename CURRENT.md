@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6F AG-UI ContentPart/media and ownership boundary discovery
-    -> inventory remaining pinned 1.0 content/media and event ownership constraints
-    -> test selected negative and extension cases without claiming full conformance
-    -> keep Agent Server REST/SSE frontend and AG-UI implementations separate
+2.6G AG-UI compatibility, processing and remaining conformance-gap review
+    -> reconcile pinned 1.0 processing, compatibility and versioning boundaries
+    -> inventory unresolved normative policies and remaining conformance gaps
+    -> use isolated negative tests; no Agent Server adapter or frontend wiring
 ~~~
 
 ## Completed
@@ -2552,13 +2552,30 @@ real tools, multi-client isolation, generic downgrade/middleware, operational
 AG-UI transport or Agent Server adapter was established. The existing Agent
 Server frontend and pinned workshop are unchanged. Parent 2.6 remains OPEN.
 
-## Current sub-block — 2.6F AG-UI ContentPart/media and ownership boundary discovery
+## Completed sub-block — 2.6F AG-UI ContentPart/media and ownership boundary discovery
 
-Review remaining pinned 1.0 `ContentPart`/multimodal/media structures and
-ownership/attribution boundaries with explicit negative and forward-extension
-cases. Keep structural conformance, event semantics, safe projection and
-operational integration distinct. Do not implement an Agent Server adapter
-or claim production guarantees without independent evidence.
+Reviewed selected ContentPart (`text`, `image`, `audio`, `video`, `document`),
+PartSource (`data`, `url`, `file`), lossy text-only rendering and owner
+continuation constraints against frozen AG-UI 1.0. **123/123 pure model-free
+assertions** and four gates (lint, production build, SSR compile, pure) PASS.
+Exact WSL evidence is pinned in Lab 23:
+`~/masl-evidence/masl-26f-agui-0f2c345-20261115T192348Z` (six SHA-256 verified artifacts).
+The implementation/reviewer source SHA-256s, published baseline `0f2c3456beab1c99933b6ff7b1b417b449fa022c`,
+nine Git blobs and unchanged reference are also documented there.
+
+A previously unknown ContentPart can be dropped but malformed known content is
+fatal. Unknown `PartSource` policy is **unresolved** between two pinned prose
+rules; no silent conformance claim was made. The tests establish no actual
+media fetch/decode, authorization/DLP, durable state, complete ownership
+coverage, Agent Server integration or production transport. The 2.6 milestone
+remains OPEN.
+
+## Current sub-block — 2.6G AG-UI compatibility, processing and remaining conformance-gap review
+
+Review remaining AG-UI 1.0 compatibility, middleware/enforcement ordering,
+version downgrade, unresolved `PartSource` policy and conformance gaps.
+Separate observed structural behavior from normative semantics and production
+integration. No automatic Agent Server adapter or model/tool execution.
 
 ## Reference environment
 

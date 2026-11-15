@@ -366,3 +366,101 @@ was implemented. The existing REST/SSE frontend remains unchanged.
 **2.6E PASSED the scoped evidence gate; parent 2.6 AG-UI remains OPEN.**
 Next proposed review: **2.6F — ContentPart/media and ownership boundary**
 discovery, with negative/extension tests before any transport adapter.
+
+## 2.6F — ContentPart/media and ownership boundary discovery (scoped completion)
+
+At published MASL baseline `0f2c3456beab1c99933b6ff7b1b417b449fa022c`, the isolated 2.6F pure review
+checked selected structures from official AG-UI 1.0, without integrating
+the existing Agent Server REST/SSE frontend or executing a Run, model or
+real tool. The lab is a **scoped synthetic contract review**, not a full
+validator, media parser, consumer, adapter, or production security control.
+
+### Frozen specification and inspected contracts
+
+- Upstream AG-UI commit: `2330368a2a74573902858867072406638ba3073d`.
+- `spec/1.0/schema.json`: Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`, SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`.
+- Pinned unions: five `ContentPart` variants (`text`, `image`, `audio`,
+  `video`, `document`) and three `PartSource` variants (`data`, `url`, `file`);
+  still 31 event variants in the broader 1.0 union.
+- Selected content checks cover known required/optional fields, closed
+  object properties, malformed known types, and future unknown part
+  members: unrecognized parts may be dropped while known malformed
+  parts are fatal, without returning partially accepted content.
+- `data` needs `mimeType`; the JSON Schema `contentEncoding=base64` is
+  **an annotation**, not proof that bytes were decoded or valid base64.
+- `file` source values are **opaque provider handles**, not general URLs;
+  the reviewer never attempts to parse, resolve, fetch, or log media.
+- A text-only projection concatenates `text` parts in order; dropping
+  media/content is lossy and signaled, and media-only becomes empty text
+  with a warning. This is not a confidentiality/DLP projection.
+- Selected ownership checks cover text/reasoning message continuation,
+  tool args and results, activities, steps, parent/child attribution,
+  and interleaving. Missing attribution on a continuation is not an
+  owner conflict; explicit contradictory tags are rejected.
+- A tool call inherits its containing assistant message attribution;
+  run-scoped events do not define a subagent owner. Unknown tags on
+  run-scoped closed events are warned/stripped at enforcement, not
+  automatically treated as fatal ownership violations.
+- `STATE_SNAPSHOT` and `STATE_DELTA` attribution means provenance:
+  the state remains shared across the Run, not privately per subagent.
+
+### Known ambiguity and negative coverage
+
+- **Unrecognized `PartSource.type` remains explicitly unresolved**:
+  pinned `basic/processing.mdx` describes dropping a required nested
+  unrecognized member with its containing part, while pinned
+  `basic/run-input.mdx` treats `PartSource` as a closed set whose unknown
+  arm fails validation. The lab reports `unresolved-source` rather
+  than silently deciding that conflict or claiming conformance.
+- Negative cases include malformed media parts, unknown future parts,
+  source/provider shapes, cross-owner continuations and tool results
+  (including after a tool end), and invalid later parts that prevent
+  exposure of partially validated earlier content.
+- This lab does not prove URL safety, media capability negotiation,
+  generic middleware/downgrade semantics or real execution lifecycle.
+
+### WSL audit evidence (original 2.6F run, not a replay)
+
+- **123/123** model-free pure assertions passed.
+- Four gates PASS: Oxlint, Vite/TypeScript production build, SSR test
+  compilation and pure Node execution.
+- The 2.6F reviewer verified the 2.6E published baseline, nine Git
+  blobs, the pinned workshop and all three isolated 2.6F sources.
+- Audit directory outside Git: `~/masl-evidence/masl-26f-agui-0f2c345-20261115T192348Z`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `10264f82579cab3aa113fb27c13cb42ca0dd23f6b003c2cb8e34fcc9ac1050f7` |
+| `review.md` | `0db3b5e11171d88068f332f25c8b0427027add34919097375343c2b992b151de` |
+| `lint.log` | `fdcaf31267779ec9d19d8d20bfc976fcdbc86fe385441e8d6398fe81929124f7` |
+| `build.log` | `30c5850a3308fa8cd4e650960ed90118df5f9a7340698e8e28655fdd24dec226` |
+| `compile.log` | `fbc765edc63eb5627f585744866b30ff82bcfe9031dce08c5946f84c330c007e` |
+| `pure.log` | `b2e6ad9005e34fc13157fdf8b0893a9440d4a0e058647064df22d968c36d30e7` |
+
+| 2.6F source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/content-ownership.ts` | `06da18a4b8fc8ec8617e15d0a904e2abb9babe5f85eefc576e9b3541bf54ede0` |
+| `apps/web/src/ag-ui/content-ownership.spec.ts` | `05aa7c59d8cae1ad179b3190ff17bf6e1af6ba2d9ef77325c480f5308fd711a6` |
+| `scripts/lab-26f-content-review.py` | `49f490e3e313eeb5cf04df8e3e38b8bdb07c1c9c2423a51db6bba260b1d12dc3` |
+
+Pinned upstream normative documents (Git blobs):
+
+| Document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/run-input.mdx` | `96dabc92854f8bffa423450edff54f83585c4cbf` |
+| `docs/spec/1.0/events/subagents.mdx` | `eafcbcc93d11c7bcc1ea5e5ee16cea3e24056a3a` |
+| `docs/spec/1.0/events/tool-calls.mdx` | `62e550f96bcc7699edf62cbb9bd4fc194c49044e` |
+
+### Explicit limits and next review
+
+Not proven: full recursive AG-UI conformance, safe media processing,
+authorization, DLP, persistence, client isolation, exactly-once,
+real model/tool interactions, operational transport, end-to-end
+middleware or Agent Server → AG-UI translation. The existing Agent Server
+frontend and workshop reference were not changed.
+
+**2.6F PASS in its selected scope; parent 2.6 AG-UI remains OPEN.**
+Next proposed scoped block: **2.6G AG-UI compatibility, processing and remaining conformance-gap review** — review the remaining
+processing/versioning/middleware boundaries and unresolved policies
+before considering a transport adapter or milestone closure.
