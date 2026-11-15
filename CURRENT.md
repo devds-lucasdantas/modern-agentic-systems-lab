@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6G AG-UI compatibility, processing and remaining conformance-gap review
-    -> reconcile pinned 1.0 processing, compatibility and versioning boundaries
-    -> inventory unresolved normative policies and remaining conformance gaps
-    -> use isolated negative tests; no Agent Server adapter or frontend wiring
+2.6H AG-UI normative gap decisions and adapter-readiness review
+    -> decide or explicitly defer the nine pinned AG-UI conformance gaps
+    -> define evidence required for protocol/adapter readiness
+    -> preserve existing REST/SSE frontend; no adapter without separate gates
 ~~~
 
 ## Completed
@@ -2570,12 +2570,28 @@ media fetch/decode, authorization/DLP, durable state, complete ownership
 coverage, Agent Server integration or production transport. The 2.6 milestone
 remains OPEN.
 
-## Current sub-block — 2.6G AG-UI compatibility, processing and remaining conformance-gap review
+## Completed sub-block — 2.6G AG-UI compatibility, processing and remaining conformance-gap review
 
-Review remaining AG-UI 1.0 compatibility, middleware/enforcement ordering,
-version downgrade, unresolved `PartSource` policy and conformance gaps.
-Separate observed structural behavior from normative semantics and production
-integration. No automatic Agent Server adapter or model/tool execution.
+Reviewed a selected synthetic AG-UI 1.0 pipeline and version/downgrade behavior
+against published baseline `ff14c7e9f254a92c92ac6b1b6cf956732d2ebb4b`. **124/124** pure assertions and four
+WSL gates (lint, production build, SSR compile, pure execution) PASS. Exact
+SHA-256 evidence and all three source pins are documented in Lab 23; original
+audit directory: `~/masl-evidence/masl-26g-agui-ff14c7e-20261115T195427Z`.
+
+The lab uses a *fictional* retired-shape fixture to demonstrate ordering; it
+is not a real compatibility shim. Unknown `PartSource` policy is unresolved.
+Nine conformance gaps (G1-G9) remain OPEN, including complete recursive schema
+validation, real middleware/transports, security, operational consistency and
+the Agent Server adapter. No model/tool/Runtime or frontend integration was
+performed. Parent milestone 2.6 AG-UI remains OPEN.
+
+## Current sub-block — 2.6H AG-UI normative gap decisions and adapter-readiness review
+
+Review the nine remaining AG-UI gaps as an explicit decision/evidence register.
+Reconcile the pinned normative `PartSource` tension without silently choosing
+an interpretation, and separate protocol interoperability decisions from
+application integration. Do not build or promise a production adapter until
+there are independent acceptance criteria and tests.
 
 ## Reference environment
 

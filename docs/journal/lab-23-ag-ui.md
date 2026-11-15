@@ -464,3 +464,94 @@ frontend and workshop reference were not changed.
 Next proposed scoped block: **2.6G AG-UI compatibility, processing and remaining conformance-gap review** — review the remaining
 processing/versioning/middleware boundaries and unresolved policies
 before considering a transport adapter or milestone closure.
+
+## 2.6G — Compatibility, processing and remaining conformance-gap review (scoped completion)
+
+On published baseline `ff14c7e9f254a92c92ac6b1b6cf956732d2ebb4b`, the 2.6G isolated pure test suite
+reviewed selected processing order, protocol version classification,
+forward extensions and user/tool text-only downgrade examples against
+the frozen AG-UI 1.0 schema and prose. **This is not a deployed pipeline**
+or an AG-UI/Agent Server adapter.
+
+### Frozen contracts and limited demonstrations
+
+- AG-UI upstream commit: `2330368a2a74573902858867072406638ba3073d`.
+- Pinned 1.0 schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`; Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`;
+  31 event variants, five `ContentPart` variants, three `PartSource` variants.
+- Versions are compared numerically as `MAJOR.MINOR` in selected cases,
+  including newer minor, absent legacy declaration, unknown declaration,
+  and an explicitly **noncommittal** unsupported-major policy.
+- Synthetic trace demonstrates: compatibility -> middleware ->
+  enforcement -> expansion -> verification -> application.
+  The middleware is an observer, and expansion/verification are traces:
+  there is no generic end-to-end executable pipeline.
+- `LAB_ONLY_RETIRED_CUSTOM` is a **fictional lab fixture**, not an actual
+  retired AG-UI event. Its transformation shows precedence, not a real
+  deprecation registry or compatibility binding.
+- Unknown events/properties are dropped/stripped as selected examples;
+  malformed known fields are fatal with no partially accepted output.
+- Text-only downgrade of selected user/tool message parts is lossy
+  when media or unknown parts are omitted, and carries warnings.
+  The demonstration preserves IDs/order; it is not a generic shim.
+- Unrecognized `PartSource` remains an explicit **unresolved-source**
+  policy conflict between pinned `processing.mdx` and `run-input.mdx`.
+
+### Open conformance gaps (source inventory, not implemented)
+
+| ID | Outstanding gap |
+|---|---|
+| G1 | Unknown `PartSource` tension: processing vs run-input |
+| G2 | Actual retired-shape registry and real compatibility middleware |
+| G3 | Complete recursive AG-UI 1.0 schema/event conformance |
+| G4 | Multiple transport bindings and protobuf presence semantics |
+| G5 | End-to-end middleware/enforcement/chunk expansion/verification |
+| G6 | Complete peer version negotiation and capability-based downgrade |
+| G7 | Media decoding, URL safety, provider handles and DLP |
+| G8 | Authorization, persistence, CAS, idempotency, multi-client isolation |
+| G9 | Agent Server REST/SSE to AG-UI adapter and frontend integration |
+
+### Original 2.6G WSL audit and source provenance
+
+- **124/124** model-free pure assertions PASS, four gates PASS:
+  lint, production build, SSR compile and pure Node execution.
+- Original audit directory outside the repo:
+  `~/masl-evidence/masl-26g-agui-ff14c7e-20261115T195427Z`.
+- The finalizer verifies the exact six evidence hashes, their internal
+  review.json report, nine published Git blobs, exact three payloads,
+  pinned workshop and the official AG-UI schema.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `faba30e45856bbb10cbd05ec10f79b151d4e346e5cf1a8e910663a5927892d0f` |
+| `review.md` | `72a3ad3ee84f33feff7ea49ade547d1618043891cdc7316a6205f6cca5771235` |
+| `lint.log` | `adb2d5a2661ddb3e3dc4dfe96a5f2ab7cbb68092ec570333cecf627a7e09bf7d` |
+| `build.log` | `a8c2fe771dfaa78af40f7dcb774792b6be118792ca5eb816f2674e8e6aa8fbaa` |
+| `compile.log` | `db75d63ab9a61040d4780063fc96362e05050c1639c83444327783bb690268cd` |
+| `pure.log` | `2dbff456d3a68496d64af814b40145b540ac5b1b61c9ee10c1a2cf08f7fc420b` |
+
+| 2.6G source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/compatibility-review.ts` | `ab5b59b04f35b83027b2a0da0b448276eb551916ccd40bb26e40ced8fd4ec09a` |
+| `apps/web/src/ag-ui/compatibility-review.spec.ts` | `ffbf640b32123cd4e128c1c783ddfb6175014b9528ffabcb49100b5590153c03` |
+| `scripts/lab-26g-compat-review.py` | `3714482154388ce7afd2c843864a9a8b0865a18f6b636ec06be8cd835dabced0` |
+
+Pinned upstream normative prose Git blobs:
+
+| Document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/versioning.mdx` | `860f82956864d5fcf29cb7d1e2993e315f03ff59` |
+| `docs/spec/1.0/basic/run-input.mdx` | `96dabc92854f8bffa423450edff54f83585c4cbf` |
+| `docs/spec/1.0/events/subagents.mdx` | `eafcbcc93d11c7bcc1ea5e5ee16cea3e24056a3a` |
+
+### Limits and next review
+
+No complete AG-UI conformance, production middleware, actual retired
+shape translation, transport binding, provider media access, DLP,
+authorization, persistence, concurrency controls, model/tool calls or
+Agent Server adapter was built or verified in 2.6G. The pinned workshop
+and existing REST/SSE frontend remain unchanged.
+
+**2.6G PASS in its selected scope; parent 2.6 AG-UI remains OPEN.**
+Next proposed sub-block: **2.6H AG-UI normative gap decisions and adapter-readiness review** — resolve normative
+decision gates and plan evidence for G1-G9, not integrate by default.
