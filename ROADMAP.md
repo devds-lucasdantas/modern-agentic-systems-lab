@@ -145,7 +145,8 @@
   - [x] 2.6E AG-UI nested schemas, state and subagent lifecycle discovery
   - [x] 2.6F AG-UI ContentPart/media and ownership boundary discovery
   - [x] 2.6G AG-UI compatibility, processing and remaining conformance-gap review
-  - [ ] 2.6H AG-UI normative gap decisions and adapter-readiness review
+  - [x] 2.6H AG-UI normative gap decisions and adapter-readiness review
+  - [ ] 2.6I AG-UI independent conformance evidence and adapter decision gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

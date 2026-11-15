@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6H AG-UI normative gap decisions and adapter-readiness review
-    -> decide or explicitly defer the nine pinned AG-UI conformance gaps
-    -> define evidence required for protocol/adapter readiness
-    -> preserve existing REST/SSE frontend; no adapter without separate gates
+2.6I AG-UI independent conformance evidence and adapter decision gates
+    -> validate independently selected executable AG-UI contracts and gap evidence
+    -> require protocol, security and adapter decision gates before integration
+    -> preserve REST/SSE frontend; leave parent 2.6 and G1-G9 OPEN
 ~~~
 
 ## Completed
@@ -2585,13 +2585,27 @@ validation, real middleware/transports, security, operational consistency and
 the Agent Server adapter. No model/tool/Runtime or frontend integration was
 performed. Parent milestone 2.6 AG-UI remains OPEN.
 
-## Current sub-block — 2.6H AG-UI normative gap decisions and adapter-readiness review
+## Completed sub-block — 2.6H AG-UI normative gap decisions and adapter-readiness review
 
-Review the nine remaining AG-UI gaps as an explicit decision/evidence register.
-Reconcile the pinned normative `PartSource` tension without silently choosing
-an interpretation, and separate protocol interoperability decisions from
-application integration. Do not build or promise a production adapter until
-there are independent acceptance criteria and tests.
+Against baseline `caf79c88ddb1d04e3814a74e22d1f2ad9d060e9a`, 2.6H introduced a model-free decision/evidence
+register for G1–G9. **198/198** selected pure assertions and four WSL gates
+(lint, build, SSR compile, pure execution) PASS. Exact evidence/source hashes
+and frozen upstream references are pinned in Lab 23. Original audit:
+`~/masl-evidence/masl-26h-agui-caf79c8-20261115T201857Z`.
+
+All nine gaps remain **OPEN** and are not independently evidenced closed.
+G1 requires upstream clarification; G4 allows only a future JSON/SSE-scoped
+experiment, not a protocol-conformance claim. Evidence claims are metadata,
+not independently verified artifacts. Adapter readiness is **BLOCKED**;
+no real adapter, network transport, Runtime/model/tool actions, independent
+security review, or production integration was tested. Parent 2.6 stays OPEN.
+
+## Current sub-block — 2.6I AG-UI independent conformance evidence and adapter decision gates
+
+Prioritize independently reproducible evidence for G1/G3/G5/G9 decision
+gates, while documenting G7/G8 security prerequisites and other open gaps.
+Do not integrate Agent Server or close the parent milestone without verified
+cross-boundary contracts and separate review approvals.
 
 ## Reference environment
 

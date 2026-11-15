@@ -555,3 +555,93 @@ and existing REST/SSE frontend remain unchanged.
 **2.6G PASS in its selected scope; parent 2.6 AG-UI remains OPEN.**
 Next proposed sub-block: **2.6H AG-UI normative gap decisions and adapter-readiness review** — resolve normative
 decision gates and plan evidence for G1-G9, not integrate by default.
+
+## 2.6H — Normative gap decisions and adapter-readiness review (scoped completion)
+
+On published 2.6G baseline `caf79c88ddb1d04e3814a74e22d1f2ad9d060e9a`, this model-free lab verified
+a strictly bounded, deterministic **decision/evidence register** for
+G1–G9. It did not validate external artifacts, resolve the gaps,
+implement an AG-UI adapter or authorize deployment.
+
+### Frozen reference and explicit decisions
+
+- AG-UI 1.0 upstream commit: `2330368a2a74573902858867072406638ba3073d`.
+- Official schema SHA-256: `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`; Git blob: `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`.
+- **G1**: escalate unknown `PartSource.type` normative conflict to AG-UI
+  maintainers; `processing.mdx` and `run-input.mdx` differ. No local
+  authoritative decision or conforming source parser is asserted.
+- **G4**: any *future* transport experiment may scope to JSON/SSE;
+  that is not a claim of an implemented JSON/SSE adapter, protobuf
+  compatibility, presence fidelity or transport equivalence.
+- **G2/G3/G5/G6**: defer until independently executed conformance,
+  middleware ordering, version handling and downgrade evidence exists.
+- **G7/G8**: require independent security and state/concurrency evidence.
+- **G9**: require a separate adapter ADR, mapping matrix and independent
+  end-to-end gates; no Agent Server integration exists in this lab.
+- Every record defines an owner *role*, acceptance criteria, upstream
+  reference paths and dependency IDs. No reviewer, approval or remediation
+  is claimed to have been assigned or completed by those role names.
+
+### Gap-by-gap dispositions (all remain OPEN)
+
+| Gap | 2.6H decision | Evidence or gate still required |
+|---|---|---|
+| G1 | Escalate normative conflict | Authoritative written ruling; paired extension/malformed tests |
+| G2 | Defer | Real registry and executable retirement translation tests |
+| G3 | Defer | Standards-aware recursive validator over all 31 events and nested definitions |
+| G4 | Scope future work to JSON/SSE only | Later differential proof for protobuf or multiple bindings |
+| G5 | Defer | Executable compatibility/middleware/enforcement/expansion/verification pipeline |
+| G6 | Defer | Peer negotiation, downgrade warning and invariant end-to-end tests |
+| G7 | Independent security review | Safe media/URL/provider-handle/DLP security evidence |
+| G8 | Independent security review | Auth, durability, retries/CAS, concurrent mutation and isolation evidence |
+| G9 | Separate adapter design | Approved mapping ADR plus tool/stream/auth/integration e2e gates |
+
+### Evidence and confidence boundary
+
+- **198/198 pure model-free assertions PASS**, all four WSL gates PASS
+  (lint, production build, SSR compile, pure execution).
+- Seven pinned critical cases prove that a declared SHA-256 or a
+  syntactically valid evidence claim is **metadata, not independent proof**.
+- The review asserts `planning_only=true`, `production_ready=false`,
+  `adapter_implemented=false`, and `parent_2_6_open=true`.
+- No code in 2.6H reads externally claimed evidence bytes, validates a
+  real middleware, invokes Agent Server, or resolves G1–G9.
+- Original WSL evidence directory: `~/masl-evidence/masl-26h-agui-caf79c8-20261115T201857Z`.
+- Its six artifacts and their SHA-256 digests are pinned below.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `5be91a9fce038e16bbb4a8e65cb3a5ed032da13d354fb6336525634d4b0d1e3f` |
+| `review.md` | `5efef58b1d86dadaa143261a41c62ea0ca3748bde5a76a6afb3b10ac59ae3b7f` |
+| `lint.log` | `4cdfb1da09cfedf00306f8a52cfc70b011c16b3b4094bd235538801e86e31bd0` |
+| `build.log` | `112dc953682081c398e1b2fc33ad9ff6a918e99b900924a911004ca39b465dba` |
+| `compile.log` | `2adb283450ab454760542f27c9a6faa48cea4d3a6cb225f7e5d13048fa59b49a` |
+| `pure.log` | `a8ba5a998a8c638e07244c265eda2ea5e16a198b502f6d3a24363dc10a55c58e` |
+
+| 2.6H source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/gap-readiness.ts` | `c860b7d8616bd542bc0f4d27eaba82532b16cc7881c75169fc08109043a59da6` |
+| `apps/web/src/ag-ui/gap-readiness.spec.ts` | `7e3a7734827b72db4288eece48229e0f3eed672615bee001ab2fbf56e90ef1e8` |
+| `scripts/lab-26h-readiness-review.py` | `2cbde26a221137ea3ecd452065a1cd68c6ae7cc50cf122a93d6396b85753c04d` |
+
+Previously source-reviewed AG-UI 1.0 normative prose pins:
+
+| Upstream document | Git blob |
+|---|---|
+| `docs/spec/1.0/basic/processing.mdx` | `22fbb70dd6bbe9c3849e76b2f4685c793fbe3e47` |
+| `docs/spec/1.0/basic/versioning.mdx` | `860f82956864d5fcf29cb7d1e2993e315f03ff59` |
+| `docs/spec/1.0/basic/run-input.mdx` | `96dabc92854f8bffa423450edff54f83585c4cbf` |
+| `docs/spec/1.0/basic/transports/http-sse.mdx` | `993b465d9e6a849fa3a616eb599c16671fccafcb` |
+
+### Limits and next evidence milestone
+
+2.6H is a *decision-register review*, not an actual protocol conformance
+suite, security attestation, recursive validator, execution pipeline,
+transport adapter, production authorization, or evidence of gap closure.
+The existing Agent Server REST/SSE frontend and pinned workshop were
+not changed. The independent evidence demands above remain unmet.
+
+**2.6H scoped PASS; G1–G9 OPEN, adapter BLOCKED, parent 2.6 OPEN.**
+Next proposed review: **2.6I AG-UI independent conformance evidence and adapter decision gates** — independently verify the first
+executable contracts and explicit adapter decision gates before any
+production or milestone-closeout claim.
