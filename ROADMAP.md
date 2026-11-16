@@ -152,7 +152,8 @@
   - [x] 2.6L AG-UI authorization and durable replay contract evidence
   - [x] 2.6M AG-UI trusted identity and transactional replay boundary design
   - [x] 2.6N AG-UI external identity and durable-store interoperability gates
-  - [ ] 2.6O AG-UI external issuer, revocation and transactional store failure gates
+  - [x] 2.6O AG-UI external issuer, revocation and transactional store failure gates
+  - [ ] 2.6P AG-UI cross-service issuer trust and recovery integration gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

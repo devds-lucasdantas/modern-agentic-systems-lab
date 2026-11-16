@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6O AG-UI external issuer, revocation and transactional store failure gates
-    -> define trusted external issuer/JWKS, rotation and revocation requirements
-    -> explore store outage, partial failure and retry/receipt reconciliation
-    -> keep G1-G9/2.6 OPEN; adapter BLOCKED pending independent review
+2.6P AG-UI cross-service issuer trust and recovery integration gates
+    -> review authenticated cross-service issuer metadata and revocation freshness
+    -> specify atomic receipt reconciliation across trust and durable-store boundaries
+    -> preserve G1-G9/2.6 OPEN; adapter BLOCKED without independent proof
 ~~~
 
 ## Completed
@@ -2688,12 +2688,27 @@ No OIDC/JWKS, production credential, token revocation, enterprise database,
 Agent Server frontend integration or security sign-off was demonstrated.
 **G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
 
-## Current sub-block — 2.6O AG-UI external issuer, revocation and transactional store failure gates
+## Completed sub-block — 2.6O AG-UI external issuer, revocation and transactional store failure gates
 
-Explore verifiable external issuer/JWKS, rotation and revocation prerequisites,
-plus replay and transactional store-failure behavior. Require independent
-identity, ACL, media/security, protocol and state evidence before an adapter
-can be considered. Preserve G1–G9 OPEN and parent milestone 2.6 OPEN.
+On published baseline `fc68c8163fd204eab68a8b84de9dbc6ae6629b9d`, the selected offline review passed
+**329/329** TypeScript assertions, **51/51** OpenSSL RS256/SQLite fixture
+assertions, 12/12 critical tests and five WSL gates. Its original eight SHA-256
+pinned artifacts include a physical SQLite file in Lab 23:
+`~/masl-evidence/masl-26o-agui-fc68c81-20261116T021858Z`.
+
+The TypeScript callbacks are synthetic. The separate offline OpenSSL fixture
+used ephemeral RSA keys, exercised local `kid` rotation and stored `jti`
+revocation, and verified SQLite rollback/CAS and an acknowledgment-loss
+simulation. These experiments are **not** integrated with real OIDC/JWKS,
+production identity, distributed revocation, Agent Server or enterprise stores.
+**G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
+
+## Current sub-block — 2.6P AG-UI cross-service issuer trust and recovery integration gates
+
+Investigate authenticated provider metadata, revocation freshness and
+reconciled transactional retries across service boundaries. Require external
+identity/ACL, protocol/schema, media security and persistence evidence before
+implementing an Agent Server AG-UI adapter. Keep G1–G9 and 2.6 OPEN.
 
 ## Reference environment
 

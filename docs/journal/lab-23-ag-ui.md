@@ -1104,3 +1104,75 @@ contracts, not a deployed identity-provider or transactional Agent Server bridge
 Next proposed: **2.6O AG-UI external issuer, revocation and transactional store failure gates** — investigate trusted issuer/JWKS and revocation
 requirements, and isolated durable-store failure injection, before any real
 Agent Server → AG-UI adapter or milestone closure is considered.
+
+## 2.6O — Local RS256 issuer/revocation and transactional fault gates (scoped completion)
+
+Against the published 2.6N baseline `fc68c8163fd204eab68a8b84de9dbc6ae6629b9d`, the WSL audit passed
+**329/329** TypeScript contract assertions, **51/51** separate OpenSSL/SQLite
+fixture assertions, **12/12** critical TypeScript markers and five gates
+(lint, production build, SSR compilation, pure execution, RS256/SQLite fixture).
+Eight original external artifacts are SHA-256 pinned below, including the
+physical SQLite file. This is **selected offline evidence**, not a production
+issuer, deployed Agent Server or full AG-UI 1.0 protocol conformance.
+
+### Executed evidence and trust limits
+
+- The isolated TypeScript 2.6O gate composes the published 2.6N/2.6M/2.6L/2.6K
+  selected pure checks via injected identity, key-state, revocation and checkpoint
+  *test-harness callbacks*. Callbacks and provenance tags are not authenticated
+  external issuer credentials, network JWKS or authoritative live ACL sources.
+- A separate Python fixture generates ephemeral RSA private/public key pairs and
+  uses **OpenSSL RS256** to verify signatures. It exercises active/retired `kid`,
+  key-substitution, malformed header/claims, issuer, audience, time and algorithm
+  confusion negatives. Local public PEM snapshots are **not fetched via OIDC/JWKS**,
+  and private test keys are not retained in the audit evidence.
+- A physical local SQLite fixture executes `BEGIN IMMEDIATE` CAS, records hashes
+  of **synthetic event bytes**, tests `jti` revocation, pre-transaction outage,
+  rollback after CAS and receipt insertion, and post-COMMIT acknowledgment-loss
+  reconciliation. The latter **simulates an ambiguous response**, not an actual
+  crash, power cut, network partition or distributed failure.
+- Separate operating-system processes race the same SQLite checkpoint: **one
+  committed, one rejected for a stale revision**; exactly one race receipt was
+  stored. This proves selected SQLite-local behavior only, not enterprise store
+  availability, revocation propagation or cross-service atomicity.
+- The Python RS256/SQLite fixture and the TypeScript callback experiment remain
+  **separate**; their results do not establish a connected trust chain, authenticated
+  event producer, operational HTTP/SSE replay or Agent Server adapter.
+- No production OIDC/JWKS issuer, token distribution/revocation SLA, cross-region
+  consistency, media/DLP review, real frontend/runtime integration or independent
+  security sign-off occurred. All G1–G9, including unresolved normative/schema,
+  media-security, persistent-state and adapter gates, remain **OPEN**; 2.6 **OPEN**;
+  adapter **BLOCKED**.
+
+### Original approved WSL evidence (outside Git)
+
+- Audit directory: `~/masl-evidence/masl-26o-agui-fc68c81-20261116T021858Z`. This finalizer verifies the
+  eight physical SHA-256 pins, metadata, 12 critical pure markers and SQLite
+  integrity/receipt/revocation records **read-only**. It does not rerun tests.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`; official 1.0 schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 variants); workshop HEAD `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `e9e6fe1cfdcc5e82e2bf2ee0d778902dc35acf5f71a55efd8c9b84303d5df2d0` |
+| `review.md` | `a3ad624d20441e1b307a7899773136f2f3bf821f9b40fec0c4e70e3ad9edbae4` |
+| `lint.log` | `7f3feb83aa5c3692210dbc873d5233dd73f46490e06e9fae2774484510c7e0d0` |
+| `build.log` | `00b5d725f25ddcc496d665a33818b0eeeb6709a7c6707a9c3af6393aabe76d35` |
+| `compile.log` | `e8d4c25d9ea5cece66cf852e4fee98fca124504c6a8a8ba04e271ff5169747f5` |
+| `pure.log` | `2d94aef8bac5993381abbe5cb741ca74a117ac41177cc32dd3e03eaabaa1d2da` |
+| `fixture.log` | `89e8ab696fb89c2db70589e5965aafdd5d56e6dc85457fcfcaf77daaac7bbdb4` |
+| `issuer-proof.sqlite3` | `2c3e87edbfc0facdd4221422a97a7c65fefcd97fbc8a3c3a7bfe3f0c48222ca8` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/issuer-revocation-failures.ts` | `369c3167403e772b0a5bdd24b631b2b4b6d3630c4900343bdc60f6889cfcc5de` |
+| `apps/web/src/ag-ui/issuer-revocation-failures.spec.ts` | `8032ce7e262f4f0689fca91421a117c4f95db0ddf4549db25ee3bbb8a9915da5` |
+| `scripts/lab-26o-issuer-failure-review.py` | `789dac3b4f10ab8864d108f8d905a6847ca310bf51a7add41557ade7dfc66eb8` |
+
+### Remaining gates and next step
+
+**2.6O selected RS256/revocation/store-failure PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+No independent issuer trust, distributed revocation/durability or production
+interoperability was established. Next proposed: **2.6P AG-UI cross-service issuer trust and recovery integration gates** —
+investigate real provider metadata, revocation freshness and authenticated
+transaction/retry composition behind separate security and protocol gates.
