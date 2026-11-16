@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6M AG-UI trusted identity and transactional replay boundary design
-    -> specify trusted principal and thread ACL injection at a server-owned boundary
-    -> design transactional checkpoint/CAS, receipt integrity and race experiments
-    -> retain G1-G9/2.6 OPEN and adapter BLOCKED pending independent evidence
+2.6N AG-UI external identity and durable-store interoperability gates
+    -> specify verifiable external identity and thread ACL enforcement boundaries
+    -> review durable checkpoint integration, CAS and replay interoperability
+    -> require independent G1-G9 decisions; preserve adapter BLOCKED and 2.6 OPEN
 ~~~
 
 ## Completed
@@ -2659,13 +2659,27 @@ storage, transactional CAS, computed commitment hash, external ACL, HTTP
 resume, Agent Server bridge or real security verification occurred. G1–G9
 remain **OPEN**, adapter **BLOCKED**, parent milestone 2.6 **OPEN**.
 
-## Current sub-block — 2.6M AG-UI trusted identity and transactional replay boundary design
+## Completed sub-block — 2.6M AG-UI trusted identity and transactional replay boundary design
 
-Prepare an isolated design and reproducible experiment for a trusted identity
-boundary and transactional replay store; require negative cross-client race,
-credential/ACL, idempotency and integrity evidence before proposing integration.
-Do not modify the existing Agent Server frontend, announce protocol conformance,
-or close G1–G9 or 2.6 by assertion.
+On published baseline `873398d87816be79a7e51c4e08924ff81011ba00`, **152/152** selected pure TypeScript
+assertions and **25/25** SQLite file-backed fixture assertions passed all
+five WSL gates. The TS identity boundary uses injected synthetic providers;
+the separate SQLite fixture demonstrated file-backed revision CAS under a
+real two-process race. Eight audit artifacts, including the physical SQLite
+file, are SHA-256 pinned in Lab 23:
+`~/masl-evidence/masl-26m-agui-873398d-20261116T011109Z`.
+
+This does not establish an external authenticated principal, live ACL, trusted
+producer, production durable store or distributed transaction. Existing Agent
+Server REST/SSE and workshop reference were unchanged. G1–G9 **OPEN**;
+adapter **BLOCKED**; parent milestone 2.6 **OPEN**.
+
+## Current sub-block — 2.6N AG-UI external identity and durable-store interoperability gates
+
+Define and independently verify trusted identity-provider and durable store
+interoperability boundaries, including negative cross-client and replay cases.
+Require external authz, media/security, protocol and state evidence before any
+real Agent Server adapter or production integration. Keep G1–G9 and 2.6 OPEN.
 
 ## Reference environment
 

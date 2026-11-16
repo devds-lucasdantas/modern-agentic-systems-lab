@@ -965,3 +965,77 @@ protocol-conformance readiness. Next proposed: **2.6M AG-UI trusted identity and
 an isolated, independently verified trusted identity source and transactional
 checkpoint boundary while retaining the existing Agent Server frontend and
 normative/security blockers until separately resolved.
+
+## 2.6M — Trusted identity boundary design and isolated transactional SQLite evidence (scoped completion)
+
+Against the published 2.6L baseline `873398d87816be79a7e51c4e08924ff81011ba00`, the selected offline WSL
+review executed **152/152** pure TypeScript assertions, **25/25** SQLite
+file-backed CAS/ACL fixture assertions and **five/five** gates (lint,
+production build, SSR compilation, pure execution, SQLite). All **10/10**
+critical TypeScript test markers were present. Audit evidence is immutable by
+SHA-256 and stored separately from the Git checkout. This is **limited
+experimental evidence**, not a production auth or Agent Server integration.
+
+### Selected implementation and trust boundaries
+
+- The TypeScript 2.6M boundary composes the published 2.6L authorization/CAS
+  *proposal*. Its principal/thread context is injected through test-harness
+  callbacks; the request body cannot self-assert privileged identity fields.
+  An injected fixture is not an OIDC/JWT, trusted issuer, live session or
+  independently verified thread ACL.
+- TypeScript's selected pipeline, 2.6L and 2.6K checks remain **pure**; the
+  TS return value is not a database transaction and cannot grant real access.
+- The separate Python SQLite fixture uses an offline session-reference lookup
+  in a test table (not authentication), computed **SHA-256 of fixture bytes**,
+  unique receipts and actual `BEGIN IMMEDIATE` transactions with revision CAS.
+- Two independent OS processes contested the same checkpoint. In the isolated
+  SQLite experiment, **exactly one committed** and **one was rejected as
+  stale**, with the resulting revision equal to one; the file's `integrity_check`
+  passed. This is local SQLite behavior, not cross-deployment durability,
+  distributed consensus, enterprise store semantics, or operational replay.
+- The physical `sqlite-proof.sqlite3` artifact is pinned below with SHA-256;
+  this finalizer performs **read-only** integrity/receipt checks without
+  changing or rerunning the original SQLite fixture.
+- No external identity provider, token verification, real RBAC/ABAC policy,
+  authenticated producer, cross-service authorization, production database,
+  resilience test, HTTP resume, client-facing sink, media/DLP or independent
+  security approval has been tested. No Agent Server/frontend code was changed.
+- G1 unknown `PartSource` remains normatively unresolved; G3 recursive schema,
+  G5 compatibility/middleware, G7 security/media, G8 shared-state durability
+  and G9 adapter interoperability remain **OPEN**, as do all nine gaps and the
+  parent 2.6 milestone. Agent Server → AG-UI adapter stays **BLOCKED**.
+
+### Original WSL audit and frozen references
+
+- Approved audit folder: `~/masl-evidence/masl-26m-agui-873398d-20261116T011109Z`; its **eight**
+  physical artifacts are SHA-256 checked by this finalizer, which reruns
+  neither tests nor database transactions.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`; official Draft 2020-12 schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants).
+- Workshop reference HEAD `3d3287cf1e51250934c11aff182d90ccfaf0e66d`; local uncommitted changes preserved.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `d94b3a93109e7f9d97738c8bce78bfb125907a4e8b15e86103de592c635e294d` |
+| `review.md` | `248e449d1cf6a05135efea937889c5b168c9e5f9110d614dbe5db8ee4619135a` |
+| `lint.log` | `9357e9c54131df7b896ef79450dd1db5c1065a034913dbc5b6b63e9f85891718` |
+| `build.log` | `3be8e935d84ff221d62d64e743a1c751c1dcc4aa30f839eafef7f515428af65c` |
+| `compile.log` | `c49ae8a2c58e2a49fd2efda55a93bcc73c06d22af5f007cf7801dfcc89b107ad` |
+| `pure.log` | `faef4f762415fdb044e4cfc2a2336464dde2b7b394e9a53599e0877ff1b017f2` |
+| `sqlite.log` | `148942b889c1966d73fa72e1a4ccb16779563783f8a271ed434f05217b2497ba` |
+| `sqlite-proof.sqlite3` | `9555bda765e55e8bf47f175e9a084bd8ff48a1e8c1a5815749dee9bc9890449f` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/trusted-transaction-boundary.ts` | `ab2ae9b77b260d2d99286d7aa793e22e0cce2ed289b8999181b6ca23c1c64592` |
+| `apps/web/src/ag-ui/trusted-transaction-boundary.spec.ts` | `07ec28b09cc957a75246de4cca12796536f940b4de62643e65ed9aca5db3f188` |
+| `scripts/lab-26m-transaction-review.py` | `7b5c39dda0e85a86ed1673247505c0fb37100f6f28fb487ac9e2cf2e3a66a58f` |
+
+### Remaining gates and next sub-block
+
+**2.6M selected boundary and SQLite CAS PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+No independent authentication/security review, distributed idempotency,
+production persistence, HTTP transport resume or integrated adapter was proven.
+Next proposed: **2.6N AG-UI external identity and durable-store interoperability gates** — determine and independently test the
+external identity and durable-store interoperability requirements before any
+Agent Server → AG-UI implementation is authorized.
