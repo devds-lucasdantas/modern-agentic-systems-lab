@@ -1254,3 +1254,75 @@ revocation/persistence, full AG-UI conformance or Agent Server integration was
 established. Next proposed: **2.6Q AG-UI authenticated transport and recovery readiness gates** — define independent transport,
 issuer/ACL, recovery and producer-authenticity evidence before considering an
 adapter or milestone closure.
+
+## 2.6Q — Local mTLS authenticated transport and receipt recovery evidence (scoped completion)
+
+Against the published 2.6P baseline `c017a9d7a8126a3a4074663509732ff860439ca9`, the WSL audit passed
+**269/269** selected TypeScript assertions, **30/30** loopback mTLS/SQLite
+fixture checks, **11/11** critical TypeScript cases and all **five** gates
+(lint, build, SSR compilation, pure execution and TLS/SQLite fixture).
+Eight original external SHA-256-pinned artifacts, including the physical SQLite
+file, are recorded below.
+
+### Verified behavior, exclusions and trust boundaries
+
+- TypeScript 2.6Q composes the published pure review contracts from 2.6P through
+  2.6J via *injected fixtures*, without consuming Python TLS identities or a
+  database connection. Its verdicts never claim operational readiness.
+- A separate Python fixture established a **real mutually authenticated TLS
+  channel on 127.0.0.1**, using a local disposable CA, server certificate and
+  client certificates. It rejected clients with no certificate, an untrusted
+  CA, an incorrect server hostname and a same-CA peer whose CN was unauthorized.
+  The selected CN check is a fixture ACL, **not** a corporate identity model.
+- A server receiving **caller-provided synthetic bytes** computed SHA-256 and
+  stored receipts through local SQLite `BEGIN IMMEDIATE` and revision CAS.
+  No authenticated upstream AG-UI event producer, signed event envelope,
+  trusted enterprise PKI, federated identity or production protocol was involved.
+- The test server deliberately withheld the response **after COMMIT**. A new
+  authenticated TLS connection reconciled the exact durable receipt without
+  writing again. This is not an actual crash, power failure, deployed network
+  partition, full AG-UI resume or distributed transaction guarantee.
+- Two independent TLS client connections contested the same SQLite checkpoint:
+  **one committed, one received a stale revision conflict**. The final database
+  contains **three** receipts, `thread-A` revision 2 and `race-thread` revision
+  1. This verifies one local file-backed SQLite store, not multi-node durability.
+- The pinned workshop and existing Agent Server REST/SSE frontend are unchanged.
+  No operational issuer, SPIFFE/mTLS deployment, remote JWKS, enterprise ACL,
+  media/DLP security sign-off, independent protocol conformance or authenticated
+  AG-UI producer was demonstrated. All G1–G9 **OPEN**, parent 2.6 **OPEN**,
+  adapter **BLOCKED**.
+
+### Approved WSL evidence and pinned references (outside Git)
+
+- Audit directory: `~/masl-evidence/masl-26q-agui-c017a9d-20261116T031821Z`. The finalizer reads all
+  eight artifact hashes and checks SQLite contents **read-only** without
+  rerunning cryptography, live sockets or test transactions.
+- Pinned AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, official schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), and workshop
+  reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `74289cd26f99d737bae9257681aeff49aa941af77363be970eb5f75552016424` |
+| `review.md` | `497815a629e90a3e4d52178c9407b37f717a1f0d0ec558b1259e3079a9352d8b` |
+| `lint.log` | `d9b65b142fd53ca27f305d6bb0023fe913b5a60602a830b447961b410538a34c` |
+| `build.log` | `07424b56af7a6ffbc750a282d1de2bd9c10db4b6f3832bb885e8c9810e89ad5f` |
+| `compile.log` | `96a0952d6f969876f12d22dd467924864de280a029706a0eea40cebb7ec517ef` |
+| `pure.log` | `49488a3a52ae5b7bb7cddd492aa2968d0e273372b4e427719b93243069ca92da` |
+| `fixture.log` | `565857395010697fd6fe17ceb44eb3c6ce4914104682878a743f1fbf5a92d03b` |
+| `transport-proof.sqlite3` | `94a8bbda3f630ef8599cb90655da194c8fd97d8c89e6095b0ff5b13bc74484a4` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/authenticated-transport-readiness.ts` | `f65f90205277c04f1fc48b7e427cc6a68ca231b0c16750c0adf61c7911698aca` |
+| `apps/web/src/ag-ui/authenticated-transport-readiness.spec.ts` | `fdb7b8b42af66e49cfc68806993c0692fd9eeb8bb14b9bc859601c0cf717730a` |
+| `scripts/lab-26q-transport-review.py` | `17e9c19b03c1cccdc02f850dac713c4db187181361501f853a80a37d585ecc66` |
+
+### Remaining gates and next laboratory
+
+**2.6Q selected loopback mTLS/recovery PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+Real enterprise identity, independent authenticated AG-UI event provenance,
+network-separated or multi-node recovery, full AG-UI 1.0 schema compliance and
+independent security review remain unproven. Next proposed: **2.6R AG-UI producer authenticity and distributed recovery evidence gates** —
+require externally grounded producer identities and failure/replay evidence
+before any real adapter or milestone closure.

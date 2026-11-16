@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6Q AG-UI authenticated transport and recovery readiness gates
-    -> specify authenticated transport, issuer and producer provenance gates
-    -> review replay/receipt reconciliation across network and storage failures
-    -> require independent G1-G9 decisions; keep 2.6 OPEN and adapter BLOCKED
+2.6R AG-UI producer authenticity and distributed recovery evidence gates
+    -> define authenticated AG-UI producer identity and event provenance requirements
+    -> examine cross-node failover, receipt reconciliation and stale revocation gates
+    -> keep G1-G9/2.6 OPEN; adapter BLOCKED until independent evidence
 ~~~
 
 ## Completed
@@ -2720,12 +2720,28 @@ pipeline. No production issuer, mTLS, JWKS, revocation SLA, persistent backend,
 real Agent Server adapter or independent security sign-off was demonstrated.
 **G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
 
-## Current sub-block — 2.6Q AG-UI authenticated transport and recovery readiness gates
+## Completed sub-block — 2.6Q AG-UI authenticated transport and recovery readiness gates
 
-Define and independently evaluate trusted network-service authentication,
-issuer metadata and event-producer provenance, together with idempotent replay
-under failed responses and checkpoints. Require external authentication and ACL,
-media/DLP, normative AG-UI 1.0 and persistence evidence before implementation.
+Against published baseline `c017a9d7a8126a3a4074663509732ff860439ca9`, the selected WSL review passed
+**269/269** pure TypeScript assertions, **30/30** loopback mTLS/SQLite checks,
+**11/11** critical cases and all five gates. Eight original SHA-256-pinned
+artifacts, including a physical SQLite database, are recorded in Lab 23 at
+`~/masl-evidence/masl-26q-agui-c017a9d-20261116T031821Z`.
+
+A local test CA issued disposable certificates and authenticated peers on
+127.0.0.1. The selected fixture proved local SQLite CAS/receipt reconciliation
+and lost-response behavior, not deployed enterprise mTLS, independently trusted
+AG-UI event production, cross-node recovery or production identity/ACL.
+The separate TypeScript callbacks remain pure test harness contracts. No
+operational Agent Server integration or independent security review occurred.
+**G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
+
+## Current sub-block — 2.6R AG-UI producer authenticity and distributed recovery evidence gates
+
+Specify and evaluate independent event-producer identity and integrity evidence,
+with isolated failover/replay and receipt consistency under service disruptions.
+Before any Agent Server adapter implementation, require external security,
+issuer/ACL, normative AG-UI 1.0, media/DLP and persistence evidence.
 Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
