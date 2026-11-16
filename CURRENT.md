@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6N AG-UI external identity and durable-store interoperability gates
-    -> specify verifiable external identity and thread ACL enforcement boundaries
-    -> review durable checkpoint integration, CAS and replay interoperability
-    -> require independent G1-G9 decisions; preserve adapter BLOCKED and 2.6 OPEN
+2.6O AG-UI external issuer, revocation and transactional store failure gates
+    -> define trusted external issuer/JWKS, rotation and revocation requirements
+    -> explore store outage, partial failure and retry/receipt reconciliation
+    -> keep G1-G9/2.6 OPEN; adapter BLOCKED pending independent review
 ~~~
 
 ## Completed
@@ -2674,12 +2674,26 @@ producer, production durable store or distributed transaction. Existing Agent
 Server REST/SSE and workshop reference were unchanged. G1–G9 **OPEN**;
 adapter **BLOCKED**; parent milestone 2.6 **OPEN**.
 
-## Current sub-block — 2.6N AG-UI external identity and durable-store interoperability gates
+## Completed sub-block — 2.6N AG-UI external identity and durable-store interoperability gates
 
-Define and independently verify trusted identity-provider and durable store
-interoperability boundaries, including negative cross-client and replay cases.
-Require external authz, media/security, protocol and state evidence before any
-real Agent Server adapter or production integration. Keep G1–G9 and 2.6 OPEN.
+Against published baseline `c890ea464856fcc5bb8771f14bdda5a99a79531c`, the WSL selected review passed
+**241/241** TypeScript assertions, **37/37** HMAC/JWT + SQLite fixture tests,
+and five gates. Eight original artifacts (including the SQLite file) are
+SHA-256 pinned in Lab 23 at `~/masl-evidence/masl-26n-agui-c890ea4-20261116T014749Z`.
+
+The Python HS256 fixture uses a disposable local key; the TS boundary uses
+synthetic injected providers. SQLite CAS and two-process races were tested
+locally, but the two parts do not form a live authenticated transaction.
+No OIDC/JWKS, production credential, token revocation, enterprise database,
+Agent Server frontend integration or security sign-off was demonstrated.
+**G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
+
+## Current sub-block — 2.6O AG-UI external issuer, revocation and transactional store failure gates
+
+Explore verifiable external issuer/JWKS, rotation and revocation prerequisites,
+plus replay and transactional store-failure behavior. Require independent
+identity, ACL, media/security, protocol and state evidence before an adapter
+can be considered. Preserve G1–G9 OPEN and parent milestone 2.6 OPEN.
 
 ## Reference environment
 

@@ -1039,3 +1039,68 @@ production persistence, HTTP transport resume or integrated adapter was proven.
 Next proposed: **2.6N AG-UI external identity and durable-store interoperability gates** — determine and independently test the
 external identity and durable-store interoperability requirements before any
 Agent Server → AG-UI implementation is authorized.
+
+## 2.6N — External identity and durable-store interoperability gates (scoped fixture completion)
+
+On published baseline `c890ea464856fcc5bb8771f14bdda5a99a79531c`, the WSL audit passed **241/241** pure
+TypeScript assertions, **37/37** fixture HMAC-JWT/SQLite assertions, all **five
+local gates** (lint, production build, SSR compilation, pure execution, fixture),
+and all **11/11** critical TypeScript labels. Its eight external artifacts are
+SHA-256 pinned below. This demonstrates only selected offline interoperability
+contracts, not a deployed identity-provider or transactional Agent Server bridge.
+
+### Tested boundaries and important exclusions
+
+- The TypeScript path composes the existing 2.6M/2.6L/2.6K selected reviews
+  through callbacks, with negative cases for untrusted principal/tenant/thread,
+  privilege fields, expired synthetic credentials and failed fixture lookups.
+  Callback-origin identity remains a **test-harness assertion**, not an OIDC
+  session or a separately verified external issuer.
+- A **separate Python** fixture verifies HS256 HMAC signatures using an embedded,
+  disposable test key; it checks issuer, audience, `kid`, time claims and
+  malformed/duplicate claims. It does **not** implement OIDC/JWKS, TLS, key
+  rotation with trusted issuers, `jti` revocation or production token handling.
+- The fixture combines validated synthetic JWT claims with a physical local
+  SQLite file, ACL checks, SHA-256 of synthetic event bytes, receipt uniqueness
+  and `BEGIN IMMEDIATE` CAS. A two-process race produced **one commit and one
+  stale revision rejection**. These checks are local SQLite properties, not an
+  enterprise database, distributed guarantee, cross-service transaction or
+  operational HTTP/SSE resume implementation.
+- The TypeScript review and Python fixture are **separate experiments**. Their
+  results do not establish a single atomic trust pipeline; no real Agent Server
+  frontend, network, Runtime, model/tool, deployment, media/DLP or independent
+  security sign-off was involved.
+- Full AG-UI recursive conformance, normative `PartSource`, compatibility,
+  media security, shared-state durability and adapter interoperability retain
+  unresolved gates. **All G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+
+### WSL evidence and pins (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26n-agui-c890ea4-20261116T014749Z`. The finalizer checks the eight
+  physical hashes and SQLite contents in read-only mode, without rerunning tests.
+- Frozen upstream `2330368a2a74573902858867072406638ba3073d`, official schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a` and Git
+  blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants); workshop reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence file | SHA-256 |
+|---|---|
+| `review.json` | `548acbf3c3df4a940e82046a30d80b6c71bff559d92af58e58094a6912591aba` |
+| `review.md` | `c61af3af40884b84ce59f5eaea353a021b4763e4e6b746d7cc6d24cd8ac40f7e` |
+| `lint.log` | `d222280c126c06a7f414f058f5193e5dd629aaef951a282094483781faa920f9` |
+| `build.log` | `d2142a2e8ec66fda2de6f67c22f5b6f9dd4146dd1eb51b1139f229e7f17da7c6` |
+| `compile.log` | `a30e376664b49ef0b150c18db4e5e1a529ab2ff845b1dd664cecff6ac22cbd36` |
+| `pure.log` | `bf9deca036cdeb8bc0b9b239dc16070e52fa5e59699fb09be72e62390a431ed1` |
+| `fixture.log` | `5c9f086de4dbc10d076c2bd291058004fce149bdab1ac7d0b893b1f656ffc893` |
+| `interop-proof.sqlite3` | `d8465941328401c81c01ffb1cdd2a62b03ea305307da580e0a01aac374bd7c6c` |
+
+| Source file | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/external-interop-gates.ts` | `19df525c556ed63176d56eeb9267426e28a3f4a79e7b8bcc97d108789a0b807a` |
+| `apps/web/src/ag-ui/external-interop-gates.spec.ts` | `d9c59e94568fd44776165269cd4ac77531b416c25cf39926374471d90d0b3f3c` |
+| `scripts/lab-26n-external-interop-review.py` | `565a383e18ff28072176d1f85538c8b720f8c865800037bc78e164fee6c87178` |
+
+### Next boundary and remaining gates
+
+**2.6N selected fixture interop PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+Next proposed: **2.6O AG-UI external issuer, revocation and transactional store failure gates** — investigate trusted issuer/JWKS and revocation
+requirements, and isolated durable-store failure injection, before any real
+Agent Server → AG-UI adapter or milestone closure is considered.
