@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6P AG-UI cross-service issuer trust and recovery integration gates
-    -> review authenticated cross-service issuer metadata and revocation freshness
-    -> specify atomic receipt reconciliation across trust and durable-store boundaries
-    -> preserve G1-G9/2.6 OPEN; adapter BLOCKED without independent proof
+2.6Q AG-UI authenticated transport and recovery readiness gates
+    -> specify authenticated transport, issuer and producer provenance gates
+    -> review replay/receipt reconciliation across network and storage failures
+    -> require independent G1-G9 decisions; keep 2.6 OPEN and adapter BLOCKED
 ~~~
 
 ## Completed
@@ -2703,12 +2703,30 @@ simulation. These experiments are **not** integrated with real OIDC/JWKS,
 production identity, distributed revocation, Agent Server or enterprise stores.
 **G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
 
-## Current sub-block — 2.6P AG-UI cross-service issuer trust and recovery integration gates
+## Completed sub-block — 2.6P AG-UI cross-service issuer trust and recovery integration gates
 
-Investigate authenticated provider metadata, revocation freshness and
-reconciled transactional retries across service boundaries. Require external
-identity/ACL, protocol/schema, media security and persistence evidence before
-implementing an Agent Server AG-UI adapter. Keep G1–G9 and 2.6 OPEN.
+On published baseline `42310c8a184215b270709c5c42caf16757351fb8`, the selected v2 WSL review passed
+**329/329** TypeScript assertions, **37/37** local signed-metadata/SQLite
+fixture checks, **13/13** critical cases and five gates. Eight original
+SHA-256-pinned artifacts (including the physical SQLite database) are recorded
+in Lab 23 at `~/masl-evidence/masl-26p-agui-42310c8-20261116T025133Z`.
+
+An unused TypeScript type import was removed after the initial v1 build failed;
+only the exact v2 payload was approved. RSA keys and issuer metadata were
+locally generated, revocation freshness was a SQLite epoch check, and the
+recovery experiment reconciled a locally persisted receipt. The TypeScript
+callbacks and Python SQLite fixture are **not** a live authenticated service
+pipeline. No production issuer, mTLS, JWKS, revocation SLA, persistent backend,
+real Agent Server adapter or independent security sign-off was demonstrated.
+**G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
+
+## Current sub-block — 2.6Q AG-UI authenticated transport and recovery readiness gates
+
+Define and independently evaluate trusted network-service authentication,
+issuer metadata and event-producer provenance, together with idempotent replay
+under failed responses and checkpoints. Require external authentication and ACL,
+media/DLP, normative AG-UI 1.0 and persistence evidence before implementation.
+Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

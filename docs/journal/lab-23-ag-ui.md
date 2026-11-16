@@ -1176,3 +1176,81 @@ No independent issuer trust, distributed revocation/durability or production
 interoperability was established. Next proposed: **2.6P AG-UI cross-service issuer trust and recovery integration gates** —
 investigate real provider metadata, revocation freshness and authenticated
 transaction/retry composition behind separate security and protocol gates.
+
+## 2.6P — Signed cross-service metadata and isolated receipt recovery gates (scoped completion)
+
+Against the published 2.6O baseline `42310c8a184215b270709c5c42caf16757351fb8`, the approved WSL v2 review
+passed **329/329** pure TypeScript contract assertions, **37/37** local signed
+metadata/OS-process/SQLite fixture assertions, **13/13** critical TypeScript
+cases and all **five WSL gates** (lint, production build, SSR compilation,
+pure execution and fixture). The original eight physical evidence artifacts,
+including a SQLite database, are pinned to exact SHA-256 values below.
+
+### Verified scope and explicitly unverified security boundaries
+
+- The TypeScript 2.6P gate composes the published 2.6O/2.6N/2.6M/2.6L/2.6K
+  *pure* contracts through injected callback metadata, revocation state,
+  credential and checkpoint fixtures. These callbacks are not authenticated
+  remote identity providers, issuer verification or a transactional data sink.
+- The separate Python fixture reused the **published 2.6O OpenSSL RS256**
+  verification helpers. A local disposable RSA root signed issuer metadata,
+  while a second local test key signed JWTs. The root public PEM was supplied
+  by the harness and was **not** obtained from real OIDC/JWKS or enterprise PKI.
+- The signed metadata freshness, active `kid` and revocation epoch were checked
+  against a local SQLite `revocation_state` inside a transaction. A stale signed
+  watermark was rejected after an independent local update; a newly signed
+  watermark then observed the revoked `jti`. This does **not** prove external
+  revocation consistency, availability, TLS or a distributed propagation SLA.
+- Receipt reconciliation after simulated loss of the commit acknowledgment
+  returned `receipt-reconciled-no-write` for the matching persisted digest.
+  Mismatched bytes and absent receipts were rejected; precommit fault injection
+  rolled back writes. This is **local SQLite behavior**, not operational HTTP
+  resume, power-loss testing, network partition or distributed atomicity.
+- Two separate OS workers ran the fixture verifier and store call against the
+  same SQLite file; one won the race and the other received a stale CAS result.
+  These workers did **not** authenticate each other over a network transport.
+  The TypeScript and Python fixtures are **separate**, not an end-to-end proof.
+- The v1 installation's failed `pnpm build` was followed by the exact v2 fix:
+  an unused TypeScript type import was removed and its source hash updated in
+  the runner. The successful WSL audit is from the **v2** evidence directory;
+  the incomplete v1 output is not counted as a passing gate.
+- No real network service, OAuth/OIDC discovery, operational JWKS validation,
+  production token distribution, authenticated AG-UI event producer, enterprise
+  persistence, security sign-off, media/DLP or Agent Server/frontend integration
+  was exercised. G1–G9 remain **OPEN**, parent milestone 2.6 **OPEN**, and the
+  AG-UI adapter **BLOCKED**.
+
+### Original approved WSL v2 audit evidence (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26p-agui-42310c8-20261116T025133Z`. The finalizer validates all
+  eight artifact hashes, report metadata, 13 critical TypeScript labels and the
+  original SQLite file **read-only**, without rerunning cryptographic tests.
+- Frozen upstream AG-UI 1.0 commit `2330368a2a74573902858867072406638ba3073d`, schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 events), workshop
+  reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `527870f61af68d1b5095973e2a3ca9d57dcb6911582f73de3c4c0d568baa8ffc` |
+| `review.md` | `7002c0090d41833f21fc2a23fd7e0d5a1515991c8b4e2f65e8a9658304fee617` |
+| `lint.log` | `356261321331c56cf1fe0f58c3edf2be4e93a4d5547d9d66ac34f293db6e63f6` |
+| `build.log` | `1d48cbe30c79bfc8f5366440e23df1982a1f912d1f80b0ee75383e5be8d65152` |
+| `compile.log` | `f8e7e084b179cf850de187209d73a9a319a52d81a3861204da95065484dda128` |
+| `pure.log` | `0721fe3065551e2837f3d115fd8a870ecaaa77c0c6ee90c74dbc02b07e22f3f2` |
+| `fixture.log` | `a086b75530aaffccc1fc43baccd2286cb29bb39385ac3dedb6bfabbaf3d97ab7` |
+| `service-proof.sqlite3` | `c68c60bc61671a5ff65f1804255e9f98ad18c83e75a244c1bc236d8ebae6ac72` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/cross-service-recovery.ts` | `80061b9a1a2ee54d5000ffaff403b8e1cf53518ffd6687dec4ce9a534c1276c9` |
+| `apps/web/src/ag-ui/cross-service-recovery.spec.ts` | `6b40c1cf70220a40e80ba21d63539d6f0fd33e80f6729a7ac2e819027903f49a` |
+| `scripts/lab-26p-cross-service-review.py` | `12b0d035f1f144e010820cd8c508c46de6527a19c6a8d3d8e45e9bceae6d4288` |
+
+### Remaining gates and next step
+
+**2.6P selected cross-service fixture PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+No real mutually authenticated service channel, network issuer trust, distributed
+revocation/persistence, full AG-UI conformance or Agent Server integration was
+established. Next proposed: **2.6Q AG-UI authenticated transport and recovery readiness gates** — define independent transport,
+issuer/ACL, recovery and producer-authenticity evidence before considering an
+adapter or milestone closure.
