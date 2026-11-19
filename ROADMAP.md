@@ -156,7 +156,8 @@
   - [x] 2.6P AG-UI cross-service issuer trust and recovery integration gates
   - [x] 2.6Q AG-UI authenticated transport and recovery readiness gates
   - [x] 2.6R AG-UI producer authenticity and distributed recovery evidence gates
-  - [ ] 2.6S AG-UI producer trust anchors and replicated recovery gates
+  - [x] 2.6S AG-UI producer trust anchors and replicated recovery gates
+  - [ ] 2.6T AG-UI external fencing and replica-consistency evidence gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

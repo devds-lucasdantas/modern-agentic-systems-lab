@@ -1400,3 +1400,80 @@ used disposable credentials plus one file-backed SQLite database. Next proposed:
 **2.6S AG-UI producer trust anchors and replicated recovery gates** — investigate independently established producer trust roots,
 network-separated replicas, revocation continuity and receipt reconciliation
 before any real adapter or milestone closure.
+
+## 2.6S — Independent producer root and two SQLite replica recovery gates (scoped completion)
+
+Against the published 2.6R baseline `2732f7c7d82deaf1f95db337720d1c22a03309a7`, the WSL review passed
+**269/269** pure TypeScript assertions, **49/49** RS256/two-independent-SQLite
+fixture checks, **12/12** critical markers, and all **five** gates (lint,
+production build, SSR compilation, pure execution and fixture). The eight
+original SHA-256-pinned evidence artifacts remain outside Git.
+
+### Verified experimental evidence and unresolved safety boundaries
+
+- TypeScript 2.6S composes the published 2.6R through 2.6J *pure* gates by
+  injected fixture data, not real issuer credentials, physical replica sessions,
+  signed trust anchors or Agent Server runtime calls. No AG-UI events escape.
+- A separate Python fixture generated independent, ephemeral RSA root and
+  producer keys, signed a producer registry and canonical event envelopes, and
+  verified SHA-256 event bytes and RS256 signatures. The root public key was
+  **locally supplied by the harness**, not externally authenticated via PKI,
+  OIDC/JWKS, an enterprise trust registry or authenticated provider discovery.
+- Two **separately created SQLite files on ONE host** stored distinct checkpoints,
+  receipts, producer revocation state and leadership epochs. Replication required
+  explicit root-attested event replay. A stale, missing or divergent receipt
+  blocked standby promotion, and replay restored convergence before a simulated
+  signed-root promotion. This is not network replication, consensus or quorum.
+- The test primary committed and intentionally lost its acknowledgment. The
+  unsynchronized standby correctly refused to confirm the receipt, while a
+  synchronized standby reconciled without a new write. A separate OS worker
+  exercised signed replay. No live production storage or multi-host outage ran.
+- **Important unresolved split-brain gap:** after standby promotion, the
+  isolated former primary **still accepted a second write** because there was
+  no effective external fencing or consensus. The fixture intentionally recorded
+  that divergence, then manually retired the old primary. This finding must
+  remain OPEN; the harness root simulates a control-plane decision, not a
+  deployed fencing authority.
+- The archived `replica-proof.tar` contains exactly two self-contained SQLite
+  snapshots with two matching receipts (`run-A`/`run-B`), thread-A revision 2,
+  and a distinct leader epoch on the promoted standby (1 versus 2). Both DBs
+  were checkpointed out of WAL before archiving. Private test keys are excluded.
+- No externally trusted producer, distributed durability, quorum, automatic
+  split-brain protection, independent AG-UI 1.0 conformance, media/DLP review,
+  corporate identity/ACL, real Agent Server integration or independent security
+  sign-off was demonstrated. **G1–G9 OPEN; parent milestone 2.6 OPEN;
+  adapter BLOCKED.**
+
+### Approved WSL evidence and pinned references (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26s-agui-2732f7c-20261119T121959Z`. The finalizer verifies all
+  eight physical artifact SHA-256 pins and inspects **both archived SQLite
+  databases in memory**, without modifying evidence or replaying test events.
+- Frozen upstream AG-UI 1.0 `2330368a2a74573902858867072406638ba3073d`, schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, schema
+  Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), pinned workshop `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `633828a5dbd4a82bf4535941140eadd63f69aa3c8a437758622e26cda3e39cb5` |
+| `review.md` | `bb06b99255f627f4eb06c194d4b642684284a6136bd880d05d38a77bb6186a73` |
+| `lint.log` | `192b83f69ccaa416cc82e75e184a67af6d955b1979bbb9404e236c44071eb55f` |
+| `build.log` | `df895321469fc4ac5a7e0f2467ae9e0390a2b88dac7604c0da7cadc47846a892` |
+| `compile.log` | `7ebcbba33f901efef5cdcab2e5237a828f8816d1a9bba9f46a4703c3f70eb041` |
+| `pure.log` | `0b67e2a72a7a04ce85aa6bcbbcb55a761a8fefb6d313e4673d28d6f732bb03e2` |
+| `fixture.log` | `9bf27c4cfe35d2638c31d3a9260903cb9b8baa1658d4ca7ce35358ee147649c0` |
+| `replica-proof.tar` | `4b8c004e7555bb50d014132aafacf429c845cfdfa654c3a55c260aa6ad76537f` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/producer-trust-replicas.ts` | `e91bc7567f32c2151bd5b6fee9c52c159fc96ce3c3a2f78d5eaad67ec4cfb2d2` |
+| `apps/web/src/ag-ui/producer-trust-replicas.spec.ts` | `084e08ace649ef44102a33ca637fed0c49bc4517cdbaaf9759bb36f65d3a30d9` |
+| `scripts/lab-26s-replica-review.py` | `ab828f523fa2e80594ffa43863c10db0b49d7d7004faf1cbe6dd4732974740c7` |
+
+### Remaining gates and next laboratory
+
+**2.6S selected root/two SQLite replicas PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The former primary can still write while isolated, so quorum, distributed
+storage correctness, trusted external fencing and production readiness are NOT
+proven. Next proposed: **2.6T AG-UI external fencing and replica-consistency evidence gates** — investigate external fencing,
+replica-consistency controls, authoritative epochs and independent failover
+integrity evidence before any adapter or milestone closure.

@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6S AG-UI producer trust anchors and replicated recovery gates
-    -> investigate independently anchored producer identity and key lifecycle
-    -> assess replica failover, receipts and revocation freshness beyond one database
-    -> preserve G1-G9/2.6 OPEN; adapter BLOCKED until independent conformance
+2.6T AG-UI external fencing and replica-consistency evidence gates
+    -> investigate externally enforced fencing and authoritative leader epochs
+    -> verify replica receipt consistency, revocation propagation and failover safety
+    -> keep G1-G9/2.6 OPEN and adapter BLOCKED pending independent evidence
 ~~~
 
 ## Completed
@@ -2751,13 +2751,28 @@ network-separated replication, distributed durability, a real AG-UI producer,
 corporate identity or security sign-off. **G1–G9 OPEN; parent 2.6 OPEN;
 adapter BLOCKED.**
 
-## Current sub-block — 2.6S AG-UI producer trust anchors and replicated recovery gates
+## Completed sub-block — 2.6S AG-UI producer trust anchors and replicated recovery gates
 
-Investigate independent producer trust anchors, authenticated event provenance,
-replica divergence and revocation consistency across separately persisted nodes.
-Real Agent Server integration requires independent issuer/ACL, normative AG-UI,
-media/DLP, identity and persistence evidence. Preserve G1–G9 and parent 2.6
-**OPEN**; adapter **BLOCKED**.
+Against published baseline `2732f7c7d82deaf1f95db337720d1c22a03309a7`, the selected WSL audit passed
+**269/269** TypeScript assertions, **49/49** local RS256/two-SQLite checks,
+**12/12** critical cases and five gates. Eight physical SHA-256-pinned
+artifacts, including two independently persisted SQLite snapshots in a TAR,
+are recorded in Lab 23 at `~/masl-evidence/masl-26s-agui-2732f7c-20261119T121959Z`.
+
+The offline root trust was simulated; signed replay reconciled two separate
+SQLite files on one host. The isolated old primary **still accepted writes**
+after standby promotion: no effective external fencing, consensus, quorum,
+enterprise PKI or cross-host durability was demonstrated. The TypeScript
+callback contract and Python fixture remain separate. **G1–G9 OPEN; parent
+2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6T AG-UI external fencing and replica-consistency evidence gates
+
+Independently evaluate writer fencing, external leader authority, replica
+conflict detection, durable receipts and revocation freshness under failures.
+Require real issuer/ACL, AG-UI 1.0 protocol, media/DLP, operational storage and
+security evidence before Agent Server integration. Preserve G1–G9 and parent
+2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 
