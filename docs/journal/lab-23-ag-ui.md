@@ -1875,3 +1875,92 @@ secure deployed service, protection from root/owner compromise or distributed
 storage atomicity. Next proposed: **2.6Y AG-UI deployable service policy and hostile-client isolation gates** — independently review
 service policy and hostile-client fault isolation while preserving all blocked
 integration and normative AG-UI gates.
+
+## 2.6Y — Static systemd unit candidate and real hostile-client OS fixture (scoped completion)
+
+Against published 2.6X baseline `78ef011c22cde2b1fa7bc93516ea46aac42c1357`, the approved WSL audit passed
+**1169/1169** TypeScript assertions, **225/225** Python assertions
+(149 published regressions and 76 new host/service checks), **12/12**
+critical cases and five gates (lint, production build, SSR compile, pure
+execution and isolated Linux fixture). The eight original physical evidence
+files remain outside Git, pinned by SHA-256 below.
+
+### Observed evidence and explicit unproven security boundaries
+
+- The pure 2.6Y TypeScript contract composes the published 2.6X through 2.6J
+  chain via injected observations. It does not consume real kernel identities,
+  systemd service status, SQLite files or authenticated AG-UI event producers.
+- The separate Python fixture used a temporary root helper after explicit
+  `sudo -v` to start unprivileged owner UID **61001**, authorized client UID
+  **61002**, and outsider UID **61003** on **one Linux host**. It did not create
+  persistent user accounts or install any service. Root and the privileged
+  helper can bypass discretionary controls and remain trusted.
+- The candidate `candidate-owner.service` was parsed and statically tested
+  against negative policy mutations. Its candidate directives include
+  `NoNewPrivileges=yes`, empty capabilities, `ProtectSystem=strict`, bounded
+  file descriptors and `StateDirectoryMode=0700`. It was **not installed,
+  started, managed or exercised by systemd**, nor is it proof of an actual
+  deployment identity or persistent service permission lifecycle.
+- With a temporary cross-UID UNIX owner, Linux DAC blocked direct SQLite
+  access; the client successfully used authorized RPC. An unrelated UID
+  was blocked by socket DAC and by `SO_PEERCRED` after deliberate socket
+  permission relaxation.
+- The owner rejected invalid JSON, scalar/list/null payloads, excessive
+  frames, unexpected RPC fields, unsupported operations, incomplete commits,
+  idle clients and unauthorized peers. During these probes the owner remained
+  alive, authorized health requests succeeded and persistent receipts were
+  unchanged. This is selected local **hostile-client robustness**, not an
+  exhaustive denial-of-service or kernel isolation assessment.
+- After a real owner exit **93** after COMMIT without ACK, selected operations
+  failed closed. Supervisor code retained the old socket inode, launched a
+  new nonroot owner with a distinct socket inode, persisted `boot_epoch=2`,
+  reapplied local runtime hardening and reconciled the receipt without a
+  duplicate commit.
+- The archive `service-hostile-proof.tar` contains exactly three physical
+  SQLite databases, `service-proof.json` and the **candidate-only** unit.
+  Authority ended on node-B at epoch 2, boot epoch 2; node-A retained one
+  receipt/revision 1 and node-B retained two receipts/revision 2. The common
+  prefix matches, but the lagging node-A is **not converged**. No cross-store
+  crash atomicity, quorum or replicated distributed leadership is proved.
+- No root/owner-compromise protection, deployed unit, production OS policy,
+  enterprise issuer/ACL, normative AG-UI 1.0 conformance, real media/DLP,
+  cross-host durability, independent security sign-off, operational Agent
+  Server adapter or production service identity was verified.
+  **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+### Approved WSL audit and pinned references (outside Git)
+
+- Approved evidence directory: `~/masl-evidence/masl-26y-agui-78ef011-20261119T180808Z`. This
+  finalizer checks all eight SHA-256-pinned physical files, 1169/225 selected
+  assertion labels, 12 critical cases, five gate logs and the exact five TAR
+  members, inspecting three SQLite databases **in memory**. It never reruns
+  `sudo`, hostile-client processes or systemd and never changes the evidence.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, official schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants); workshop reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `a67ad5202889d1d4fdb5e78486787e0c37f28cfb5f30666165a77f25a9f98c89` |
+| `review.md` | `e8e28cf1d0a81e14bc87735d359168855e714c540b7755d27668e72b81276605` |
+| `lint.log` | `d9728f7796db30a9e9d81ef5396380bf3f1aa175080a6b99fa8ce9593f654b57` |
+| `build.log` | `1fe9cf5d891666e89a9e940c5597f8a1ca2252c006c753fe7eded97f1c78f4ae` |
+| `compile.log` | `b2b3e6380086cb2f9e193a9eca50d76b6759c0060a06cd1167408c7a1be05f00` |
+| `pure.log` | `af670d9ce0ce59a4688c03c67a5894be56f65be733a108f20dff07e0d4bf9e88` |
+| `fixture.log` | `8f1a77dbdc6bb126618625962bd5b5862d099566cb1a9b9ee3718086a004509b` |
+| `service-hostile-proof.tar` | `0e5a1fe6bba7c4ff013be973e3569908f4ea68416f47c9395f37dc12d105cdfb` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/deployable-service-hostile-clients.ts` | `042b02b9e6b85a51fbf83fa0db25462e8b6577eb15b7f4a65a758cbc074e1298` |
+| `apps/web/src/ag-ui/deployable-service-hostile-clients.spec.ts` | `d650d1b8299d63673685db197497b996d8e857829a8b12be08a27b31633ef1d9` |
+| `scripts/lab-26y-service-review.py` | `ff7fab08dea74e4dcb461c720344348d762c2380fb34fdf5ac959487c84da269` |
+
+### Remaining gates and next laboratory
+
+**2.6Y selected static service policy and hostile-client isolation PASS;
+G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.** This does **not** imply that
+systemd service execution, root/owner compromise protection, multi-store
+atomicity, normative AG-UI compliance or operational integration were
+validated. Next proposed: **2.6Z AG-UI supervised service execution and persistent policy enforcement gates** — test actually supervised
+service behavior and persistent policy enforcement in a disposable environment
+before any production readiness or adapter milestone closure.

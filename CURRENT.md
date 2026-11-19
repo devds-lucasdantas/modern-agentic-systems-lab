@@ -7,9 +7,9 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6Y AG-UI deployable service policy and hostile-client isolation gates
-    -> examine reproducible service deployment and least-privilege policy
-    -> test hostile clients and fail-closed restart under changed runtime identities
+2.6Z AG-UI supervised service execution and persistent policy enforcement gates
+    -> examine supervised service execution and persistent Linux identity policy
+    -> test safe service restarts, hostile clients and privileged-boundary limits
     -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
@@ -2848,13 +2848,30 @@ production service; root/compromised-owner bypass, distributed atomicity,
 enterprise issuer/ACL and independent security approval remain unproven.
 **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6Y AG-UI deployable service policy and hostile-client isolation gates
+## Completed sub-block — 2.6Y AG-UI deployable service policy and hostile-client isolation gates
 
-Investigate reproducible least-privilege service policies and deployment
-identity, hostile-client denial, owner replacement and persistent socket/storage
-permissions. Demand independent issuer/ACL, normative AG-UI 1.0, media/DLP,
-production persistence and security evidence before any Agent Server adapter.
-Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+Against the published baseline `78ef011c22cde2b1fa7bc93516ea46aac42c1357`, the selected WSL audit passed
+**1169/1169** TypeScript assertions, **225/225** Python kernel/hostile-client
+checks (149 regressions, 76 new), **12/12** critical cases and five gates.
+Eight physical SHA-256-pinned artifacts, including three independently stored
+SQLite snapshots, `service-proof.json` and `candidate-owner.service`, are
+recorded in Lab 23 at `~/masl-evidence/masl-26y-agui-78ef011-20261119T180808Z`.
+
+The temporary cross-UID Linux owner handled hostile clients without corrupting
+receipts, survived the selected probes and restarted after a crash, with
+idempotent lost-ACK recovery. The systemd unit was **only statically reviewed,
+never installed or executed**. Root/owner-compromise bypass, production OS
+policy, distributed atomicity and independent security approval remain unproven.
+**G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6Z AG-UI supervised service execution and persistent policy enforcement gates
+
+Investigate real supervised service execution and persistence of least-privilege
+identity, directory and socket policy under restart and hostile-client load.
+Keep root/owner compromise, cross-host consensus, distributed atomicity and
+normative AG-UI gaps explicitly unresolved. Require independent issuer/ACL,
+media/DLP, production persistence and security approval before Agent Server
+integration. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 
