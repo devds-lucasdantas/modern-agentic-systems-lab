@@ -7,9 +7,9 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
-    -> investigate supervised least-privilege storage owner deployment
-    -> test identity lifecycle, denial and owner compromise response boundaries
+2.6Y AG-UI deployable service policy and hostile-client isolation gates
+    -> examine reproducible service deployment and least-privilege policy
+    -> test hostile clients and fail-closed restart under changed runtime identities
     -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
@@ -2831,13 +2831,30 @@ No protection against root, owner compromise, namespace bypass, distributed
 atomicity or production identity was demonstrated. **G1–G9 OPEN; parent 2.6
 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
+## Completed sub-block — 2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
 
-Investigate operational provisioning of distinct owner/client identities,
-least-privilege service and socket lifecycle, privilege-boundary failures and
-crash isolation. Require independent AG-UI 1.0 conformance, issuer/ACL,
-media/DLP, persistence and security evidence before integrating with Agent
-Server. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+Against the published baseline `b0e9b23ad2da1b970325e7d394dfa3d6afae0a72`, the approved WSL run passed
+**779/779** TypeScript assertions, **149/149** Python regression/kernel
+checks, **12/12** critical cases and all five gates. Eight SHA-256-pinned
+artifacts, three physical SQLite snapshots and `runtime-proof.json` were
+inspected and documented in Lab 23 at `~/masl-evidence/masl-26x-agui-b0e9b23-20261119T171252Z`.
+
+The temporary cross-UID Linux owner demonstrated `no_new_privs`, zero
+capabilities, restricted dumpability and core dumps, limited file descriptors,
+UNIX socket rotation after a genuine owner crash, durable `boot_epoch=2`,
+fail-closed stale socket access and idempotent lost-ACK reconciliation.
+The selected DAC/identity and runtime controls were not deployed as a
+production service; root/compromised-owner bypass, distributed atomicity,
+enterprise issuer/ACL and independent security approval remain unproven.
+**G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6Y AG-UI deployable service policy and hostile-client isolation gates
+
+Investigate reproducible least-privilege service policies and deployment
+identity, hostile-client denial, owner replacement and persistent socket/storage
+permissions. Demand independent issuer/ACL, normative AG-UI 1.0, media/DLP,
+production persistence and security evidence before any Agent Server adapter.
+Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

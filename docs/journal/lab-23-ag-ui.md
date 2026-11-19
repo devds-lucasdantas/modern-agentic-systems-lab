@@ -1796,3 +1796,82 @@ SQLite authority and replica commits are not distributed-atomic. Next proposed:
 **2.6X AG-UI cross-UID runtime hardening and failure-isolation gates** — investigate stronger process identity provisioning,
 privilege separation and failure isolation without overstating operational
 readiness or advancing a real Agent Server adapter.
+
+## 2.6X — Nonroot Linux owner hardening and fail-stop socket lifecycle (scoped completion)
+
+Against published 2.6W baseline `b0e9b23ad2da1b970325e7d394dfa3d6afae0a72`, the selected WSL review passed
+**779/779** pure TypeScript assertions, **149/149** Python assertions
+(106 published 2.6W regressions and 43 new real Linux runtime checks),
+**12/12** critical cases and five gates (lint, production build, SSR compile,
+pure execution and Linux fixture). All eight original physical artifacts are
+SHA-256 pinned below and retained outside Git.
+
+### Observed hardening and failure isolation, not deployed service security
+
+- The pure TypeScript 2.6X layer composes the published 2.6W through 2.6J
+  contracts via injected observations, not actual Linux/process/SQLite system
+  calls or normative AG-UI production event processing.
+- A temporary root helper (explicit `sudo -v`) started separate nonroot Linux
+  UIDs: owner **61001**, authorized client **61002** and outsider **61003**.
+  No permanent OS accounts or service units were created; the privileged
+  helper remains capable of bypassing local discretionary access controls.
+- The selected owner demonstrated Linux `PR_SET_NO_NEW_PRIVS`, zero effective
+  and bounding capabilities, no supplemental groups, disabled `RLIMIT_CORE`,
+  `PR_SET_DUMPABLE=0`, bounded `RLIMIT_NOFILE=128` and inability to regain UID 0.
+  These are fixture-local observations, **not** proof against root, kernel or
+  compromised owner attacks, nor proof of a deployed supervisor policy.
+- Linux DAC kept the storage directory owner-only (`0700`), three SQLite
+  files owner-only (`0600`) and a UNIX socket accessible to the authorized
+  client (`0660`), checked with `SO_PEERCRED`. Different-UID unprivileged
+  clients could not write SQLite directly; unauthorized socket requests failed.
+- The owner intentionally exited with status 93 after a durable COMMIT but
+  before sending an ACK. During absence, client operations failed closed;
+  the supervisor preserved the dead socket path, started a new owner on a
+  distinct socket inode and increased a **durable boot_epoch to 2**. Lost ACK
+  reconciliation did **not** duplicate receipt/commit.
+- Selected promotion advanced authority to node-B **epoch 2**, denied stale
+  epoch writes, and left node-A lagging at revision 1 (one receipt) versus
+  node-B revision 2 (two receipts). The TAR contains these **three independent
+  physical SQLite snapshots** plus `runtime-proof.json`; the finalizer checks
+  their contents and owner/mode metadata **in memory without extraction**.
+- No persistent `systemd` units, root/compromised-owner defense, deployment
+  policy, arbitrary fault tolerance, quorum, consensus, cross-host durability,
+  crash-atomic three-store promotion, production issuer/ACL, independent AG-UI
+  conformance/media/DLP or security sign-off was proven. No Agent Server
+  adapter was integrated. **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+### Pinned WSL evidence and official references
+
+- Approved directory: `~/masl-evidence/masl-26x-agui-b0e9b23-20261119T171252Z`. The finalizer verifies
+  the eight original physical SHA-256 hashes, approved JSON report, all 12
+  critical TypeScript markers, 149 Python pass records and immutable SQLite
+  archive. It does not rerun sudo/kernel tests or mutate physical evidence.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants); workshop commit
+  `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `eb8c5e55bbe4c38b1c2a3d98bf5f5fa1a172a680b47e1f6deb054925202bda37` |
+| `review.md` | `2b6cf2468161140583a65d2fa02c685891a5f012d04e4684a153b1c902a78a9e` |
+| `lint.log` | `bb004ed9ef7e4c860d646a62f0e9b0a9c2147c0495055335f0c894e1c91a34ae` |
+| `build.log` | `d2142a2e8ec66fda2de6f67c22f5b6f9dd4146dd1eb51b1139f229e7f17da7c6` |
+| `compile.log` | `b42c77864a56497074e4920529eb3a9d21abdc433a3d7d281e672126d921be6f` |
+| `pure.log` | `9d364cce9172d3e61bab4f026f772d6ec2f58b03d1727e63a9edfd9877723f5d` |
+| `fixture.log` | `a1b38816544b7bdd670a2be049655fbb75801cc9b1dd55db9bdadd97eeecac87` |
+| `runtime-hardening-proof.tar` | `e0139ad898fd9bfc4ffcee095753aad0a8d3aa71314e2e70467480a2a513a749` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/cross-uid-runtime-hardening.ts` | `748bc7d18671f8d2e5d88ba500c104e37f935aa5eaffbccafc2cd00fcdc13333` |
+| `apps/web/src/ag-ui/cross-uid-runtime-hardening.spec.ts` | `7d683771b4771a17f19d5c39d6ef4fdfbd9505046c5204a1835cd9dc68a61167` |
+| `scripts/lab-26x-runtime-review.py` | `ef8f8530a2500722504fafa2b6d793ab832ef0b8492a91bd9d3274cf988c5e68` |
+
+### Remaining gaps and next laboratory
+
+**2.6X selected owner-hardening and fail-stop restart PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+Cross-UID kernel DAC and selected process-hardening evidence does not imply a
+secure deployed service, protection from root/owner compromise or distributed
+storage atomicity. Next proposed: **2.6Y AG-UI deployable service policy and hostile-client isolation gates** — independently review
+service policy and hostile-client fault isolation while preserving all blocked
+integration and normative AG-UI gates.
