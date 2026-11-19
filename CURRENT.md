@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6R AG-UI producer authenticity and distributed recovery evidence gates
-    -> define authenticated AG-UI producer identity and event provenance requirements
-    -> examine cross-node failover, receipt reconciliation and stale revocation gates
-    -> keep G1-G9/2.6 OPEN; adapter BLOCKED until independent evidence
+2.6S AG-UI producer trust anchors and replicated recovery gates
+    -> investigate independently anchored producer identity and key lifecycle
+    -> assess replica failover, receipts and revocation freshness beyond one database
+    -> preserve G1-G9/2.6 OPEN; adapter BLOCKED until independent conformance
 ~~~
 
 ## Completed
@@ -2736,13 +2736,28 @@ The separate TypeScript callbacks remain pure test harness contracts. No
 operational Agent Server integration or independent security review occurred.
 **G1–G9 OPEN; adapter BLOCKED; parent milestone 2.6 OPEN.**
 
-## Current sub-block — 2.6R AG-UI producer authenticity and distributed recovery evidence gates
+## Completed sub-block — 2.6R AG-UI producer authenticity and distributed recovery evidence gates
 
-Specify and evaluate independent event-producer identity and integrity evidence,
-with isolated failover/replay and receipt consistency under service disruptions.
-Before any Agent Server adapter implementation, require external security,
-issuer/ACL, normative AG-UI 1.0, media/DLP and persistence evidence.
-Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+On published baseline `b98f63ac9364c7cf6b8a52ccd03c5188f72a9cc4`, the WSL review passed **380/380** selected
+TypeScript assertions, **48/48** local producer RS256/mTLS/SQLite checks,
+**13/13** critical cases and five gates. Eight SHA-256-pinned artifacts,
+including the physical SQLite database, are recorded in Lab 23 at
+`~/masl-evidence/masl-26r-agui-b98f63a-20261119T101244Z`.
+
+The signed envelope used disposable local RSA credentials; two independent
+loopback TLS server processes shared **one SQLite file**. The simulated lost
+acknowledgment and primary termination demonstrated local receipt recovery, not
+network-separated replication, distributed durability, a real AG-UI producer,
+corporate identity or security sign-off. **G1–G9 OPEN; parent 2.6 OPEN;
+adapter BLOCKED.**
+
+## Current sub-block — 2.6S AG-UI producer trust anchors and replicated recovery gates
+
+Investigate independent producer trust anchors, authenticated event provenance,
+replica divergence and revocation consistency across separately persisted nodes.
+Real Agent Server integration requires independent issuer/ACL, normative AG-UI,
+media/DLP, identity and persistence evidence. Preserve G1–G9 and parent 2.6
+**OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

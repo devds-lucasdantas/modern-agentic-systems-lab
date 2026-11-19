@@ -155,7 +155,8 @@
   - [x] 2.6O AG-UI external issuer, revocation and transactional store failure gates
   - [x] 2.6P AG-UI cross-service issuer trust and recovery integration gates
   - [x] 2.6Q AG-UI authenticated transport and recovery readiness gates
-  - [ ] 2.6R AG-UI producer authenticity and distributed recovery evidence gates
+  - [x] 2.6R AG-UI producer authenticity and distributed recovery evidence gates
+  - [ ] 2.6S AG-UI producer trust anchors and replicated recovery gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

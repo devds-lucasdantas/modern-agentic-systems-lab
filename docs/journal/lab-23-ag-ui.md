@@ -1326,3 +1326,77 @@ network-separated or multi-node recovery, full AG-UI 1.0 schema compliance and
 independent security review remain unproven. Next proposed: **2.6R AG-UI producer authenticity and distributed recovery evidence gates** —
 require externally grounded producer identities and failure/replay evidence
 before any real adapter or milestone closure.
+
+## 2.6R — Signed producer events and two-node shared SQLite recovery gates (scoped completion)
+
+Against the published 2.6Q baseline `b98f63ac9364c7cf6b8a52ccd03c5188f72a9cc4`, the WSL audit passed
+**380/380** selected TypeScript assertions, **48/48** local RS256/mTLS/SQLite
+fixture checks, **13/13** critical TypeScript markers, and all **five** gates
+(lint, production build, SSR compilation, pure execution, network fixture).
+The eight original SHA-256-pinned evidence artifacts remain outside Git.
+
+### Verified experimental behavior and limits
+
+- TypeScript 2.6R composes the published *pure* 2.6Q through 2.6J review
+  contracts using injected fixture metadata; callbacks do not authenticate
+  transport peers, RSA signatures, real event sources or SQLite connections.
+- The separate Python fixture used an ephemeral RSA producer private key to
+  sign a canonical event envelope (producer ID, tenant, thread, run, sequence,
+  revision, revocation epoch and SHA-256 of event bytes). It verified the RS256
+  signature with an independently supplied **local test public key** over
+  actual loopback mTLS, and refused modified signed fields, tampered payload,
+  untrusted signing key and duplicate JSON keys. This is **not proof of a real
+  authenticated AG-UI producer** or an enterprise-backed signing authority.
+- Two distinct local OS TLS server processes were started on `127.0.0.1`, with
+  disposable local CA/certificates and gateway CN test ACL. They used **one
+  shared SQLite file**: this demonstrates coordination across local processes,
+  **not replicated/distributed persistence, quorum, network-separated failover,
+  consensus or multi-node durability**.
+- A test primary committed a signed event but intentionally withheld its ack.
+  The primary process was terminated, and the standby reconciled the same
+  persisted receipt without an additional write. This does **not** establish
+  recovery from power loss, storage outage or a real network partition.
+- A signed CAS race between two loopback server processes resulted in exactly
+  one accepted producer sequence update and one stale loser. The final database
+  records **five** receipts, four `thread-A` revisions and one `race-thread`
+  revision, with receipt labels from both local processes. Primary producer
+  sequence reached 4; its revocation epoch reached 3 and its key was disabled.
+- No operational Agent Server integration, corporate PKI, online JWKS/OIDC,
+  authoritative producer registration, external revocation SLA, media/DLP,
+  independent AG-UI 1.0 conformance or security sign-off was demonstrated.
+  **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED**.
+
+### Approved WSL evidence (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26r-agui-b98f63a-20261119T101244Z`. The finalizer verifies each
+  original evidence digest, report metadata, assertion markers, and the
+  physical SQLite state **read-only**, without rerunning network tests.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, official 1.0 schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), pinned workshop
+  reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `ee2154e3e75426f149217d97154a7c9a19914c86942e04531e4c3bbf9fbff535` |
+| `review.md` | `6137d610f92da2b06be38055415bf24d5cdd4284a6ab2e110fa09446fe439579` |
+| `lint.log` | `925503f9ced519bca7b00b41a08fff676f25a5c55131a72cbe1265cd44b5aacf` |
+| `build.log` | `2e4411af3df4f0f9a8e8b478d6abc10007252a54f7bad2b30fd923f19f9ef98e` |
+| `compile.log` | `7099a88232e1257ddb0424caee5ccd7a4d8134cc6226e2d72e0db7e94e764f4f` |
+| `pure.log` | `70085afafc091023585429de9b2f83045dded1ff6be3d4342573ebf036294ee0` |
+| `fixture.log` | `328124cca2c1eb5dcf779b4584dd6eae0807592e98c277d5a82139de75912d24` |
+| `producer-proof.sqlite3` | `ea839e3de7aecdc1a5b9a218c324a5835c7b0d3051ac28521d0c9a383dfd6490` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/producer-failover-evidence.ts` | `8a86e5cfc60c74b3d968fbeea839eb0716c8f54c6243c7df4efaae836c1122ce` |
+| `apps/web/src/ag-ui/producer-failover-evidence.spec.ts` | `b1b30aa73b9fa60c0d0e9e448b88a6c44c7819be3f6b8ab3609a07f6a4c2c7de` |
+| `scripts/lab-26r-producer-failover-review.py` | `c3dd1c6efd2b713fbbe7d5cdb55900fe04e0f103198ada5281e52ec2cf855ee1` |
+
+### Remaining gates and next step
+
+**2.6R isolated signed producer/local failover PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The authenticated producer and two-node recovery experiments were local and
+used disposable credentials plus one file-backed SQLite database. Next proposed:
+**2.6S AG-UI producer trust anchors and replicated recovery gates** — investigate independently established producer trust roots,
+network-separated replicas, revocation continuity and receipt reconciliation
+before any real adapter or milestone closure.
