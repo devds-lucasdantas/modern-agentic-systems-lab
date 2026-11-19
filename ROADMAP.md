@@ -160,7 +160,8 @@
   - [x] 2.6T AG-UI external fencing and replica-consistency evidence gates
   - [x] 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
   - [x] 2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
-  - [ ] 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
+  - [x] 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
+  - [ ] 2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

@@ -7,9 +7,9 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6W AG-UI cross-UID storage ownership and enforced mediation gates
-    -> investigate a truly different OS principal for database file ownership
-    -> test file/socket ACL and trusted-owner restart under denial conditions
+2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
+    -> investigate supervised least-privilege storage owner deployment
+    -> test identity lifecycle, denial and owner compromise response boundaries
     -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
@@ -2813,14 +2813,31 @@ after a committed lost-ack and the selected `prepared` promotion recovered, but
 cross-store transactions remain non-atomic. No cross-UID or production security
 sign-off occurred. **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
+## Completed sub-block — 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
 
-Investigate distinct OS-identity storage ownership, mandatory file/socket ACL,
-least-privilege access to SQLite files and mediation by a trusted owner.
-Validate fail-stop behavior when access checks fail and prevent unsafe
-promotion after a crash. Independent producer/issuer/ACL, normative AG-UI 1.0,
-media/DLP, persistence and security evidence remain necessary before a real
-Agent Server adapter. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+Against the published baseline `e005fc7d5a67612124b13cda048fc3f5c8b86d11`, the selected WSL review passed
+**639/639** TypeScript assertions, **106/106** Python checks (72 regressions,
+34 real cross-UID tests), **12/12** critical cases and all five gates.
+Eight SHA-256-pinned evidence artifacts, including `uid-proof.json` and three
+independent SQLite snapshots in TAR, are recorded in Lab 23 at
+`~/masl-evidence/masl-26w-agui-e005fc7-20261119T162840Z`.
+
+A temporary privileged helper launched separate non-root Linux UIDs for
+SQLite ownership and clients. Linux DAC denied direct database access by
+the different-UID unprivileged client; the authorized UNIX RPC used `SO_PEERCRED`.
+The owner restarted after a lost acknowledgment, reconciled without duplicate
+writes and rejected selected stale-leader requests after promotion.
+No protection against root, owner compromise, namespace bypass, distributed
+atomicity or production identity was demonstrated. **G1–G9 OPEN; parent 2.6
+OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
+
+Investigate operational provisioning of distinct owner/client identities,
+least-privilege service and socket lifecycle, privilege-boundary failures and
+crash isolation. Require independent AG-UI 1.0 conformance, issuer/ACL,
+media/DLP, persistence and security evidence before integrating with Agent
+Server. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

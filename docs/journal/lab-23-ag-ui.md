@@ -1713,3 +1713,86 @@ promotion recovery do not prove arbitrary distributed fault tolerance.
 Next proposed: **2.6W AG-UI cross-UID storage ownership and enforced mediation gates** — examine distinct OS principal ownership,
 file/socket ACL, non-bypassable writer mediation and safe recovery before any
 real adapter or milestone closure.
+
+## 2.6W — Real cross-UID Linux DAC and owner-mediated UNIX socket recovery (scoped completion)
+
+Against the published 2.6V baseline `e005fc7d5a67612124b13cda048fc3f5c8b86d11`, the selected WSL audit passed
+**639/639** pure TypeScript assertions, **106/106** Python assertions
+(72 published 2.6V regressions and 34 new cross-UID checks), **12/12**
+critical cases and all **five** gates (lint, production build, SSR compilation,
+pure execution and isolated Linux kernel/SQLite fixture). Eight original
+physical evidence artifacts remain outside Git, pinned by SHA-256 below.
+
+### Selected OS-enforced evidence and security limitations
+
+- The 2.6W TypeScript pure contract composes published 2.6V through 2.6J
+  using injected observations, not direct access to Linux UIDs, file ACLs,
+  socket credentials or real AG-UI event provenance.
+- The separate Linux Python fixture, explicitly authorized with `sudo -v`,
+  used a privileged helper to launch an unprivileged **owner UID 61001**,
+  **authorized client UID 61002** and **outsider UID 61003**, without creating
+  persistent Linux accounts. The helper itself can override discretionary
+  access controls and is not protected by this experiment.
+- Linux DAC enforced owner-only access to the SQLite storage directory (`0700`)
+  and its three SQLite files (`0600`). The different-UID authorized client was
+  denied direct read/write/create/open operations while its UNIX RPC through
+  the owner remained usable. This evidence is kernel-enforced for the selected
+  unprivileged client, unlike the voluntarily installed seccomp of 2.6V.
+- The UNIX socket had owner UID 61001 and client group 61002 with mode `0660`.
+  An unrelated third UID was denied socket connection by DAC. Even after the
+  test made socket permissions temporarily permissive, the owner's `SO_PEERCRED`
+  check rejected the outsider. No network PKI/OIDC or production service identity
+  was involved.
+- The owner intentionally exited after durable COMMIT without returning an
+  acknowledgment; an independent restarted process under UID 61001 reconciled
+  exactly the existing receipt without an extra write. While the owner was
+  unavailable, selected requests failed closed. The owner subsequently promoted
+  node-B to epoch 2 and rejected obsolete node-A and stale-epoch writes.
+- The archived `crossuid-proof.tar` contains **three independently stored**
+  SQLite files and `uid-proof.json`. The authority ended stable at node-B epoch 2,
+  node-A retained one receipt (revision 1, epoch 1), and node-B had two receipts
+  (revision 2, epoch 2). The matched receipt prefix does **not** establish
+  complete replica convergence or atomic multi-store failover.
+- The three databases and socket ran on **ONE host**, in disposable `/tmp`
+  storage. Root, owner compromise, arbitrary privilege-escalation attacks,
+  operational deployment ACL, namespace escapes, quorum, distributed durability,
+  cross-store crash atomicity, independently authenticated AG-UI production
+  events, media/DLP and security sign-off were **not** proven.
+  **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED**.
+
+### Approved WSL evidence and pinned references (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26w-agui-e005fc7-20261119T162840Z`. The finalizer validates
+  all eight physical hashes and immutable `uid-proof.json`/three SQLite
+  snapshots **in memory**. It does not rerun `sudo`, mutate evidence, or
+  change the security configuration of the executing machine.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, official 1.0 schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), workshop
+  `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `d50230100af7bec4766bd4d7ea80a1432abc8cfd6c2df82d894dc789bb8e8c3b` |
+| `review.md` | `de9bcbcc211611ecf17aee955999efcc3620c9c5f035be006fdee03fef5a5db1` |
+| `lint.log` | `31abdcf9c2cc52b11b997b4c2c1fe691ea63194b5922c20a0563dc755cf32c18` |
+| `build.log` | `9f64e8dcd78889004af40e765bc214d8f5d378a640a46c3ffdf2de31d9f154e8` |
+| `compile.log` | `ef375f481292c9fc746b89a27155b76cc39c416b7b4f9e908f19bef7945c4290` |
+| `pure.log` | `35395e2f2f7c3ed7d2e985bd35dd9b1e468fcbadc2bb68cf93a15929d13ab3c5` |
+| `fixture.log` | `7b5a17b601dea43e673c542f3985a7b538cf151a073890b3b56861c1571dedd8` |
+| `crossuid-proof.tar` | `a835becd798b9d99c56219cde054586ec076f1282a1c660e6a72b49af892609d` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/cross-uid-storage-mediation.ts` | `d89ab3f022121bc9d289f9d00fd216576931cfb3b97b50cee122ee7f018d1477` |
+| `apps/web/src/ag-ui/cross-uid-storage-mediation.spec.ts` | `8ace5623aa7722ff536cb7e1981477ea5bb8fe6269724774fed50aca43068a93` |
+| `scripts/lab-26w-crossuid-review.py` | `eb575fe0ec11b77cca14fced54d784d578502945ab1927e725aa6287eb018add` |
+
+### Remaining gaps and next laboratory
+
+**2.6W selected cross-UID Linux DAC/SO_PEERCRED PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+A cross-UID client cannot directly access SQLite under the selected Linux
+permissions, but root and the owner identity remain trusted, while separate
+SQLite authority and replica commits are not distributed-atomic. Next proposed:
+**2.6X AG-UI cross-UID runtime hardening and failure-isolation gates** — investigate stronger process identity provisioning,
+privilege separation and failure isolation without overstating operational
+readiness or advancing a real Agent Server adapter.
