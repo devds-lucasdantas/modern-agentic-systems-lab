@@ -7,9 +7,9 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
-    -> investigate OS/storage identity separation and write mediation at file boundary
-    -> test fail-stop writes and restart reconciliation after incomplete promotion
+2.6W AG-UI cross-UID storage ownership and enforced mediation gates
+    -> investigate a truly different OS principal for database file ownership
+    -> test file/socket ACL and trusted-owner restart under denial conditions
     -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
@@ -2796,13 +2796,31 @@ local OS processes. A same-UID writer with direct SQLite file access
 replicas and authority are not crash-atomic, and there was no external security
 sign-off or production identity. **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
+## Completed sub-block — 2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
 
-Investigate file-level identity/ACL enforcement that a same-UID direct writer
-cannot bypass, along with safe storage ownership and fail-stop promotion
-recovery. Real integration requires independent AG-UI 1.0 conformance,
-authenticated issuer/ACL, media/DLP, security and durable persistence evidence.
-Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+Against the published baseline `55080d65044fb14da37d8c8f432c377fc3fad0e1`, the selected WSL audit passed
+**487/487** pure TypeScript assertions, **72/72** local owner/SQLite checks
+(39 regression and 33 new), **14/14** critical cases, and all five gates.
+Eight SHA-256-pinned artifacts, including the three physical SQLite snapshots,
+are recorded in Lab 23 at `~/masl-evidence/masl-26v-agui-55080d6-20261119T152349Z`.
+
+A separate SQLite-owning process served selected RPC calls through a local UNIX
+socket. A voluntarily confined same-UID client attempted Linux `seccomp` file
+open denial; the actual kernel result is retained in the approved WSL review.
+A non-confined **same-UID** process still bypassed broker-mediated writes on a
+disposable copy, so mandatory isolation is **NOT proven**. The owner restarted
+after a committed lost-ack and the selected `prepared` promotion recovered, but
+cross-store transactions remain non-atomic. No cross-UID or production security
+sign-off occurred. **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
+
+Investigate distinct OS-identity storage ownership, mandatory file/socket ACL,
+least-privilege access to SQLite files and mediation by a trusted owner.
+Validate fail-stop behavior when access checks fail and prevent unsafe
+promotion after a crash. Independent producer/issuer/ACL, normative AG-UI 1.0,
+media/DLP, persistence and security evidence remain necessary before a real
+Agent Server adapter. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

@@ -1632,3 +1632,84 @@ not an atomic distributed transaction. Next proposed: **2.6V AG-UI storage-isola
 investigate actual OS-level storage isolation, exclusively mediated write
 identities, failure-safe promotion and recovery across independently persisted
 stores before any operational adapter or milestone closure.
+
+## 2.6V — Local UNIX socket owner, voluntary seccomp and fail-stop recovery (scoped completion)
+
+On published 2.6U baseline `55080d65044fb14da37d8c8f432c377fc3fad0e1`, the WSL review passed **487/487**
+selected TypeScript assertions, **72/72** local owner/SQLite/Python assertions
+(39 published 2.6U regressions and 33 new checks), **14/14** critical TypeScript
+markers and all **five** gates (lint, production build, SSR compilation,
+pure execution, and isolated owner/socket/crash fixture). Eight immutable
+SHA-256-pinned physical evidence artifacts remain outside Git.
+
+### Verified behavior and explicitly unresolved isolation boundary
+
+- The 2.6V TypeScript pure review composes published 2.6U through 2.6J
+  via injected fixture observations. It does not consume the actual SQLite
+  files, socket credentials, Linux seccomp status or real AG-UI producer events.
+- The separate Python fixture ran a SQLite-owning OS process with a local
+  UNIX socket endpoint and restrictive DAC modes (`0700` owner directory;
+  `0600` files/socket). The owner mediated selected commit/reconcile calls.
+  This is **same-UID** process separation, not identity separation by Linux UID.
+- A test client voluntarily installed Linux `seccomp` restrictions when the
+  kernel allowed it. In that selected mode, opening the SQLite file was
+  blocked for the confined client while the UNIX RPC remained usable.
+  Whether this was available on the selected WSL run is retained in the
+  `review.json` and `fixture.log`; **no enforcement is claimed if unavailable**.
+- A disposable unsandboxed **same-UID** connection directly modified SQLite
+  without consulting the owning broker. Because `seccomp` is opt-in and
+  discretionary modes do not isolate same-UID processes, universal
+  mandatory fencing **remains unproven**. The bypass did not contaminate the
+  three archived databases.
+- The owner committed a receipt and intentionally terminated its process
+  after COMMIT without returning the ack. A restarted owner reconciled the
+  exact receipt without duplicating the write. A second real child process
+  terminated after durable `prepared` promotion; while pending, the broker
+  denied commits. Selected recovery checked receipt prefix and published
+  node-B epoch 2 after reconciling the standby.
+- The three independently stored SQLite files share **ONE host**: authority
+  journal stable at node-B epoch 2; node-A at revision 2 with two receipts;
+  node-B at revision 3 with three receipts. The prefix agrees, but node-A
+  remains lagging. This is not cross-host durability, quorum, consensus or
+  crash-atomic promotion across independent storage transactions.
+- The test did **not** establish cross-UID storage isolation, reliable kernel
+  policy deployment, operational external trust/ACL, authenticated production
+  AG-UI event provenance, normative conformance, media/DLP approval,
+  independent security sign-off or a real Agent Server adapter.
+  **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+### Approved audit and frozen references (outside Git)
+
+- WSL review directory: `~/masl-evidence/masl-26v-agui-55080d6-20261119T152349Z`. The finalizer
+  checks all eight original physical SHA-256 pins, report metadata, all
+  selected assertion labels, and the three SQLite snapshots **read-only in
+  memory**. It does not rerun seccomp, subprocess fault injection or Git writes.
+- Pinned official AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, 1.0 schema SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`, Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), workshop
+  reference `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `8e65e63f0bdb484e9ace6436c4b922a2c476c8620b6257cb110e25497f51eff4` |
+| `review.md` | `a73750f74d322e1a2596d102c4a6685596b4bf7d7a06dd2b6b6afb2dbd0b1b09` |
+| `lint.log` | `1be64f526b076b5a9c516291c1c4378423095b4eb9d105487bf0f9f14ebc5745` |
+| `build.log` | `df895321469fc4ac5a7e0f2467ae9e0390a2b88dac7604c0da7cadc47846a892` |
+| `compile.log` | `a39c92caba0bad42a67d0465c0b8111940a147619bda78f52e3c05af0adc2688` |
+| `pure.log` | `168b1d5b137f38edc7b009e002227db20ed20bad6bec982b6e0ba36fac6b2181` |
+| `fixture.log` | `8bd8064f52338aeadc40f7a6400bfdf09b7ebcd0a31f198d7341a5f527466137` |
+| `storage-isolation-proof.tar` | `1a44e05236624659a6c5581d8131ccef855ab04440df3d54846bc79b0ef0d434` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/storage-isolation-failstop.ts` | `129f50288e80de013f97f073becc97b6bc94671bcb36287f694c28a9da080f38` |
+| `apps/web/src/ag-ui/storage-isolation-failstop.spec.ts` | `e053b19505fed76a5142f456d4b3782e782aede6b0a0a922600c7cd3742b59a6` |
+| `scripts/lab-26v-storage-review.py` | `3e36c42aeca3625ccc625a5545af55c79b0cb1168b7e31bc5c3143bb1d8302fe` |
+
+### Remaining gates and next laboratory
+
+**2.6V selected owner/socket/seccomp-rehearsal PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The local same-UID direct-file bypass remains possible; selected restart and
+promotion recovery do not prove arbitrary distributed fault tolerance.
+Next proposed: **2.6W AG-UI cross-UID storage ownership and enforced mediation gates** — examine distinct OS principal ownership,
+file/socket ACL, non-bypassable writer mediation and safe recovery before any
+real adapter or milestone closure.
