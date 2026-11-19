@@ -1556,3 +1556,79 @@ still bypassed it and promotion was not crash-atomic across stores. Next propose
 **2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates** — investigate mandatory enforcement at the storage boundary,
 writer-token expiry and crash-recovery consistency before considering an
 operational AG-UI adapter or milestone closure.
+
+## 2.6U — Guarded SQLite broker and local crash-recovery promotion journal (scoped completion)
+
+Against published 2.6T baseline `ace5da75a78c1dee1af32fdde7d6fa1f4ee3cc13`, the WSL audit passed **348/348**
+selected TypeScript assertions, **39/39** local broker/SQLite/RS256 checks,
+**13/13** critical TypeScript cases and all **five** gates (lint, production build,
+SSR compilation, pure execution and isolated crash-recovery fixture). The eight
+original physical evidence files remain outside Git, pinned by SHA-256 below.
+
+### Proven experimental behavior and explicit limits
+
+- The TypeScript 2.6U contract composes the published 2.6T through 2.6J pure
+  gates using injected broker/journal observations. Those callbacks are not
+  authenticated event producers, actual SQL operations or an Agent Server adapter.
+- The Python fixture uses a **test RSA root**, signed producer envelopes and
+  signed fencing grants. The three independently persisted SQLite databases
+  (authority, node-A and node-B) run on **ONE host**. No deployed identity
+  provider, network-separated authority, quorum, consensus or enterprise PKI.
+- A Python SQLite `set_authorizer` rejects unadmitted writes **only on the
+  connection opened by the controlled broker**. The experiment deliberately
+  confirms that a same-UID writer opening a replica SQLite file directly can
+  bypass the authorizer. Thus **mandatory universal fencing remains OPEN**.
+- The local authority maintains a durable promotion intent journal with
+  `prepared`, `replica-applied` and `stable` phases. Real child OS processes
+  terminated with `os._exit` after the first two phases; a separate recovery
+  run reconciled the persisted journal, authority and replica receipt state.
+  These selected scenarios passed, but independent store commits are **not**
+  crash-atomic, and this is not proof of arbitrary fault tolerance.
+- Selected broker commits fail closed while promotion is pending, with missing
+  authority, bad signed ticket, stale leader or conflicting registered sequence.
+  Corrupted replica receipt/registry state or unknown journal phase blocks
+  recovery rather than silently publishing an inconsistent leader.
+- The archived `mandatory-proof.tar` has exactly three self-contained SQLite
+  snapshots: authority with stable journal and node-B leader in epoch 2;
+  node-A with one receipt at revision 1 and a stale local leader role;
+  node-B with two receipts at revision 2. No cross-store atomicity or
+  automated production fencing guarantee can be inferred.
+- No real AG-UI event producer, operational Agent Server adapter, enterprise
+  ACL/security/DLP review, independent normative AG-UI 1.0 conformance or
+  cross-host durability was demonstrated. **G1–G9 OPEN; parent 2.6 OPEN;
+  adapter BLOCKED**.
+
+### Approved WSL evidence and frozen references (outside Git)
+
+- Run: `~/masl-evidence/masl-26u-agui-ace5da7-20261119T144459Z`. The finalizer checks all eight
+  original SHA-256 hashes, report and assertions, and inspects the three
+  immutable SQLite snapshots **in memory**, without extracting or writing them.
+- Frozen AG-UI upstream `2330368a2a74573902858867072406638ba3073d`, official 1.0 schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), workshop `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `86be41a9caff8aae6092c97d4b7e560bc8c2890196d64e4dad1a8ab3e9ff6202` |
+| `review.md` | `0f1a6950add01217bf1bca152e4d2f3e1dddec8f894d81de6eebade373f5e311` |
+| `lint.log` | `668201fc10285d3415841ad35755b32e13fcb087b26f3b2e43bf542f09b18495` |
+| `build.log` | `3be8e935d84ff221d62d64e743a1c751c1dcc4aa30f839eafef7f515428af65c` |
+| `compile.log` | `0284c54531cf714b5864d629ba6cc053819301f1da5e8a99b184691a266853fd` |
+| `pure.log` | `802fbb31bbc98d6ff9c90f6d177759588345a035749508352f77053b672ca025` |
+| `fixture.log` | `1ac2d6e21a020a648034a4d02f560bd5a808902dfe48f1bb47a88b9fffc244a2` |
+| `mandatory-proof.tar` | `00ca33ed071d2c2210f1775b4b0c422c32a3dd176ae3a784fee802aba2a1ac0e` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/mandatory-fencing-promotion.ts` | `028d9df28c815dddd77343e79b1f3df59e25ee568612275ac635ac359ce5497f` |
+| `apps/web/src/ag-ui/mandatory-fencing-promotion.spec.ts` | `a471c65c48864a7174b0bb31a2acfb16ff3b41030d31083bcc6a2afffa677d9b` |
+| `scripts/lab-26u-mandatory-review.py` | `f74296d81f5fb9166002899818baa25b62329e65558c521c6483b7f423f863c4` |
+
+### Remaining gates and next laboratory
+
+**2.6U selected broker/journal crash-recovery PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The SQLite connection authorizer cannot enforce protection against direct
+file access by the same identity; recovery was selected local crash replay,
+not an atomic distributed transaction. Next proposed: **2.6V AG-UI storage-isolation and fail-stop writer enforcement gates** —
+investigate actual OS-level storage isolation, exclusively mediated write
+identities, failure-safe promotion and recovery across independently persisted
+stores before any operational adapter or milestone closure.

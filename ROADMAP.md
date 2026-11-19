@@ -158,7 +158,8 @@
   - [x] 2.6R AG-UI producer authenticity and distributed recovery evidence gates
   - [x] 2.6S AG-UI producer trust anchors and replicated recovery gates
   - [x] 2.6T AG-UI external fencing and replica-consistency evidence gates
-  - [ ] 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
+  - [x] 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
+  - [ ] 2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

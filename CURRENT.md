@@ -7,9 +7,9 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
-    -> examine mandatory writer authorization at the durable storage boundary
-    -> test crash-interrupted promotion and reconciliation of leader/receipt state
+2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
+    -> investigate OS/storage identity separation and write mediation at file boundary
+    -> test fail-stop writes and restart reconciliation after incomplete promotion
     -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
@@ -2781,12 +2781,27 @@ authority and replica are not atomic after a crash. There was no operational
 consensus, external fencing service or enterprise production trust.
 **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
+## Completed sub-block — 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
 
-Investigate enforcement that all writers cannot bypass, leader-epoch recovery
-across a crash-interrupted promotion, and reconciliation of divergent receipts.
-Require independent identity/ACL, full normative AG-UI 1.0, media/DLP,
-production persistence and security evidence before Agent Server integration.
+Against the published baseline `ace5da75a78c1dee1af32fdde7d6fa1f4ee3cc13`, the selected WSL audit passed
+**348/348** TypeScript assertions, **39/39** isolated SQLite/RS256 checks,
+**13/13** critical cases and all five gates. Eight SHA-256-pinned physical
+artifacts, including three SQLite database snapshots, are recorded in Lab 23 at
+`~/masl-evidence/masl-26u-agui-ace5da7-20261119T144459Z`.
+
+A guarded SQLite connection authorizer and restartable promotion journal
+rejected selected unauthorized writes and recovered two intentionally crashed
+local OS processes. A same-UID writer with direct SQLite file access
+**bypassed the connection-level authorizer**. Database transitions across
+replicas and authority are not crash-atomic, and there was no external security
+sign-off or production identity. **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6V AG-UI storage-isolation and fail-stop writer enforcement gates
+
+Investigate file-level identity/ACL enforcement that a same-UID direct writer
+cannot bypass, along with safe storage ownership and fail-stop promotion
+recovery. Real integration requires independent AG-UI 1.0 conformance,
+authenticated issuer/ACL, media/DLP, security and durable persistence evidence.
 Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
