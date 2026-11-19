@@ -7,10 +7,10 @@ Phase 2 — Agent ↔ UI
 Current sub-block:
 
 ~~~text
-2.6T AG-UI external fencing and replica-consistency evidence gates
-    -> investigate externally enforced fencing and authoritative leader epochs
-    -> verify replica receipt consistency, revocation propagation and failover safety
-    -> keep G1-G9/2.6 OPEN and adapter BLOCKED pending independent evidence
+2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
+    -> examine mandatory writer authorization at the durable storage boundary
+    -> test crash-interrupted promotion and reconciliation of leader/receipt state
+    -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
 ~~~
 
 ## Completed
@@ -2766,13 +2766,28 @@ enterprise PKI or cross-host durability was demonstrated. The TypeScript
 callback contract and Python fixture remain separate. **G1–G9 OPEN; parent
 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6T AG-UI external fencing and replica-consistency evidence gates
+## Completed sub-block — 2.6T AG-UI external fencing and replica-consistency evidence gates
 
-Independently evaluate writer fencing, external leader authority, replica
-conflict detection, durable receipts and revocation freshness under failures.
-Require real issuer/ACL, AG-UI 1.0 protocol, media/DLP, operational storage and
-security evidence before Agent Server integration. Preserve G1–G9 and parent
-2.6 **OPEN**; adapter **BLOCKED**.
+Against published baseline `32e129bd72a111cab3c0d36f2dd152071880219c`, the selected WSL review passed
+**250/250** TypeScript assertions, **43/43** local RS256/three-SQLite checks,
+**11/11** critical cases and five gates. The eight original SHA-256-pinned
+artifacts, including three physical SQLite snapshots in a TAR, are recorded
+in Lab 23 at `~/masl-evidence/masl-26t-agui-32e129b-20261119T140730Z`.
+
+The local third-SQLite authority denied an isolated obsolete writer **only
+through the controlled fencing API**. The fixture demonstrated that a direct
+SQLite write still bypasses fencing, and promotion transactions across the
+authority and replica are not atomic after a crash. There was no operational
+consensus, external fencing service or enterprise production trust.
+**G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
+
+## Current sub-block — 2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates
+
+Investigate enforcement that all writers cannot bypass, leader-epoch recovery
+across a crash-interrupted promotion, and reconciliation of divergent receipts.
+Require independent identity/ACL, full normative AG-UI 1.0, media/DLP,
+production persistence and security evidence before Agent Server integration.
+Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
 
 ## Reference environment
 

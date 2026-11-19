@@ -1477,3 +1477,82 @@ storage correctness, trusted external fencing and production readiness are NOT
 proven. Next proposed: **2.6T AG-UI external fencing and replica-consistency evidence gates** — investigate external fencing,
 replica-consistency controls, authoritative epochs and independent failover
 integrity evidence before any adapter or milestone closure.
+
+## 2.6T — Local external SQLite writer authority and independent replica consistency gates (scoped completion)
+
+Against published 2.6S baseline `32e129bd72a111cab3c0d36f2dd152071880219c`, the WSL audit passed
+**250/250** selected TypeScript assertions, **43/43** local RS256/SQLite
+fixture checks, **11/11** critical TypeScript cases and **five** gates (lint,
+production build, SSR compilation, pure execution and isolated fixture).
+The original eight physical evidence artifacts are SHA-256 pinned below.
+
+### Verified behavior and unresolved security boundaries
+
+- The TypeScript 2.6T layer composes the published 2.6S through 2.6J pure
+  contracts via injected callbacks. Its simulated authority/ticket/replica
+  snapshots are **not** cryptographic, TLS or operational authorization proofs.
+- The separate Python fixture used ephemeral local RSA keys for a signed
+  fencing grant and signed producer envelopes. No enterprise trust anchor,
+  external identity provider, online JWKS or real AG-UI event producer was used.
+- A **third separate local SQLite file** acted as a writer authority for two
+  independently stored SQLite replicas, all on **ONE host**. A selected writer
+  held its authority `BEGIN IMMEDIATE` transaction during local commit;
+  simulated promotion serialized on the same authority lock. Obsolete ticket,
+  wrong node, stale epoch, failed authority and stale revocation were denied.
+- After promotion to node-B epoch 2, isolated node-A still reported its own
+  local leader role (epoch 1), but the *fenced test API* refused its writes.
+  Two independent processes contending for authority produced exactly one
+  accepted new commit and one rejected stale writer.
+- Crucial unsolved bypass: a writer that accesses the replica SQLite directly
+  still writes without consulting authority. The fixture demonstrated this on
+  a disposable **unarchived copy**, without contaminating archived evidence.
+  No mandatory writer enforcement or protection against all split-brain writers
+  has been demonstrated.
+- The simulated promotion modifies separate SQLite files in **sequential
+  transactions**, not one crash-atomic transaction across databases. There is
+  no quorum, consensus, cross-host durability, replicated leadership authority
+  or production-grade fencing SLA. The local authority is a single failure point.
+- The `fencing-proof.tar` contains exactly three independent, WAL-checkpointed,
+  self-contained SQLite databases (`authority.sqlite3`, `node-A.sqlite3`,
+  `node-B.sqlite3`). Authority points to node-B, epoch 2; node-A has one receipt
+  (revision 1, old leader), node-B three receipts (revision 3, new leader).
+  Divergence is recorded, **not** falsely claimed to be resolved.
+- No operational Agent Server or web adapter integration, real producer
+  identity, enterprise ACL, independent normative AG-UI 1.0 conformance,
+  media/DLP assessment or security sign-off occurred. **G1–G9 OPEN;
+  parent 2.6 OPEN; adapter BLOCKED.**
+
+### Approved WSL evidence and pinned references (outside Git)
+
+- Approved run: `~/masl-evidence/masl-26t-agui-32e129b-20261119T140730Z`. This finalizer checks all
+  eight physical SHA-256 pins, original report metadata, 11 critical TS cases,
+  and **all three SQLite databases in memory** without writing evidence or
+  rerunning the network/cryptographic tests.
+- Frozen upstream AG-UI 1.0 `2330368a2a74573902858867072406638ba3073d`, official schema SHA-256 `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  schema Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78` (31 event variants), workshop `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `77db51fd1ed193007d758bdc39d0fdf0ca9bfe8fbb98d3045988e67ac08237eb` |
+| `review.md` | `1148053675feb1b727fe3709c65c9e9be61600e2514f7728b7dece5a06ac22b7` |
+| `lint.log` | `f5be8ee6e853d68feadadedfcd95f3fe473cb8c62a378456e5b7135355b8ab4a` |
+| `build.log` | `1fe9cf5d891666e89a9e940c5597f8a1ca2252c006c753fe7eded97f1c78f4ae` |
+| `compile.log` | `3f3d33ce6ba087857f91f976f064179e1d117a2b8c8cf2074db5ae8444cc67e6` |
+| `pure.log` | `19ad0fbd81a28d4a2d4606fe40d67fec0d5c506fcad93ff34d56aa0be63df6b6` |
+| `fixture.log` | `ee2f2fd5cba3f3154ee77836e5b9e02c2216dffc1119123910d2f40be29677d2` |
+| `fencing-proof.tar` | `9d73b3ecd9292e5dbeb0ff8b4132127674f75799cde16c375468d7aef4a49114` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/external-fencing-consistency.ts` | `4c24fdc9eee353f021d097265fe0081167b34bf75f9fd56f8a650a1f5b7d83e5` |
+| `apps/web/src/ag-ui/external-fencing-consistency.spec.ts` | `6aaff939a0c3907e00e11c4b0a0f4c555be7d61f4d1b721f982a8b13f7510f3a` |
+| `scripts/lab-26t-fencing-review.py` | `c5fa7fb6813d67c02cc9bc37fd964d151f16c528d559a00bcc56dc884e4c30b3` |
+
+### Remaining gaps and next sub-block
+
+**2.6T local fencing API PASS; G1–G9 OPEN; adapter BLOCKED; parent 2.6 OPEN.**
+The authority serialized *selected* writes and promotions, but direct writes
+still bypassed it and promotion was not crash-atomic across stores. Next proposed:
+**2.6U AG-UI mandatory fencing enforcement and crash-consistent promotion gates** — investigate mandatory enforcement at the storage boundary,
+writer-token expiry and crash-recovery consistency before considering an
+operational AG-UI adapter or milestone closure.
