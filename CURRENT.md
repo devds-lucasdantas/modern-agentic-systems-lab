@@ -4,13 +4,14 @@
 
 Phase 2 — Agent ↔ UI
 
-Current sub-block:
+Current focus:
 
 ~~~text
-2.6Z AG-UI supervised service execution and persistent policy enforcement gates
-    -> examine supervised service execution and persistent Linux identity policy
-    -> test safe service restarts, hostile clients and privileged-boundary limits
-    -> preserve G1-G9/2.6 OPEN and adapter BLOCKED pending independent review
+2.6 AG-UI parent milestone: OPEN
+    -> 2.6Z supervised service audit + independent evidence review: PASS
+    -> next scoped evidence gate: not selected; review unresolved G1-G9 first
+    -> operational Agent Server adapter: BLOCKED
+    -> do not advance to 2.7 or claim production readiness
 ~~~
 
 ## Completed
@@ -2864,14 +2865,43 @@ never installed or executed**. Root/owner-compromise bypass, production OS
 policy, distributed atomicity and independent security approval remain unproven.
 **G1–G9 OPEN; parent 2.6 OPEN; adapter BLOCKED.**
 
-## Current sub-block — 2.6Z AG-UI supervised service execution and persistent policy enforcement gates
+## Completed sub-block — 2.6Z AG-UI supervised service execution and persistent policy enforcement gates
 
-Investigate real supervised service execution and persistence of least-privilege
-identity, directory and socket policy under restart and hostile-client load.
-Keep root/owner compromise, cross-host consensus, distributed atomicity and
-normative AG-UI gaps explicitly unresolved. Require independent issuer/ACL,
-media/DLP, production persistence and security approval before Agent Server
-integration. Preserve G1–G9 and parent 2.6 **OPEN**; adapter **BLOCKED**.
+Against the published 2.6Y baseline `2ed262d138aa7bc98f71a83e49f66ef8b3426431`, the approved WSL review
+passed **1,532/1,532** TypeScript assertions, **269/269** Python checks
+(225 previous regressions and 44 real supervised checks), **11/11** critical
+cases and five gates (lint, production build, SSR compile, pure TypeScript and
+real Linux/systemd fixture). An independent, separate read-only audit verified
+all eight pinned physical files, the official frozen schema/reference, the
+TAR and its three SQLite databases. The source and evidence pins are recorded
+in Lab 23 at `~/masl-evidence/masl-26z-agui-2ed262d-20261120T030905Z`.
+
+The disposable **systemd-run transient SYSTEM service** ran under UID 61001 and
+primary GID 61002 after temporary `/run/userdb` NSS identity provisioning,
+with no permanent accounts or installed unit. Effective service properties and
+selected live `/proc` privileges were checked, including `NoNewPrivileges=1`
+and zero effective/bounding capabilities. Socket DAC and `SO_PEERCRED` denied
+outsiders; selected hostile clients did not modify durable receipts.
+Two real failures (exit codes 93 and 94) triggered systemd restarts, distinct
+MainPIDs and socket inodes, `boot_epoch` 1→2→3, lost-ACK reconciliation and
+recovery of a prepared local promotion. The authority ended with node-B leader,
+epoch 2, boot epoch 3; node-A and node-B each retained r1/r2 receipts.
+
+The tested group policy permits the primary GID 61002 to be repeated in the
+supplementary group list, but rejects any *different* supplementary GID; it
+does **not** prove a literally empty group list. The temporary NSS records
+were removed after the fixture, but their publication under `/run/userdb` was
+a short-lived host-global name-service change. A `SIGKILL` or host crash may
+interrupt cleanup. A transient unit and observed properties are **not** an
+installed production service or complete kernel security attestation.
+
+Root/compromised-owner bypass, crash-atomic cross-store promotion, cross-host
+consensus/durability, full normative AG-UI 1.0/media-DLP conformance,
+enterprise issuer/ACL and independent security approval remain unproven.
+**G1–G9 OPEN; parent 2.6 OPEN; operational adapter BLOCKED.**
+
+Next scoped sub-block is **not yet selected**; determine it from the remaining
+G1–G9 gaps. Do not imply that 2.6 or the next Phase 2.7 has been completed.
 
 ## Reference environment
 

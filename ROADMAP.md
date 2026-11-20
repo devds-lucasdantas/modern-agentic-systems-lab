@@ -163,7 +163,7 @@
   - [x] 2.6W AG-UI cross-UID storage ownership and enforced mediation gates
   - [x] 2.6X AG-UI cross-UID runtime hardening and failure-isolation gates
   - [x] 2.6Y AG-UI deployable service policy and hostile-client isolation gates
-  - [ ] 2.6Z AG-UI supervised service execution and persistent policy enforcement gates
+  - [x] 2.6Z AG-UI supervised service execution and persistent policy enforcement gates
 - [ ] 2.7 Generative UI patterns
 
 ## Phase 3 — Knowledge & Mini Open SWE

@@ -1964,3 +1964,113 @@ atomicity, normative AG-UI compliance or operational integration were
 validated. Next proposed: **2.6Z AG-UI supervised service execution and persistent policy enforcement gates** — test actually supervised
 service behavior and persistent policy enforcement in a disposable environment
 before any production readiness or adapter milestone closure.
+
+## 2.6Z — Real supervised systemd service with transient NSS and two restart proofs (scoped completion)
+
+Against the published **2.6Y** baseline `2ed262d138aa7bc98f71a83e49f66ef8b3426431`, the approved WSL execution
+of 20 November 2026 passed **1,532/1,532 TypeScript** assertions, **269/269 Python**
+checks (225 previous regressions plus 44 new supervised checks), **11/11 critical**
+TypeScript cases and **all five gates**: lint, production build, SSR compilation,
+pure TypeScript and a real disposable Linux/systemd fixture. The official runner
+reported `REVIEW STATUS: PASS`; a separately pinned, read-only independent
+auditor then reported `INDEPENDENT EVIDENCE AUDIT: PASS` for that exact run.
+The evidence directory is outside Git:
+
+`~/masl-evidence/masl-26z-agui-2ed262d-20261120T030905Z`
+
+### Actual execution and recorded limitations
+
+- A *transient system-level* `systemd-run` service (not a persistent installed
+  unit) executed a separate Python owner with UID **61001** and primary GID
+  **61002**. A temporary privileged fixture registered NSS user/group JSON
+  records in `/run/userdb` only for the test; names/IDs were prechecked for
+  collisions, resolution was verified, and records were removed on the normal
+  handled cleanup path. This temporarily affected host-global NSS visibility;
+  abrupt `SIGKILL`, kernel/host failure or malicious root can prevent cleanup.
+- Selected manager-reported hardening (`User`, `Group`, `Restart=on-failure`,
+  `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`,
+  `UMask=0077`, bounded descriptors and empty capability properties) was checked.
+  For observed running `MainPID`s, `/proc` also confirmed `NoNewPrivs: 1`
+  and zero effective/bounding capabilities. Manager configuration alone does
+  not establish enforcement in every process or all security conditions.
+- **Group boundary:** the real systemd worker reported `euid=61001`,
+  `egid=61002`, supplementary groups `[61002]`. The selected check therefore
+  accepts a repeated copy of the **primary GID only** and rejects any distinct
+  supplementary GID. It is **not** evidence of an empty supplementary-group list.
+- DAC protected the owner-only `0700` storage directory and three `0600`
+  SQLite databases. The authorized UID 61002 used the `0660` UNIX socket,
+  while outsider UID 61003 was denied through socket DAC and, when permissions
+  were intentionally relaxed, through live `SO_PEERCRED`. Malformed, oversized,
+  idle and unsupported requests left the selected receipt state intact.
+- A real owner exit **93** lost an ACK after durable COMMIT; `Restart=on-failure`
+  yielded a new `MainPID`, socket inode and durable `boot_epoch=2`, with
+  idempotent receipt reconciliation. A second real owner exit **94** during
+  selected preparation/recovery yielded a further restart and
+  `boot_epoch=3`, recovery of the prepared promotion and rejection of the
+  obsolete leader. These are *single-host selected failure proofs*, not
+  crash-atomic three-store or distributed consensus guarantees.
+- Three separate physical SQLite snapshots were checked in memory, with
+  `PRAGMA integrity_check=ok`: authority final leader **node-B**, epoch **2**,
+  boot epoch **3**; node-A state `(revision=2, role=leader, epoch=1)` and
+  node-B `(revision=2, role=leader, epoch=2)`, each with unique receipts
+  `(r1,1)` and `(r2,2)`. The node-A stored role is stale historical state;
+  do not interpret it as validated simultaneous distributed leadership.
+- The proof TAR contains exactly `authority.sqlite3`, `node-A.sqlite3`,
+  `node-B.sqlite3`, `supervisor-proof.json` and
+  `effective-unit-properties.json`. No service, NSS record, test private key,
+  TAR evidence or database is committed to the repository.
+- **Excluded:** protection against root or compromised storage owner,
+  cross-host quorum/consensus, distributed transaction atomicity, enterprise
+  issuer/ACL, independent security signoff, full AG-UI 1.0 normative/media/DLP
+  conformance, production operating policy and an operational Agent Server
+  bridge. **G1–G9 OPEN; parent milestone 2.6 OPEN; adapter BLOCKED.**
+
+### Versioned failure history and evidence provenance
+
+- Original v1 runner stopped with `uid should be integer, not str` because
+  the embedded Python client program overwrote the numeric `CLIENT` constant.
+  v2 renamed the program to `CLIENT_PROGRAM` while keeping UID 61002.
+- `217/USER` was observed before NSS provisioning. The v3 runner added
+  temporary `/run/userdb` identities and verified both resolution and cleanup.
+- In the first real worker process the supplementary-group list contained the
+  primary GID 61002; v4 corrected the *stated group-policy invariant*, without
+  deleting the identity or effective privilege checks. Failed diagnostics and
+  their logs were preserved separately and do not constitute PASS evidence.
+- Approved v4 runner SHA-256:
+  `ab9ed4e579e9633cd26b4b8b11bcbaaef256ba5454c1dd466ce21cee7ffe10ed`.
+  Original official review and the **independent evidence audit** are PASS for
+  the exact eight original physical artifacts below. Neither audit is a
+  substitute for independent enterprise security assessment.
+
+### Pinned original WSL evidence and source files
+
+- Official frozen AG-UI 1.0 Draft 2020-12 schema: SHA-256
+  `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`,
+  Git blob `c2ce3c18036b6bb2afe583a9b916959e7dcd9b78`, **31 event variants**.
+- Pinned AG-UI upstream commit `2330368a2a74573902858867072406638ba3073d`;
+  workshop reference commit `3d3287cf1e51250934c11aff182d90ccfaf0e66d`.
+- Independent auditor SHA-256 `48622ad8bb512c3b0f81e77b1e97423a6d717fe5754d5c303a538493df46f4c6`.
+
+| Evidence artifact | SHA-256 |
+|---|---|
+| `review.json` | `3f3bdd40a172dbf2d0e6d09602b4590cae8d2917a7b909c065c2f0c126a91fb3` |
+| `review.md` | `5486ae911633f95fcd24f16b65abe283758dc2df143c5602bb36f5b67a7c111a` |
+| `lint.log` | `be92888c1123045c54e1afbc98412e16f1bd7909eb14c9a1adb7765138e27f49` |
+| `build.log` | `9f64e8dcd78889004af40e765bc214d8f5d378a640a46c3ffdf2de31d9f154e8` |
+| `compile.log` | `1631b6491987511962c6d7bb8a3674b7d1db460d6f0c18e25bf70a9c996d6bea` |
+| `pure.log` | `c84c97d6963454baf623649bea4302b3c8b39d7d947f3ac6105ab60fe549a870` |
+| `fixture.log` | `404294ac30d9a0b4d824f08faffb894e7aadfcbdd8d865c186363dbd66a69512` |
+| `supervised-proof.tar` | `622dc5329fea44cdb49f5d391b82da57899ce9c8cf5a8372711bab36aed92978` |
+
+| Source artifact | SHA-256 |
+|---|---|
+| `apps/web/src/ag-ui/supervised-service-policy.ts` | `a748047ce039f663e6918e320b84e09d5af8ab45d8a5afa6d5119a0b6a1ebbba` |
+| `apps/web/src/ag-ui/supervised-service-policy.spec.ts` | `a1a3cee401bfa2e864baa795bd65a026c5ab171931898a5f49fa5c901aa2d98a` |
+| `scripts/lab-26z-supervised-review.py` | `ab9ed4e579e9633cd26b4b8b11bcbaaef256ba5454c1dd466ce21cee7ffe10ed` |
+
+### Remaining gate decision
+
+**2.6Z selected real disposable systemd execution/recovery PASS; G1–G9 OPEN;
+parent 2.6 OPEN; operational adapter BLOCKED.** A subsequent scoped gate must
+be selected from the actual unresolved gaps. No transition to 2.7 or production
+claim is implied by this sub-block completion.
